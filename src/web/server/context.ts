@@ -40,17 +40,17 @@ function withLocalTokens(j: JupiterPort, list: string | undefined): JupiterPort 
   });
 }
 
-let ctx: WebContext | null = null;
+const g = globalThis as { __quantsCtx?: WebContext | null };
 
-export const setContextForTests = (c: WebContext | null) => { ctx = c; };
+export const setContextForTests = (c: WebContext | null) => { g.__quantsCtx = c; };
 
 export function getContext(): WebContext {
-  if (ctx) return ctx;
+  if (g.__quantsCtx) return g.__quantsCtx;
   const e = process.env;
   const conn = new Connection(e.RPC_URL!, "confirmed");
   // The web server never signs: these throwaway keypairs only satisfy constructors whose signing paths it never calls.
   const chain = new SolanaChain(conn, Keypair.generate(), Keypair.generate());
-  ctx = {
+  const ctx: WebContext = {
     sql: sharedDb(),
     conn,
     meteora: new MeteoraLive(chain, e.DAMM_V2_MIGRATION_CONFIG!),
@@ -67,5 +67,6 @@ export function getContext(): WebContext {
     sessionSecret: new TextEncoder().encode(e.ADMIN_SESSION_SECRET!),
     tokenProgramOf: async (mint) => (await conn.getAccountInfo(new PublicKey(mint)))?.owner.toBase58() ?? "",
   };
+  g.__quantsCtx = ctx;
   return ctx;
 }
