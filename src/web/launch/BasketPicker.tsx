@@ -1,10 +1,9 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import { Avatar } from "@/web/ui/Avatar";
-import { inputClass } from "@/web/ui/Field";
+import { TokenPicker, type PickedToken } from "./TokenPicker";
 
 export type BasketItem = { mint: string; symbol: string; name: string; icon: string | null; decimals: number; weight: number };
-type Found = Omit<BasketItem, "weight">;
 
 export const basketTotal = (items: BasketItem[]) => items.reduce((a, b) => a + b.weight, 0);
 
@@ -15,31 +14,12 @@ function evenly(items: BasketItem[]): BasketItem[] {
 }
 
 export function BasketPicker({ value, onChange }: { value: BasketItem[]; onChange: (v: BasketItem[]) => void }) {
-  const [q, setQ] = useState("");
-  const [found, setFound] = useState<Found[]>([]);
-  const [searching, setSearching] = useState(false);
+  const [picking, setPicking] = useState(false);
+  const close = useCallback(() => setPicking(false), []);
 
-  useEffect(() => {
-    if (q.trim().length < 2) { setFound([]); return; }
-    const t = setTimeout(async () => {
-      setSearching(true);
-      try {
-        const r = await fetch(`/api/tokens/search?q=${encodeURIComponent(q.trim())}`);
-        setFound(((await r.json()).tokens ?? []) as Found[]);
-      } catch {
-        setFound([]);
-      } finally {
-        setSearching(false);
-      }
-    }, 250);
-    return () => clearTimeout(t);
-  }, [q]);
-
-  const add = (t: Found) => {
+  const add = (t: PickedToken) => {
     if (value.length >= 3 || value.some((v) => v.mint === t.mint)) return;
     onChange(evenly([...value, { ...t, weight: 0 }]));
-    setQ("");
-    setFound([]);
   };
   const setWeight = (mint: string, w: number) => onChange(value.map((v) => (v.mint === mint ? { ...v, weight: Math.max(0, Math.min(100, Math.round(w) || 0)) } : v)));
   const remove = (mint: string) => onChange(evenly(value.filter((v) => v.mint !== mint)));
@@ -93,34 +73,22 @@ export function BasketPicker({ value, onChange }: { value: BasketItem[]; onChang
       )}
 
       {value.length < 3 && (
-        <div className="flex flex-col gap-2">
-          <label className="flex flex-col gap-2.5 text-[13px] text-muted">
-            <span>Add a token</span>
-            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search by name, symbol or address" className={`${inputClass} font-sans text-base`} />
-          </label>
-          {(found.length > 0 || searching) && (
-            <div className="flex flex-col max-h-72 overflow-y-auto">
-              {searching && found.length === 0 && <span className="text-sm text-muted py-3">Searching</span>}
-              {found.map((t) => (
-                <button
-                  key={t.mint}
-                  type="button"
-                  onClick={() => add(t)}
-                  disabled={value.some((v) => v.mint === t.mint)}
-                  className="grid grid-cols-[36px_minmax(0,1fr)_auto] gap-3 items-center py-3 border-b line text-left cursor-pointer hover:bg-white/[0.02] disabled:opacity-40 min-h-11"
-                >
-                  <Avatar seed={t.mint} label={t.symbol} image={t.icon} size={36} />
-                  <span className="flex flex-col min-w-0">
-                    <span className="font-semibold truncate">{t.symbol}</span>
-                    <span className="text-[13px] text-muted truncate">{t.name}</span>
-                  </span>
-                  <span className="text-lime text-sm font-semibold">Add</span>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
+        <button
+          type="button"
+          onClick={() => setPicking(true)}
+          className="flex items-center gap-3 px-5 min-h-16 rounded-2xl border-[1.5px] border-dashed border-lime/40 bg-lime/[0.04] text-lime font-semibold cursor-pointer hover:border-lime/70 hover:bg-lime/[0.07] text-left"
+        >
+          <span className="w-9 h-9 rounded-full bg-lime/15 flex items-center justify-center shrink-0" aria-hidden>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round"><path d="M12 5v14" /><path d="M5 12h14" /></svg>
+          </span>
+          <span className="flex flex-col">
+            <span>{value.length === 0 ? "Add a reward token" : "Add another token"}</span>
+            <span className="text-[13px] font-normal text-muted">{3 - value.length} of 3 left</span>
+          </span>
+        </button>
       )}
+
+      <TokenPicker open={picking} onClose={close} onPick={add} taken={value.map((v) => v.mint)} />
     </div>
   );
 }

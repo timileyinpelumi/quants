@@ -20,8 +20,10 @@ test("launch, see the token, stake, exit early and see the burn", async ({ page 
   await page.locator('input[type="file"]').setInputFiles("e2e/fixtures/cat.png");
   await page.getByLabel("Name").fill("End To End");
   await page.getByLabel("Symbol").fill(symbol);
-  await page.getByPlaceholder("Search by name, symbol or address").fill("ZEC");
-  await page.getByRole("button", { name: /ZEC.*Add/ }).click();
+  await page.getByRole("button", { name: /Add a reward token/ }).click();
+  await page.getByRole("dialog").getByPlaceholder("Name, symbol or address").fill("ZEC");
+  await page.getByRole("dialog").getByRole("button", { name: /ZEC.*Add/ }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
   await page.getByPlaceholder("0").first().fill("1");
   await page.getByRole("button", { name: `Launch ${symbol}` }).click();
   await page.waitForURL(/\/t\/[1-9A-HJ-NP-Za-km-z]{32,44}$/, { timeout: 120_000 });
