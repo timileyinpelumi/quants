@@ -15,7 +15,7 @@ import { beginStep, failStep } from "../../src/ledger/ledger";
 const cookieOf = (r: Response) => r.headers.get("set-cookie")!.split(";")[0]!;
 
 async function signIn(kp: Keypair, tamper = false) {
-  const n = await nonceRoute(new Request("http://x", { method: "POST" }));
+  const n = await nonceRoute();
   const { message } = await n.json();
   const signed = tamper ? message.replace(/Nonce: \w+/, "Nonce: deadbeef") : message;
   const signature = bs58.encode(nacl.sign.detached(new TextEncoder().encode(signed), kp.secretKey));
