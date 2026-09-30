@@ -1,0 +1,15 @@
+[Unit]
+Description=quants keeper
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+WorkingDirectory=/opt/quants
+EnvironmentFile=/opt/quants/.env
+ExecStart=/usr/local/bin/bun src/keeper/main.ts
+Restart=on-failure
+RestartSec=30
+User=quants
+
+[Install]
+WantedBy=multi-user.target

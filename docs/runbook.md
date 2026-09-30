@@ -32,7 +32,7 @@ bun scripts/create-kamino-global-config.ts         # prints KAMINO_GLOBAL_CONFIG
 SOL_GRADUATION=85 OURTOKEN_GRADUATION=<amount> bun scripts/create-configs.ts > config-keys.json
 ```
 
-Commit `config-keys.json`; the launch API reads config keys from it. Save the initial settings from a script or the admin page (plan 2) with `saveSettings(sql, defaultSettings(OURTOKEN_MINT), "<admin>")`.
+Keep `config-keys.json` next to `.env` on the server (it is gitignored because the dev seed regenerates it); the web app reads it from `CONFIG_KEYS_PATH`. Save the initial settings from a script or the admin page (plan 2) with `saveSettings(sql, defaultSettings(OURTOKEN_MINT), "<admin>")`.
 
 ## Running the keeper
 
@@ -61,3 +61,45 @@ bun scripts/e2e-local.ts
 ```
 
 The script launches a token, trades it, runs the keeper three times (before staking, after staking, after an early exit) and checks the burn reduced the mint supply by the burned amount. Jupiter is not available locally, so a stand-in mints the basket token to the keeper instead of swapping.
+
+## Web app environment
+
+On top of the keeper variables above, the web app needs:
+
+| Variable | What it is |
+|---|---|
+| `KEEPER_ADDRESS` | Keeper public key; launch fees are paid to it |
+| `SPILL_ADDRESS` | Spill public key; stake pools send penalties to its token accounts |
+| `PINATA_JWT` | Pinata API JWT for image and metadata uploads |
+| `PINATA_GATEWAY` | Your Pinata gateway domain (optional, else ipfs.io links) |
+| `ADMIN_WALLETS` | Comma separated wallet addresses allowed into `/admin` |
+| `ADMIN_SESSION_SECRET` | At least 32 random bytes, hex |
+| `CONFIG_KEYS_PATH` | Path to `config-keys.json` |
+| `GECKO_BASE` | `https://api.geckoterminal.com/api/v2` |
+| `NEXT_PUBLIC_RPC_URL` | RPC the browser uses |
+| `NEXT_PUBLIC_OURTOKEN_MINT`, `NEXT_PUBLIC_OURTOKEN_SYMBOL` | The platform token |
+| `NEXT_PUBLIC_SOL_GRADUATION`, `NEXT_PUBLIC_OURTOKEN_GRADUATION` | Shown on the launch form; must match what the config keys were created with |
+
+Never set these in production: `NEXT_PUBLIC_TEST_WALLET_SECRET`, `PINATA_JWT=stub`, `DEV_UPLOADS_BASE`, `ALLOW_LOCAL_URIS`, `LOCAL_TOKEN_LIST`, `LOCAL_REWARD_MINTS`. They exist for the local seed and end to end run only.
+
+## Deploying to a VPS
+
+1. Install Bun, Node 22 or newer (for the build), Postgres 16 and Caddy. Create a `quants` user.
+2. Clone the repo to `/opt/quants`, write `/opt/quants/.env` with every variable from `.env.example` and put `config-keys.json` next to it.
+3. `bun install`, `bun run migrate`, `bun run build`.
+4. Copy `deploy/quants-web.service` and `deploy/quants-keeper.service` to `/etc/systemd/system/`, then `systemctl enable --now quants-web quants-keeper`.
+5. Point your domain at the server, set `QUANTS_DOMAIN` for Caddy, copy `deploy/Caddyfile` to `/etc/caddy/Caddyfile` and reload Caddy. It gets a certificate on its own.
+6. Watch the keeper with `journalctl -u quants-keeper -f`. A `ReconcileError` exits the keeper; systemd restarts it after 30 seconds and it exits again until the ledger and wallets agree.
+
+`bun run build` runs `next build` under Node 22 or newer (install Node on the server too), because Bun 1.3.14 crashes when Next's build workers exit. The app itself runs on Bun (`bun --bun next start`), which it needs for `Bun.SQL`.
+
+## Local development
+
+```bash
+docker compose up -d
+solana-test-validator ... (flags in "Local end-to-end run" above)
+bun run seed                                  # writes .env.local and config-keys.json, launches CAT and DOG
+bun --env-file=.env.local scripts/keeper-once.ts
+bun run dev                                   # http://localhost:3000, connect "Test Wallet"
+set -a; source .env.local; set +a; bun run e2e
+```

@@ -8,7 +8,7 @@
     "keeper": "bun src/keeper/main.ts",
     "typecheck": "bunx tsc --noEmit",
     "dev": "bun --bun next dev",
-    "build": "bun --bun next build",
+    "build": "node node_modules/next/dist/bin/next build",
     "start": "bun --bun next start",
     "e2e": "bunx playwright test",
     "seed": "bun scripts/dev-seed.ts"
