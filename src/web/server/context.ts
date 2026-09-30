@@ -7,7 +7,7 @@ import { MeteoraLive, type MeteoraPort } from "@/meteora/port";
 import { KaminoBackend } from "@/staking/kamino";
 import type { StakingAdapter } from "@/staking/adapter";
 import { JupiterLive, type JupiterPort } from "@/jupiter/port";
-import type { PinataPort } from "./pinata";
+import { PinataRest, type PinataPort } from "./pinata";
 import type { ChartSource } from "./chart";
 
 export interface WebContext {
@@ -28,7 +28,7 @@ export interface WebContext {
 }
 
 let ctx: WebContext | null = null;
-let factories: { pinata?: () => PinataPort; chart?: () => ChartSource } = {};
+let factories: { chart?: () => ChartSource } = {};
 
 export const setContextForTests = (c: WebContext | null) => { ctx = c; };
 export const registerFactories = (f: typeof factories) => { factories = { ...factories, ...f }; };
@@ -45,7 +45,7 @@ export function getContext(): WebContext {
     meteora: new MeteoraLive(chain, e.DAMM_V2_MIGRATION_CONFIG!),
     staking: new KaminoBackend(chain, e.RPC_URL!, e.KAMINO_GLOBAL_CONFIG!),
     jupiter: new JupiterLive(e.JUPITER_BASE_URL ?? "https://api.jup.ag/swap/v1", chain, fetch, e.JUPITER_API_KEY),
-    pinata: factories.pinata!(),
+    pinata: new PinataRest(e.PINATA_JWT!),
     chart: factories.chart!(),
     configKeys: JSON.parse(readFileSync(e.CONFIG_KEYS_PATH ?? "config-keys.json", "utf8")),
     keeperAddress: e.KEEPER_ADDRESS!,
