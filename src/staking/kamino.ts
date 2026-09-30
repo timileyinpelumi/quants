@@ -1,5 +1,5 @@
-import { Keypair, PublicKey, Transaction } from "@solana/web3.js";
-import { createAssociatedTokenAccountIdempotentInstruction, TOKEN_PROGRAM_ID } from "@solana/spl-token";
+import { Keypair, PublicKey, SystemProgram, Transaction } from "@solana/web3.js";
+import { createAssociatedTokenAccountIdempotentInstruction, createSyncNativeInstruction, getAssociatedTokenAddressSync, NATIVE_MINT, TOKEN_PROGRAM_ID } from "@solana/spl-token";
 import { Farms, FarmConfigOption, getWithdrawSlashedAmountInstruction } from "@kamino-finance/farms-sdk";
 import { address, createSolanaRpc } from "@solana/kit";
 import Decimal from "decimal.js";
@@ -66,7 +66,19 @@ export class KaminoBackend implements StakingAdapter {
     const ui = new Decimal(i.amount.toString()).div(new Decimal(10).pow(i.decimals));
     const topUp = await this.farms.addRewardAmountToFarmIx(admin, address(i.farm), address(i.rewardMint), ui);
     const rate = await this.farms.updateFarmConfigIx(admin, address(i.farm), address(i.rewardMint), FarmConfigOption.UpdateRewardRps, i.rawRps);
-    return this.chain.signLegacy(new Transaction().add(fromKitInstruction(topUp), fromKitInstruction(rate)), []);
+    const tx = new Transaction();
+    // The keeper holds SOL rewards as native lamports; Kamino pulls from the wSOL account.
+    if (i.rewardMint === NATIVE_MINT.toBase58()) {
+      const keeper = this.chain.keeper.publicKey;
+      const wsol = getAssociatedTokenAddressSync(NATIVE_MINT, keeper);
+      tx.add(
+        createAssociatedTokenAccountIdempotentInstruction(keeper, wsol, keeper, NATIVE_MINT),
+        SystemProgram.transfer({ fromPubkey: keeper, toPubkey: wsol, lamports: i.amount }),
+        createSyncNativeInstruction(wsol),
+      );
+    }
+    tx.add(fromKitInstruction(topUp), fromKitInstruction(rate));
+    return this.chain.signLegacy(tx, []);
   }
 
   async slashedAmount(farm: string) { return (await this.state(farm)).slashedAmountCurrent; }
