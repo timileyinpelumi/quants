@@ -150,7 +150,7 @@ export function LaunchForm({ split, tiers, launchFeeLamports, maxPenaltyBps }: {
         <div className="flex flex-col">
           <div className={section}>
             <span className={num}>01</span>
-            <div className="grid grid-cols-[112px_minmax(0,1fr)] md:grid-cols-[132px_minmax(0,1fr)_200px] gap-5 items-end">
+            <div className="grid grid-cols-[112px_minmax(0,1fr)] md:grid-cols-[132px_minmax(0,1fr)_200px] gap-5 items-start md:items-end">
               <div className="flex flex-col gap-2.5 text-[13px] text-muted row-span-2 md:row-span-1">
                 <span>Image</span>
                 <label className="w-28 h-28 md:w-[132px] md:h-[132px] rounded-[28px] border-[1.5px] border-dashed border-lime/45 bg-lime/5 flex flex-col items-center justify-center gap-2 text-lime text-[13px] cursor-pointer overflow-hidden focus-within:border-lime">

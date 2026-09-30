@@ -7,3 +7,6 @@ next-env.d.ts
 test-results
 playwright-report
 .env.e2e
+public/dev-uploads
+.env.local
+config-keys.json

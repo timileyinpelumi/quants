@@ -7,7 +7,7 @@ import { MeteoraLive, type MeteoraPort } from "@/meteora/port";
 import { KaminoBackend } from "@/staking/kamino";
 import type { StakingAdapter } from "@/staking/adapter";
 import { JupiterLive, type JupiterPort } from "@/jupiter/port";
-import { PinataRest, type PinataPort } from "./pinata";
+import { DevPinata, PinataRest, type PinataPort } from "./pinata";
 import { GeckoChart, type ChartSource } from "./chart";
 
 export interface WebContext {
@@ -27,6 +27,16 @@ export interface WebContext {
   tokenProgramOf(mint: string): Promise<string>;
 }
 
+// Local development only: a validator's own mints are unknown to Jupiter, so LOCAL_TOKEN_LIST stands in for token search.
+function withLocalTokens(j: JupiterPort, list: string | undefined): JupiterPort {
+  if (!list) return j;
+  const tokens = JSON.parse(list) as Awaited<ReturnType<JupiterPort["searchVerified"]>>;
+  return Object.assign(Object.create(j), {
+    searchVerified: async (q: string) => tokens.filter((t) => `${t.symbol} ${t.name} ${t.mint}`.toLowerCase().includes(q.toLowerCase())),
+    isVerified: async (m: string) => tokens.some((t) => t.mint === m),
+  });
+}
+
 let ctx: WebContext | null = null;
 
 export const setContextForTests = (c: WebContext | null) => { ctx = c; };
@@ -42,8 +52,8 @@ export function getContext(): WebContext {
     conn,
     meteora: new MeteoraLive(chain, e.DAMM_V2_MIGRATION_CONFIG!),
     staking: new KaminoBackend(chain, e.RPC_URL!, e.KAMINO_GLOBAL_CONFIG!),
-    jupiter: new JupiterLive(e.JUPITER_BASE_URL ?? "https://api.jup.ag/swap/v1", chain, fetch, e.JUPITER_API_KEY),
-    pinata: new PinataRest(e.PINATA_JWT!),
+    jupiter: withLocalTokens(new JupiterLive(e.JUPITER_BASE_URL ?? "https://api.jup.ag/swap/v1", chain, fetch, e.JUPITER_API_KEY), e.LOCAL_TOKEN_LIST),
+    pinata: e.PINATA_JWT === "stub" ? new DevPinata() : new PinataRest(e.PINATA_JWT!),
     chart: new GeckoChart(e.GECKO_BASE ?? "https://api.geckoterminal.com/api/v2"),
     configKeys: JSON.parse(readFileSync(e.CONFIG_KEYS_PATH ?? "config-keys.json", "utf8")),
     keeperAddress: e.KEEPER_ADDRESS!,

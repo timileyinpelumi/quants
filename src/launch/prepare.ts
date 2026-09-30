@@ -9,14 +9,16 @@ export class LaunchError extends Error {
   constructor(public code: "invalid_input" | "basket_not_verified" | "basket_unsupported" | "dev_buy_too_large" | "not_found_on_chain" | "pool_mismatch", message: string) { super(message); }
 }
 
+// ALLOW_LOCAL_URIS is set only by scripts/dev-seed.ts so local uploads served over http work.
+const publicUri = (u: string) => u.startsWith("https://") || (process.env.ALLOW_LOCAL_URIS === "1" && u.startsWith("http://localhost"));
 const addr = z.string().regex(/^[1-9A-HJ-NP-Za-km-z]{32,44}$/);
 const uint = z.string().regex(/^\d+$/).default("0").transform((v) => BigInt(v));
 
 const launchInput = (ourtokenMint: string) => z.object({
   name: z.string().trim().min(1).max(32),
   symbol: z.string().regex(/^[A-Za-z0-9]{1,10}$/),
-  uri: z.string().url().startsWith("https://"),
-  image: z.string().url().startsWith("https://").optional(),
+  uri: z.string().url().refine(publicUri, "Metadata link must be HTTPS"),
+  image: z.string().url().refine(publicUri, "Image link must be HTTPS").optional(),
   creator: addr,
   quoteMint: z.enum([NATIVE_MINT, ourtokenMint] as [string, string]),
   feeTierBps: z.number().refine((v) => (FEE_TIERS_BPS as readonly number[]).includes(v)),
