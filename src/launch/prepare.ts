@@ -6,7 +6,7 @@ import { loadLatestSettings } from "../domain/settings";
 import { NATIVE_MINT } from "../domain/types";
 
 export class LaunchError extends Error {
-  constructor(public code: "invalid_input" | "basket_not_verified" | "dev_buy_too_large" | "not_found_on_chain", message: string) { super(message); }
+  constructor(public code: "invalid_input" | "basket_not_verified" | "basket_unsupported" | "dev_buy_too_large" | "not_found_on_chain", message: string) { super(message); }
 }
 
 const addr = z.string().regex(/^[1-9A-HJ-NP-Za-km-z]{32,44}$/);
@@ -27,10 +27,13 @@ const launchInput = (ourtokenMint: string) => z.object({
 });
 export type LaunchInput = z.infer<ReturnType<typeof launchInput>>;
 
+// Kamino farms are configured with the classic Token program for every reward mint.
+const CLASSIC_TOKEN_PROGRAM = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
 const SUPPLY_BASE_UNITS = 1_000_000_000n * 1_000_000n;
 
 export async function prepareLaunch(
-  deps: { sql: SQL; meteora: MeteoraPort; configKeys: Record<string, string>; ourtokenMint: string; keeperAddress: string; isVerified: (mint: string) => Promise<boolean> },
+  deps: { sql: SQL; meteora: MeteoraPort; configKeys: Record<string, string>; ourtokenMint: string; keeperAddress: string;
+    isVerified: (mint: string) => Promise<boolean>; tokenProgramOf: (mint: string) => Promise<string> },
   raw: unknown,
 ) {
   const parsed = launchInput(deps.ourtokenMint).safeParse(raw);
@@ -38,6 +41,9 @@ export async function prepareLaunch(
   const input = parsed.data;
   for (const b of input.basket) {
     if (!(await deps.isVerified(b.mint))) throw new LaunchError("basket_not_verified", `${b.mint} is not on the Jupiter verified list`);
+    if ((await deps.tokenProgramOf(b.mint)) !== CLASSIC_TOKEN_PROGRAM) {
+      throw new LaunchError("basket_unsupported", `${b.mint} is not a classic SPL token`);
+    }
   }
   const settings = await loadLatestSettings(deps.sql);
   if (input.devBuyMinOut * 10_000n > SUPPLY_BASE_UNITS * BigInt(settings.devBuyCapBps)) {

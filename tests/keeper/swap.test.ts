@@ -60,7 +60,7 @@ test("a Jupiter network error for one token does not stop the other swaps", asyn
   const jupiter = new FakeJupiter(f.chain);
   jupiter.rates.set("ZEC", 2).set("CATE", 3);
   const orig = jupiter.quote.bind(jupiter);
-  jupiter.quote = async (i, o, a, s) => { if (o === "CATE") throw new Error("fetch failed"); return orig(i, o, a, s); };
+  jupiter.quote = async (i: string, o: string, a: bigint) => { if (o === "CATE") throw new Error("fetch failed"); return orig(i, o, a); };
   const deps = { ...f.deps, jupiter };
   const id = await insertLaunch(f.sql);
   await f.sql`insert into baskets values (${id}, 'ZEC', 5000), (${id}, 'CATE', 5000)`;

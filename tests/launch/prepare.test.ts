@@ -15,11 +15,11 @@ const valid = {
   basket: [{ mint: "Zec1111111111111111111111111111111111111111", weightBps: 5000 }, { mint: "Cate111111111111111111111111111111111111111", weightBps: 5000 }],
 };
 
-async function setup(verified = true) {
+async function setup(verified = true, tokenProgram = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA") {
   const sql = await freshDb();
   await saveSettings(sql, defaultSettings(OURS), "test");
   const meteora = new FakeMeteora(new FakeChain());
-  return { sql, meteora, deps: { sql, meteora, configKeys, ourtokenMint: OURS, keeperAddress: KEEPER, isVerified: async () => verified } };
+  return { sql, meteora, deps: { sql, meteora, configKeys, ourtokenMint: OURS, keeperAddress: KEEPER, isVerified: async () => verified, tokenProgramOf: async () => tokenProgram } };
 }
 
 test("prepares a transaction against the right config key with the launch fee", async () => {
@@ -56,4 +56,9 @@ test("rejects a dev buy over the cap", async () => {
   const { deps } = await setup();
   await expect(prepareLaunch(deps, { ...valid, devBuyQuoteAmount: "1", devBuyMinOut: (600_000_000n * 1_000_000n).toString() }))
     .rejects.toMatchObject({ code: "dev_buy_too_large" });
+});
+
+test("rejects basket tokens that are not classic SPL tokens", async () => {
+  const { deps } = await setup(true, "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb");
+  await expect(prepareLaunch(deps, valid)).rejects.toMatchObject({ code: "basket_unsupported" });
 });

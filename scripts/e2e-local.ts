@@ -55,7 +55,8 @@ log("3. database migrated, default settings saved");
 
 const meteora = new MeteoraLive(chain, DAMM_CUSTOM);
 const prepared = await prepareLaunch(
-  { sql, meteora, configKeys, ourtokenMint: ours.toBase58(), keeperAddress: keeper.publicKey.toBase58(), isVerified: async () => true },
+  { sql, meteora, configKeys, ourtokenMint: ours.toBase58(), keeperAddress: keeper.publicKey.toBase58(), isVerified: async () => true,
+    tokenProgramOf: async (m: string) => (await conn.getAccountInfo(new PublicKey(m)))!.owner.toBase58() },
   { name: "Cat", symbol: "CAT", uri: "https://example.com/cat.json", creator: creator.publicKey.toBase58(), quoteMint: NATIVE_MINT, feeTierBps: 200,
     basket: [{ mint: zec.toBase58(), weightBps: 10_000 }], devBuyQuoteAmount: "100000000" },
 );
