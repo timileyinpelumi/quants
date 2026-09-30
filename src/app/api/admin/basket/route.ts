@@ -1,0 +1,40 @@
+import { z } from "zod";
+import { getContext } from "@/web/server/context";
+import { json, jsonError, readJson } from "@/web/server/http";
+import { requireAdmin } from "@/web/server/admin";
+import { LaunchError } from "@/launch/prepare";
+
+export const dynamic = "force-dynamic";
+
+const CLASSIC = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
+const Body = z.object({
+  mint: z.string().min(1),
+  basket: z.array(z.object({ mint: z.string().regex(/^[1-9A-HJ-NP-Za-km-z]{32,44}$/), weightBps: z.number().int().positive(), symbol: z.string().max(20).optional(), decimals: z.number().int().min(0).max(18).optional() }))
+    .min(1).max(3)
+    .refine((b) => new Set(b.map((x) => x.mint)).size === b.length, "Duplicate basket token")
+    .refine((b) => b.reduce((a, x) => a + x.weightBps, 0) === 10_000, "Weights must add up to 100%"),
+});
+
+export async function POST(req: Request) {
+  try {
+    const c = getContext();
+    await requireAdmin(c, req);
+    const b = Body.parse(await readJson(req));
+    const [l] = await c.sql`select l.id, sp.status from launches l left join stake_pools sp on sp.launch_id = l.id where l.mint = ${b.mint}`;
+    if (!l) throw new LaunchError("invalid_input", "No token here");
+    if (l.status === "ready") throw new LaunchError("invalid_input", "Farms already exist for this launch");
+    for (const t of b.basket) {
+      if ((await c.tokenProgramOf(t.mint)) !== CLASSIC) throw new LaunchError("basket_unsupported", `${t.mint} is not a classic SPL token`);
+    }
+    // A delete and insert of the same key cannot share one statement, so this rare admin write uses a transaction.
+    await c.sql.begin(async (tx) => {
+      await tx`delete from baskets where launch_id = ${l.id}`;
+      await tx`insert into baskets (launch_id, reward_mint, weight_bps, symbol, decimals)
+        select ${l.id}, x.mint, x."weightBps", x.symbol, x.decimals
+        from jsonb_to_recordset(${JSON.stringify(b.basket)}::text::jsonb) as x(mint text, "weightBps" int, symbol text, decimals int)`;
+    });
+    return json({ ok: true });
+  } catch (e) {
+    return jsonError(e);
+  }
+}
