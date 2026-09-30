@@ -14,7 +14,8 @@ Copy `.env.example` to `.env` and fill in:
 | `OURTOKEN_MINT` | The platform token, classic SPL |
 | `KAMINO_GLOBAL_CONFIG` | Output of `scripts/create-kamino-global-config.ts` |
 | `DAMM_V2_MIGRATION_CONFIG` | `A8gMrEPJkacWkcb3DGwtJwTe16HktSEfvwtuDh2MCtck` (DAMM v2 Customizable) |
-| `JUPITER_BASE_URL` | `https://lite-api.jup.ag/swap/v1` |
+| `JUPITER_BASE_URL` | `https://api.jup.ag/swap/v1` |
+| `JUPITER_API_KEY` | Free key from the Jupiter portal; without it requests are limited to 30 a minute |
 
 ## Wallets
 

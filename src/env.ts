@@ -9,7 +9,8 @@ const Env = z.object({
   OURTOKEN_MINT: z.string().min(32),
   KAMINO_GLOBAL_CONFIG: z.string().min(32),
   DAMM_V2_MIGRATION_CONFIG: z.string().min(32),
-  JUPITER_BASE_URL: z.string().url().default("https://lite-api.jup.ag/swap/v1"),
+  JUPITER_BASE_URL: z.string().url().default("https://api.jup.ag/swap/v1"),
+  JUPITER_API_KEY: z.string().optional(),
 });
 export type Env = z.infer<typeof Env>;
 export const loadEnv = (): Env => Env.parse(process.env);

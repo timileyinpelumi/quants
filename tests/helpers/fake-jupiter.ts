@@ -16,4 +16,6 @@ export class FakeJupiter implements JupiterPort {
     return t;
   }
   async isVerified() { return true; }
+  async searchVerified() { return []; }
+  async buildUnsignedSwap() { return { base64: "c3dhcA==", lastValidBlockHeight: 1n }; }
 }

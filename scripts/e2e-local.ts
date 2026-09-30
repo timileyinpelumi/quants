@@ -84,6 +84,8 @@ const jupiter: JupiterPort = {
     ), []);
   },
   async isVerified() { return true; },
+  async searchVerified() { return []; },
+  async buildUnsignedSwap() { throw new Error("not used locally"); },
 };
 const deps = {
   sql, chain, meteora, jupiter,
