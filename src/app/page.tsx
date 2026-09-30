@@ -1,12 +1,16 @@
 import { Header } from "@/web/ui/Header";
+import { LaunchForm } from "@/web/launch/LaunchForm";
+import { getContext } from "@/web/server/context";
+import { loadLatestSettings } from "@/domain/settings";
 
-export default function LaunchPage() {
+export const dynamic = "force-dynamic";
+
+export default async function LaunchPage() {
+  const s = await loadLatestSettings(getContext().sql);
   return (
     <div className="min-h-screen bg-launch">
       <Header active="launch" />
-      <main className="px-4 md:px-16 py-14">
-        <h1 className="font-display font-black text-5xl md:text-6xl tracking-tight">Launch a token.</h1>
-      </main>
+      <LaunchForm split={s.split} tiers={s.tiers} launchFeeLamports={s.launchFeeLamports.toString()} maxPenaltyBps={s.maxPenaltyBps} />
     </div>
   );
 }
