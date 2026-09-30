@@ -9,7 +9,9 @@
     "typecheck": "bunx tsc --noEmit",
     "dev": "bun --bun next dev",
     "build": "bun --bun next build",
-    "start": "bun --bun next start"
+    "start": "bun --bun next start",
+    "e2e": "bunx playwright test",
+    "seed": "bun scripts/dev-seed.ts"
   },
   "dependencies": {
     "@kamino-finance/farms-sdk": "4.0.1",
@@ -21,7 +23,10 @@
     "@solana/wallet-adapter-base": "^0.9.28",
     "@solana/wallet-adapter-react": "0.15.40",
     "@solana/wallet-adapter-react-ui": "0.9.40",
+    "@solana/wallet-standard-features": "^1.5.0",
     "@solana/web3.js": "^1.98",
+    "@wallet-standard/features": "^1.1.1",
+    "@wallet-standard/wallet": "^1.1.1",
     "bn.js": "^5.2.5",
     "bs58": "^6.0.0",
     "decimal.js": "^10.6.0",

@@ -2,6 +2,10 @@
 import { ConnectionProvider, WalletProvider } from "@solana/wallet-adapter-react";
 import { WalletModalProvider } from "@solana/wallet-adapter-react-ui";
 import "@solana/wallet-adapter-react-ui/styles.css";
+import { registerTestWallet } from "./test-wallet";
+
+const TEST_SECRET = process.env.NEXT_PUBLIC_TEST_WALLET_SECRET;
+if (typeof window !== "undefined" && TEST_SECRET) registerTestWallet(Uint8Array.from(JSON.parse(TEST_SECRET)));
 
 export function Providers({ children }: { children: React.ReactNode }) {
   return (

@@ -33,12 +33,14 @@
     }
   },
   "include": [
-    "src",
-    "tests",
-    "scripts",
-    "next-env.d.ts",
+    ".next/dev/types/**/*.ts",
     ".next/types/**/*.ts",
-    ".next/dev/types/**/*.ts"
+    "e2e",
+    "next-env.d.ts",
+    "playwright.config.ts",
+    "scripts",
+    "src",
+    "tests"
   ],
   "exclude": [
     "node_modules",
