@@ -1,0 +1,59 @@
+import type { SQL } from "bun";
+import { readFileSync } from "node:fs";
+import { Connection, Keypair, PublicKey } from "@solana/web3.js";
+import { sharedDb } from "@/db/client";
+import { SolanaChain } from "@/chain/solana";
+import { MeteoraLive, type MeteoraPort } from "@/meteora/port";
+import { KaminoBackend } from "@/staking/kamino";
+import type { StakingAdapter } from "@/staking/adapter";
+import { JupiterLive, type JupiterPort } from "@/jupiter/port";
+import type { PinataPort } from "./pinata";
+import type { ChartSource } from "./chart";
+
+export interface WebContext {
+  sql: SQL;
+  conn: Connection;
+  meteora: MeteoraPort;
+  staking: StakingAdapter;
+  jupiter: JupiterPort;
+  pinata: PinataPort;
+  chart: ChartSource;
+  configKeys: Record<string, string>;
+  keeperAddress: string;
+  spillWallet: PublicKey;
+  ourtokenMint: string;
+  adminWallets: Set<string>;
+  sessionSecret: Uint8Array;
+  tokenProgramOf(mint: string): Promise<string>;
+}
+
+let ctx: WebContext | null = null;
+let factories: { pinata?: () => PinataPort; chart?: () => ChartSource } = {};
+
+export const setContextForTests = (c: WebContext | null) => { ctx = c; };
+export const registerFactories = (f: typeof factories) => { factories = { ...factories, ...f }; };
+
+export function getContext(): WebContext {
+  if (ctx) return ctx;
+  const e = process.env;
+  const conn = new Connection(e.RPC_URL!, "confirmed");
+  // The web server never signs: these throwaway keypairs only satisfy constructors whose signing paths it never calls.
+  const chain = new SolanaChain(conn, Keypair.generate(), Keypair.generate());
+  ctx = {
+    sql: sharedDb(),
+    conn,
+    meteora: new MeteoraLive(chain, e.DAMM_V2_MIGRATION_CONFIG!),
+    staking: new KaminoBackend(chain, e.RPC_URL!, e.KAMINO_GLOBAL_CONFIG!),
+    jupiter: new JupiterLive(e.JUPITER_BASE_URL ?? "https://api.jup.ag/swap/v1", chain, fetch, e.JUPITER_API_KEY),
+    pinata: factories.pinata!(),
+    chart: factories.chart!(),
+    configKeys: JSON.parse(readFileSync(e.CONFIG_KEYS_PATH ?? "config-keys.json", "utf8")),
+    keeperAddress: e.KEEPER_ADDRESS!,
+    spillWallet: new PublicKey(e.SPILL_ADDRESS!),
+    ourtokenMint: e.OURTOKEN_MINT!,
+    adminWallets: new Set((e.ADMIN_WALLETS ?? "").split(",").map((s) => s.trim()).filter(Boolean)),
+    sessionSecret: new TextEncoder().encode(e.ADMIN_SESSION_SECRET!),
+    tokenProgramOf: async (mint) => (await conn.getAccountInfo(new PublicKey(mint)))?.owner.toBase58() ?? "",
+  };
+  return ctx;
+}
