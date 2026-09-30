@@ -6,7 +6,7 @@ import { loadLatestSettings } from "../domain/settings";
 import { NATIVE_MINT } from "../domain/types";
 
 export class LaunchError extends Error {
-  constructor(public code: "invalid_input" | "basket_not_verified" | "basket_unsupported" | "dev_buy_too_large" | "not_found_on_chain", message: string) { super(message); }
+  constructor(public code: "invalid_input" | "basket_not_verified" | "basket_unsupported" | "dev_buy_too_large" | "not_found_on_chain" | "pool_mismatch", message: string) { super(message); }
 }
 
 const addr = z.string().regex(/^[1-9A-HJ-NP-Za-km-z]{32,44}$/);
@@ -56,9 +56,13 @@ export async function prepareLaunch(
     launchFeeLamports: settings.launchFeeLamports, feeReceiver: deps.keeperAddress,
     devBuyQuoteAmount: input.devBuyQuoteAmount, devBuyMinOut: input.devBuyMinOut,
   });
+  const mint = baseMint.publicKey.toBase58();
+  await deps.sql`insert into prepared_launches (mint, pool, quote_mint, fee_tier_bps, config_key, creator, basket, settings_version)
+    values (${mint}, ${pool}, ${input.quoteMint}, ${input.feeTierBps}, ${configKey}, ${input.creator},
+            ${JSON.stringify(input.basket)}::text::jsonb, ${settings.version})`;
   return {
     transaction: tx.serialize({ requireAllSignatures: false }).toString("base64"),
-    mint: baseMint.publicKey.toBase58(),
+    mint,
     pool,
     settingsVersion: settings.version,
   };

@@ -42,6 +42,7 @@ test.skipIf(!up)("launch, claim partner fee, graduate, find position, claim posi
   await conn.confirmTransaction(await conn.sendRawTransaction(tx.serialize()));
   expect(await conn.getBalance(keeper.publicKey)).toBe(keeperBefore + 300_000_000);
   expect(await m.curveState(pool)).toEqual({ migrated: false, complete: false });
+  expect(await m.poolInfo(pool)).toEqual({ baseMint: baseMint.publicKey.toBase58(), config: config.publicKey.toBase58(), creator: creator.publicKey.toBase58() });
 
   const fee = await m.pendingPartnerQuoteFee(pool);
   expect(fee).toBeGreaterThan(0n);

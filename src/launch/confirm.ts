@@ -1,33 +1,39 @@
 import type { SQL } from "bun";
 import { PublicKey, type Connection } from "@solana/web3.js";
+import { getAssociatedTokenAddressSync } from "@solana/spl-token";
 import { LaunchError } from "./prepare";
-import { configKeyName } from "../meteora/config";
+import type { MeteoraPort } from "../meteora/port";
 
+// Everything except the mint and signature comes from what prepareLaunch stored, checked against the pool on-chain.
 export async function confirmLaunch(
-  deps: { sql: SQL; conn: Connection; configKeys: Record<string, string> },
-  i: { signature: string; mint: string; pool: string; creator: string; quoteMint: string; feeTierBps: number;
-       basket: { mint: string; weightBps: number }[]; settingsVersion: number; spillAccount: string },
+  deps: { sql: SQL; conn: Pick<Connection, "getSignatureStatuses">; meteora: Pick<MeteoraPort, "poolInfo">; spillWallet: PublicKey },
+  i: { signature: string; mint: string },
 ): Promise<number> {
   const [existing] = await deps.sql`select id from launches where mint = ${i.mint}`;
   if (existing) return Number(existing.id);
+  const [prep] = await deps.sql`select * from prepared_launches where mint = ${i.mint}`;
+  if (!prep) throw new LaunchError("not_found_on_chain", "launch was not prepared here");
   const { value } = await deps.conn.getSignatureStatuses([i.signature], { searchTransactionHistory: true });
   const status = value[0];
-  const pool = await deps.conn.getAccountInfo(new PublicKey(i.pool), "confirmed").catch(() => null);
-  if (!status || status.err || !pool) throw new LaunchError("not_found_on_chain", "launch transaction or pool not found");
-  const configKey = deps.configKeys[configKeyName(i.quoteMint, i.feeTierBps)]!;
-  const basket = JSON.stringify(i.basket);
+  if (!status || status.err) throw new LaunchError("not_found_on_chain", "launch transaction not found");
+  const pool = await deps.meteora.poolInfo(prep.pool);
+  if (!pool) throw new LaunchError("not_found_on_chain", "pool not found");
+  if (pool.baseMint !== i.mint || pool.config !== prep.config_key || pool.creator !== prep.creator) {
+    throw new LaunchError("pool_mismatch", "on-chain pool does not match the prepared launch");
+  }
+  const spillAccount = getAssociatedTokenAddressSync(new PublicKey(i.mint), deps.spillWallet).toBase58();
   const [row] = await deps.sql`
-    with s as (select data from settings where version = ${i.settingsVersion}),
+    with s as (select data from settings where version = ${prep.settings_version}),
     l as (
       insert into launches (mint, pool, quote_mint, fee_tier_bps, config_key, creator, status, settings_version)
-      values (${i.mint}, ${i.pool}, ${i.quoteMint}, ${i.feeTierBps}, ${configKey}, ${i.creator}, 'live', ${i.settingsVersion})
+      values (${i.mint}, ${prep.pool}, ${prep.quote_mint}, ${prep.fee_tier_bps}, ${prep.config_key}, ${prep.creator}, 'live', ${prep.settings_version})
       on conflict (mint) do nothing returning id
     ), b as (
       insert into baskets (launch_id, reward_mint, weight_bps)
-      select l.id, x.mint, x."weightBps" from l cross join jsonb_to_recordset(${basket}::text::jsonb) as x(mint text, "weightBps" int)
+      select l.id, x.mint, x."weightBps" from l cross join jsonb_to_recordset(${JSON.stringify(prep.basket)}::text::jsonb) as x(mint text, "weightBps" int)
     ), p as (
       insert into stake_pools (launch_id, backend, max_penalty_bps, spill_account, status)
-      select l.id, s.data->>'defaultBackend', (s.data->>'maxPenaltyBps')::int, ${i.spillAccount}, 'pending' from l, s
+      select l.id, s.data->>'defaultBackend', (s.data->>'maxPenaltyBps')::int, ${spillAccount}, 'pending' from l, s
       returning launch_id
     ), t as (
       insert into stake_tiers (launch_id, tier_id, lock_seconds, multiplier_bps)

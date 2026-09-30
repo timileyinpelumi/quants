@@ -64,11 +64,7 @@ const launchTx = Transaction.from(Buffer.from(prepared.transaction, "base64"));
 launchTx.partialSign(creator);
 const launchSig = await conn.sendRawTransaction(launchTx.serialize());
 await conn.confirmTransaction(launchSig, "confirmed");
-const spillAccount = getAssociatedTokenAddressSync(new PublicKey(prepared.mint), spill.publicKey).toBase58();
-const launchId = await confirmLaunch({ sql, conn, configKeys }, {
-  signature: launchSig, mint: prepared.mint, pool: prepared.pool, creator: creator.publicKey.toBase58(), quoteMint: NATIVE_MINT, feeTierBps: 200,
-  basket: [{ mint: zec.toBase58(), weightBps: 10_000 }], settingsVersion: prepared.settingsVersion, spillAccount,
-});
+const launchId = await confirmLaunch({ sql, conn, meteora, spillWallet: spill.publicKey }, { signature: launchSig, mint: prepared.mint });
 log("4. launch confirmed", { launchId, mint: prepared.mint, pool: prepared.pool });
 
 const swap = async (who: Keypair, amount: BN, sell: boolean) =>
