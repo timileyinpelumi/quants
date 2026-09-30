@@ -20,14 +20,17 @@ export async function POST(req: Request) {
     const c = getContext();
     await requireAdmin(c, req);
     const b = Body.parse(await readJson(req));
-    const [l] = await c.sql`select l.id, sp.status from launches l left join stake_pools sp on sp.launch_id = l.id where l.mint = ${b.mint}`;
+    const [l] = await c.sql`select l.id from launches l where l.mint = ${b.mint}`;
     if (!l) throw new LaunchError("invalid_input", "No token here");
-    if (l.status === "ready") throw new LaunchError("invalid_input", "Farms already exist for this launch");
     for (const t of b.basket) {
       if ((await c.tokenProgramOf(t.mint)) !== CLASSIC) throw new LaunchError("basket_unsupported", `${t.mint} is not a classic SPL token`);
     }
     // A delete and insert of the same key cannot share one statement, so this rare admin write uses a transaction.
     await c.sql.begin(async (tx) => {
+      // Any farm or swap already carries the old reward mints, so the basket is frozen from then on.
+      const [started] = await tx`select exists(select 1 from stake_tiers where launch_id = ${l.id} and farm is not null)
+        or exists(select 1 from distributions where launch_id = ${l.id} and kind in ('create_farm', 'configure_farm', 'swap')) as yes`;
+      if (started.yes) throw new LaunchError("invalid_input", "Farms already exist for this launch");
       await tx`delete from baskets where launch_id = ${l.id}`;
       await tx`insert into baskets (launch_id, reward_mint, weight_bps, symbol, decimals)
         select ${l.id}, x.mint, x."weightBps", x.symbol, x.decimals

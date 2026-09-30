@@ -7,7 +7,8 @@ import { NATIVE_MINT } from "@/domain/types";
 const Body = z.object({
   devBuySol: z.string().regex(/^\d+$/, "First buy must be a whole number of lamports").default("0"),
   quoteMint: z.string(),
-  creator: z.string(),
+  creator: z.string().regex(/^[1-9A-HJ-NP-Za-km-z]{32,44}$/, "Creator wallet address is not valid"),
+  basket: z.array(z.object({ mint: z.string() }).passthrough()).max(3).default([]),
 }).passthrough();
 
 export type UnsignedTx = { base64: string; versioned: boolean };
@@ -15,6 +16,11 @@ export type UnsignedTx = { base64: string; versioned: boolean };
 // An OURTOKEN first buy is paid in SOL: a Jupiter swap runs first and the curve buy is capped at the swap's slippage floor.
 export async function prepareWithSwap(ctx: WebContext, raw: unknown) {
   const { devBuySol, ...rest } = Body.parse(raw);
+  // Labels and decimals shown to stakers come from Jupiter's verified list, never from the request.
+  rest.basket = await Promise.all(rest.basket.map(async (b) => {
+    const t = (await ctx.jupiter.searchVerified(b.mint)).find((x) => x.mint === b.mint);
+    return { ...b, symbol: t?.symbol, decimals: t?.decimals };
+  }));
   const sol = BigInt(devBuySol);
   const transactions: UnsignedTx[] = [];
   let devBuyQuoteAmount = sol;

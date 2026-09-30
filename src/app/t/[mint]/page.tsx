@@ -14,7 +14,7 @@ import { MarketStats } from "@/web/token/MarketStats";
 export const dynamic = "force-dynamic";
 
 const SOL = "So11111111111111111111111111111111111111112";
-const tokens = (base: string) => fmtCompact(Number(BigInt(base) / 10_000n) / 100);
+const tokens = (base: string | null) => (base === null ? "Unknown" : fmtCompact(Number(BigInt(base) / 10_000n) / 100));
 
 export default async function TokenPage({ params }: { params: Promise<{ mint: string }> }) {
   const { mint } = await params;

@@ -29,7 +29,7 @@ export async function listLaunches(sql: SQL, opts: { graduated?: boolean; limit?
 export interface LaunchDetail {
   launch: LaunchListItem & { creator: string; dammPool: string | null };
   basket: { mint: string; symbol: string | null; decimals: number | null; weightBps: number; paidOut: string }[];
-  tiers: { tierId: string; lockSeconds: number; multiplierBps: number; farm: string | null; staked: string; sharePct: number }[];
+  tiers: { tierId: string; lockSeconds: number; multiplierBps: number; farm: string | null; staked: string | null; sharePct: number }[];
   burned: string;
   maxPenaltyBps: number;
   stakeReady: boolean;
@@ -47,15 +47,15 @@ export async function launchDetail(ctx: WebContext, mint: string): Promise<Launc
     from baskets b where b.launch_id = ${row.id} order by b.weight_bps desc, b.reward_mint`;
   const [pool] = await ctx.sql`select status, max_penalty_bps from stake_pools where launch_id = ${row.id}`;
   const tierRows = await ctx.sql`select tier_id, lock_seconds, multiplier_bps, farm from stake_tiers where launch_id = ${row.id} order by lock_seconds`;
-  const staked = await Promise.all(tierRows.map((t: any) => (t.farm ? ctx.staking.totalStaked(t.farm) : Promise.resolve(0n))));
-  const weights = tierRows.map((t: any, i: number) => staked[i]! * BigInt(t.multiplier_bps));
+  const staked: (bigint | null)[] = await Promise.all(tierRows.map((t: any) => (t.farm ? ctx.staking.totalStaked(t.farm).catch(() => null) : Promise.resolve(0n))));
+  const weights = tierRows.map((t: any, i: number) => (staked[i] ?? 0n) * BigInt(t.multiplier_bps));
   const total = weights.reduce((a: bigint, b: bigint) => a + b, 0n);
   const progress = await ctx.meteora.curveProgress(item!.pool).catch(() => ({ quoteReserve: 0n, threshold: 0n, migrated: item!.status === "graduated" }));
   return {
     launch: { ...item!, creator: row.creator, dammPool: row.damm_pool },
     basket: basket.map((b: any) => ({ mint: b.reward_mint, symbol: b.symbol, decimals: b.decimals, weightBps: b.weight_bps, paidOut: b.paid })),
     tiers: tierRows.map((t: any, i: number) => ({
-      tierId: t.tier_id, lockSeconds: t.lock_seconds, multiplierBps: t.multiplier_bps, farm: t.farm, staked: staked[i]!.toString(),
+      tierId: t.tier_id, lockSeconds: t.lock_seconds, multiplierBps: t.multiplier_bps, farm: t.farm, staked: staked[i] === null ? null : staked[i]!.toString(),
       sharePct: total === 0n ? 0 : Math.round(Number((weights[i]! * 10_000n) / total) / 100),
     })),
     burned: item!.burned,

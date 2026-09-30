@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { getContext } from "@/web/server/context";
-import { json, jsonError } from "@/web/server/http";
+import { json, jsonError, limitBody, rateLimit } from "@/web/server/http";
 import { validateImage } from "@/web/server/image";
 import { gatewayUrl } from "@/web/server/pinata";
 
@@ -23,6 +23,8 @@ const Fields = z.object({
 
 export async function POST(req: Request) {
   try {
+    rateLimit(req, "metadata", 10);
+    limitBody(req, 2_300_000);
     const form = await req.formData();
     const raw = Object.fromEntries([...form.entries()].filter(([k, v]) => k !== "image" && v !== ""));
     const fields = Fields.parse(raw);

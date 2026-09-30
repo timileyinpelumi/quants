@@ -55,3 +55,24 @@ test("token search proxies verified tokens and ignores short queries", async () 
   expect((await (await search(new Request("http://x/api/tokens/search?q=zec"))).json()).tokens[0].symbol).toBe("ZEC");
   expect((await (await search(new Request("http://x/api/tokens/search?q=z"))).json()).tokens).toEqual([]);
 });
+
+test("an invalid creator is refused before any Jupiter call", async () => {
+  const c = await makeWebContext();
+  let quoted = false;
+  (c.jupiter as any).quote = async () => { quoted = true; return null; };
+  const r = await post(prepare, body({ quoteMint: OURS, devBuySol: "1000000000", creator: "not-an-address" }));
+  expect(r.status).toBe(400);
+  expect(quoted).toBe(false);
+});
+
+test("basket symbols and decimals come from the server, not the request", async () => {
+  const c = await makeWebContext();
+  (c.jupiter as any).searchVerified = async (q: string) => q === "Zec1111111111111111111111111111111111111111"
+    ? [{ mint: q, symbol: "ZEC", name: "Zcash", icon: null, decimals: 8, tokenProgram: "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA" }] : [];
+  const r = await post(prepare, body({ basket: [{ mint: "Zec1111111111111111111111111111111111111111", weightBps: 10000, symbol: "BTC", decimals: 2 }] }));
+  expect(r.status).toBe(200);
+  const { mint } = await r.json();
+  const [p] = await c.sql`select basket from prepared_launches where mint = ${mint}`;
+  const basket = typeof p.basket === "string" ? JSON.parse(p.basket) : p.basket;
+  expect(basket[0]).toMatchObject({ symbol: "ZEC", decimals: 8 });
+});

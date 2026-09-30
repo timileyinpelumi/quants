@@ -67,3 +67,12 @@ test("detail route returns 404 json for an unknown mint", async () => {
   expect(r.status).toBe(404);
   expect((await r.json()).error.code).toBe("not_found");
 });
+
+test("a failing stake read shows unknown instead of breaking the page", async () => {
+  const c = await makeWebContext();
+  const a = await launch(c, "CAT");
+  await c.sql`update stake_tiers set farm = 'farmX' where launch_id = ${a.id}`;
+  (c.staking as any).totalStaked = async () => { throw new Error("429"); };
+  const d = (await launchDetail(c, a.mint))!;
+  expect(d.tiers.every((t) => t.staked === null && t.sharePct === 0)).toBe(true);
+});

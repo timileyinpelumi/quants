@@ -44,3 +44,28 @@ test("rejects non square, too large, wrong type, bad links and a missing image b
   }
   expect((c.pinata as FakePinata).files.length).toBe(0);
 });
+
+test("an SVG labelled as PNG is rejected", async () => {
+  const c = await makeWebContext();
+  const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64"><script>alert(1)</script></svg>';
+  const r = await POST(form({ image: new File([svg], "a.png", { type: "image/png" }), name: "Cat", symbol: "CAT" }));
+  expect(r.status).toBe(400);
+  expect((c.pinata as FakePinata).files.length).toBe(0);
+});
+
+test("a body larger than the upload limit is refused before it is read", async () => {
+  await makeWebContext();
+  const r = await POST(new Request("http://x/api/metadata", { method: "POST", headers: { "content-length": String(10 * 1024 * 1024) }, body: "x" }));
+  expect(r.status).toBe(413);
+});
+
+test("uploads are rate limited per address", async () => {
+  await makeWebContext();
+  const codes: number[] = [];
+  for (let i = 0; i < 12; i++) {
+    const f = new FormData();
+    f.set("name", "Cat"); f.set("symbol", "CAT");
+    codes.push((await POST(new Request("http://x/api/metadata", { method: "POST", headers: { "x-forwarded-for": "9.9.9.9" }, body: f }))).status);
+  }
+  expect(codes.filter((c) => c === 429).length).toBeGreaterThan(0);
+});

@@ -5,6 +5,7 @@ import { FakeMeteora } from "./fake-meteora";
 import { FakeStaking } from "./fake-staking";
 import { FakeJupiter } from "./fake-jupiter";
 import { setContextForTests, type WebContext } from "../../src/web/server/context";
+import { resetRateLimits } from "../../src/web/server/http";
 import type { PinataPort } from "../../src/web/server/pinata";
 import type { Candle, ChartSource, Market } from "../../src/web/server/chart";
 import { defaultSettings, saveSettings } from "../../src/domain/settings";
@@ -52,5 +53,6 @@ export async function makeWebContext(over: Partial<WebContext> = {}) {
     ...over,
   };
   setContextForTests(ctx);
+  resetRateLimits();
   return Object.assign(ctx, { fakeChain: chain });
 }

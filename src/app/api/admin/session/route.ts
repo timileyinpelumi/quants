@@ -6,8 +6,10 @@ export const dynamic = "force-dynamic";
 
 export async function POST(req: Request) {
   try {
-    const setCookie = await openSession(getContext(), req, await readJson(req));
-    return new Response(JSON.stringify({ ok: true }), { headers: { "content-type": "application/json", "set-cookie": setCookie } });
+    const cookies = await openSession(getContext(), req, await readJson(req));
+    const headers = new Headers({ "content-type": "application/json" });
+    for (const c of cookies) headers.append("set-cookie", c);
+    return new Response(JSON.stringify({ ok: true }), { headers });
   } catch (e) {
     return jsonError(e);
   }

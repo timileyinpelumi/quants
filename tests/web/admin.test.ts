@@ -95,7 +95,7 @@ test("basket override replaces a pending launch's basket and is refused once far
   expect(ok.status).toBe(200);
   const rows = await c.sql`select reward_mint, weight_bps from baskets where launch_id = ${l.id} order by weight_bps desc`;
   expect(rows.map((r: any) => r.weight_bps)).toEqual([6000, 4000]);
-  await c.sql`update stake_pools set status = 'ready'`;
+  await c.sql`insert into stake_tiers values (${l.id}, '7d', 604800, 10000, 'FarmA')`;
   const late = await basketRoute(withCookie(cookie, { method: "POST", body: JSON.stringify(body) }));
   expect(late.status).toBe(400);
   expect((await late.json()).error.message).toBe("Farms already exist for this launch");
@@ -111,4 +111,25 @@ test("basket override can keep a token that was already in the basket", async ()
     { mint: "Zec1111111111111111111111111111111111111111", weightBps: 5000 }, { mint: "Cate111111111111111111111111111111111111111", weightBps: 5000 }] }) }));
   expect(r.status).toBe(200);
   expect((await c.sql`select count(*)::int n from baskets where launch_id = ${l.id}`)[0].n).toBe(2);
+});
+
+test("basket override is refused once any farm or swap exists", async () => {
+  const c = await makeWebContext();
+  const cookie = cookieOf(await signIn(ADMIN));
+  const [l] = await c.sql`insert into launches (mint, pool, quote_mint, fee_tier_bps, config_key, creator, status, settings_version) values ('M3', 'P3', 'q', 200, 'c', 'cr', 'live', 1) returning id`;
+  await c.sql`insert into stake_pools values (${l.id}, 'kamino', 3000, 'S', 'pending')`;
+  await c.sql`insert into stake_tiers values (${l.id}, '7d', 604800, 10000, 'FarmA'), (${l.id}, '30d', 2592000, 15000, null)`;
+  const r = await basketRoute(withCookie(cookie, { method: "POST", body: JSON.stringify({ mint: "M3", basket: [{ mint: "Zec1111111111111111111111111111111111111111", weightBps: 10000 }] }) }));
+  expect(r.status).toBe(400);
+  expect((await r.json()).error.message).toBe("Farms already exist for this launch");
+});
+
+test("a nonce and signature can only open one session", async () => {
+  await makeWebContext();
+  const n = await nonceRoute();
+  const { message } = await n.json();
+  const signature = bs58.encode(nacl.sign.detached(new TextEncoder().encode(message), ADMIN.secretKey));
+  const req = () => sessionRoute(new Request("http://x", { method: "POST", headers: { cookie: cookieOf(n) }, body: JSON.stringify({ wallet: ADMIN.publicKey.toBase58(), signature }) }));
+  expect((await req()).status).toBe(200);
+  expect((await req()).status).toBe(401);
 });

@@ -23,19 +23,23 @@ function readCookie(req: Request, name: string): string | null {
 export async function issueNonce(ctx: WebContext): Promise<{ message: string; setCookie: string }> {
   const nonce = Buffer.from(crypto.getRandomValues(new Uint8Array(16))).toString("hex");
   const message = `Sign in to quants admin\nNonce: ${nonce}\nIssued: ${new Date().toISOString()}`;
-  const token = await new SignJWT({ message }).setProtectedHeader({ alg: "HS256" }).setIssuedAt().setExpirationTime("5m").sign(ctx.sessionSecret);
+  const token = await new SignJWT({ message, typ: "nonce" }).setProtectedHeader({ alg: "HS256" }).setJti(nonce).setIssuedAt().setExpirationTime("5m").sign(ctx.sessionSecret);
   return { message, setCookie: cookie(NONCE, token, 300) };
 }
 
 const SessionBody = z.object({ wallet: z.string().min(32).max(44), signature: z.string().min(40) });
 
-export async function openSession(ctx: WebContext, req: Request, raw: unknown): Promise<string> {
+export async function openSession(ctx: WebContext, req: Request, raw: unknown): Promise<string[]> {
   const { wallet, signature } = SessionBody.parse(raw);
   const token = readCookie(req, NONCE);
   if (!token) throw new AuthError(401, "Start sign in again");
   let message: string;
+  let jti: string;
   try {
-    message = (await jwtVerify(token, ctx.sessionSecret)).payload.message as string;
+    const { payload } = await jwtVerify(token, ctx.sessionSecret);
+    if (payload.typ !== "nonce" || !payload.jti) throw new Error("not a nonce");
+    message = payload.message as string;
+    jti = payload.jti;
   } catch {
     throw new AuthError(401, "Sign in expired, start again");
   }
@@ -47,8 +51,10 @@ export async function openSession(ctx: WebContext, req: Request, raw: unknown): 
   }
   if (!ok) throw new AuthError(401, "Signature does not match");
   if (!ctx.adminWallets.has(wallet)) throw new AuthError(403, "This wallet is not an admin");
-  const session = await new SignJWT({ wallet }).setProtectedHeader({ alg: "HS256" }).setIssuedAt().setExpirationTime("8h").sign(ctx.sessionSecret);
-  return cookie(SESSION, session, 8 * 3600);
+  const used = await ctx.sql`insert into admin_nonces (jti) values (${jti}) on conflict do nothing returning jti`;
+  if (used.length === 0) throw new AuthError(401, "That sign in was already used, start again");
+  const session = await new SignJWT({ wallet, typ: "session" }).setProtectedHeader({ alg: "HS256" }).setIssuedAt().setExpirationTime("8h").sign(ctx.sessionSecret);
+  return [cookie(SESSION, session, 8 * 3600), cookie(NONCE, "", 0)];
 }
 
 export async function requireAdmin(ctx: WebContext, req: Request): Promise<string> {
@@ -56,7 +62,9 @@ export async function requireAdmin(ctx: WebContext, req: Request): Promise<strin
   if (!token) throw new AuthError(401, "Sign in first");
   let wallet: string;
   try {
-    wallet = (await jwtVerify(token, ctx.sessionSecret)).payload.wallet as string;
+    const { payload } = await jwtVerify(token, ctx.sessionSecret);
+    if (payload.typ !== "session") throw new Error("not a session");
+    wallet = payload.wallet as string;
   } catch {
     throw new AuthError(401, "Session expired, sign in again");
   }
