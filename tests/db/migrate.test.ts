@@ -1,0 +1,12 @@
+import { test, expect } from "bun:test";
+import { freshDb } from "../helpers/db";
+import { migrate } from "../../src/db/migrate";
+
+test("migrations create tables and are idempotent", async () => {
+  const sql = await freshDb();
+  const tables = await sql`select table_name from information_schema.tables where table_schema = 'public' order by 1`;
+  expect(tables.map((t: { table_name: string }) => t.table_name)).toEqual(
+    ["baskets", "distributions", "escrow", "launches", "schema_migrations", "settings", "stake_pools", "stake_tiers"],
+  );
+  expect(await migrate(sql)).toEqual([]);
+});
