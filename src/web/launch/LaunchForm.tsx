@@ -71,6 +71,7 @@ export function LaunchForm({ split, tiers, launchFeeLamports, maxPenaltyBps }: {
   const [telegram, setTelegram] = useState("");
   const [status, setStatus] = useState<Status>("idle");
   const [error, setError] = useState<string | null>(null);
+  const [pending, setPending] = useState<{ mint: string; sig: string } | null>(null);
 
   useEffect(() => () => { if (preview) URL.revokeObjectURL(preview); }, [preview]);
 
@@ -100,10 +101,34 @@ export function LaunchForm({ split, tiers, launchFeeLamports, maxPenaltyBps }: {
   const busy = status !== "idle";
   const pairLabel = pair === SOL ? "SOL" : OURS_SYMBOL;
 
+  async function settle(p: { mint: string; sig: string }) {
+    setStatus("confirming");
+    for (let i = 0; i < 20; i++) {
+      const { value } = await connection.getSignatureStatuses([p.sig], { searchTransactionHistory: true });
+      const st = value[0];
+      if (st?.err) { setPending(null); setError("The launch transaction failed on chain. Nothing was created, so you can try again."); setStatus("idle"); return; }
+      if (st && (st.confirmationStatus === "confirmed" || st.confirmationStatus === "finalized")) {
+        try {
+          await postJson("/api/launch/confirm", { signature: p.sig, mint: p.mint });
+        } catch {
+          // The keeper records launches that landed but were never confirmed, so the page will exist shortly either way.
+        }
+        router.push(`/t/${p.mint}`);
+        return;
+      }
+      await new Promise((r) => setTimeout(r, 3000));
+    }
+    setPending(p);
+    setError("We could not confirm your launch yet. Do not launch again. If it went through it will show on Explore within a few minutes.");
+    setStatus("idle");
+  }
+
   async function launch() {
+    if (pending) { setError(null); await settle(pending); return; }
     if (!wallet.publicKey) { modal.setVisible(true); return; }
     if (problems.length) { setError(problems[0]!); return; }
     setError(null);
+    let prepared: { mint: string; transactions: UnsignedTx[] } | null = null;
     try {
       setStatus("uploading");
       const form = new FormData();
@@ -116,7 +141,7 @@ export function LaunchForm({ split, tiers, launchFeeLamports, maxPenaltyBps }: {
       if (!metaRes.ok) throw new Error(meta.error?.message ?? "Upload failed");
 
       setStatus("preparing");
-      const prepared = await postJson<{ mint: string; transactions: UnsignedTx[] }>("/api/launch/prepare", {
+      prepared = await postJson<{ mint: string; transactions: UnsignedTx[] }>("/api/launch/prepare", {
         name: name.trim(), symbol, uri: meta.uri, image: meta.image, creator: wallet.publicKey.toBase58(),
         quoteMint: pair, feeTierBps: fee, devBuySol: (devBuyLamports ?? 0n).toString(),
         basket: basket.map((b) => ({ mint: b.mint, weightBps: b.weight * 100, symbol: b.symbol, decimals: b.decimals })),
@@ -125,11 +150,18 @@ export function LaunchForm({ split, tiers, launchFeeLamports, maxPenaltyBps }: {
       setStatus("signing");
       const sigs = await signAndSendAll(wallet, connection, prepared.transactions);
 
-      setStatus("confirming");
-      await postJson("/api/launch/confirm", { signature: sigs[sigs.length - 1], mint: prepared.mint });
-      router.push(`/t/${prepared.mint}`);
+      await settle({ mint: prepared.mint, sig: sigs[sigs.length - 1]! });
     } catch (e) {
-      setError(e instanceof SendError || e instanceof Error ? e.message : "Something went wrong");
+      const count = prepared?.transactions.length ?? 0;
+      if (e instanceof SendError && prepared && e.unconfirmed && e.confirmed.length === count - 1) {
+        await settle({ mint: prepared.mint, sig: e.unconfirmed });
+        return;
+      }
+      if (e instanceof SendError && count === 2 && e.confirmed.length === 1) {
+        setError(`The swap to ${OURS_SYMBOL} went through but the launch did not. The ${OURS_SYMBOL} is in your wallet. Try again with no first buy, or a smaller one.`);
+      } else {
+        setError(e instanceof Error ? e.message : "Something went wrong");
+      }
       setStatus("idle");
     }
   }
@@ -269,7 +301,7 @@ export function LaunchForm({ split, tiers, launchFeeLamports, maxPenaltyBps }: {
 
         {error && <p role="alert" className="m-0 text-sm text-burn">{error}</p>}
         <Button size="lg" onClick={launch} disabled={busy}>
-          {busy ? LABELS[status] : wallet.publicKey ? `Launch ${symbol || "token"}` : "Connect wallet"}
+          {busy ? LABELS[status] : pending ? "Check my launch" : wallet.publicKey ? `Launch ${symbol || "token"}` : "Connect wallet"}
         </Button>
       </aside>
     </main>

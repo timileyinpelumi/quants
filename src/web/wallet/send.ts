@@ -1,7 +1,9 @@
 import { Transaction, VersionedTransaction, type Connection } from "@solana/web3.js";
 import type { WalletContextState } from "@solana/wallet-adapter-react";
 
-export class SendError extends Error {}
+export class SendError extends Error {
+  constructor(message: string, public confirmed: string[] = [], public unconfirmed: string | null = null) { super(message); }
+}
 export type UnsignedTx = { base64: string; versioned: boolean };
 
 export async function signAndSendAll(wallet: Pick<WalletContextState, "publicKey" | "signAllTransactions">, conn: Connection, txs: UnsignedTx[]): Promise<string[]> {
@@ -22,11 +24,16 @@ export async function signAndSendAll(wallet: Pick<WalletContextState, "publicKey
     try {
       sig = await conn.sendRawTransaction(tx.serialize(), { maxRetries: 3 });
     } catch (e) {
-      throw new SendError(`The network rejected the transaction: ${e instanceof Error ? e.message.split("\n")[0] : String(e)}`);
+      throw new SendError(`The network rejected the transaction: ${e instanceof Error ? e.message.split("\n")[0] : String(e)}`, [...sigs]);
     }
-    const { blockhash, lastValidBlockHeight } = await conn.getLatestBlockhash("confirmed");
-    const res = await conn.confirmTransaction({ signature: sig, blockhash, lastValidBlockHeight }, "confirmed");
-    if (res.value.err) throw new SendError(`The transaction failed: ${JSON.stringify(res.value.err)}`);
+    let res: Awaited<ReturnType<Connection["confirmTransaction"]>>;
+    try {
+      const { blockhash, lastValidBlockHeight } = await conn.getLatestBlockhash("confirmed");
+      res = await conn.confirmTransaction({ signature: sig, blockhash, lastValidBlockHeight }, "confirmed");
+    } catch {
+      throw new SendError("We could not confirm the transaction yet", [...sigs], sig);
+    }
+    if (res.value.err) throw new SendError(`The transaction failed: ${JSON.stringify(res.value.err)}`, [...sigs]);
     sigs.push(sig);
   }
   return sigs;

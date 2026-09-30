@@ -36,3 +36,12 @@ test("an on-chain failure stops the sequence", async () => {
 test("no wallet is a readable error", async () => {
   await expect(signAndSendAll({ publicKey: null } as any, conn(), [legacy()])).rejects.toThrow(new SendError("Connect a wallet first"));
 });
+
+test("a confirmation that errors reports which signature is still unconfirmed", async () => {
+  const c = conn();
+  c.confirmTransaction = async () => { throw new Error("block height exceeded"); };
+  const err = await signAndSendAll(wallet(), c, [legacy(), legacy()]).catch((e) => e);
+  expect(err).toBeInstanceOf(SendError);
+  expect(err.unconfirmed).toBe("sig0");
+  expect(err.confirmed).toEqual([]);
+});

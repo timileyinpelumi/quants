@@ -12,6 +12,7 @@ import { createFarmsStep } from "./steps/farms";
 import { swapStep } from "./steps/swap";
 import { fundStep } from "./steps/fund";
 import { penaltyStep } from "./steps/penalty";
+import { sweepPreparedLaunches } from "./steps/sweep";
 
 export class ReconcileError extends Error {}
 
@@ -51,6 +52,7 @@ export async function processLaunch(deps: KeeperDeps, launch: LaunchRow, s: Vers
 export async function runKeeper(deps: KeeperDeps) {
   await resume(deps);
   await reconcile(deps);
+  await sweepPreparedLaunches(deps).catch((e) => console.error("sweep failed", e));
   const settings = await loadLatestSettings(deps.sql);
   const runId = crypto.randomUUID();
   const launches = await loadLaunches(deps.sql, deps.ourtokenMint);

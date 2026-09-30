@@ -21,7 +21,14 @@ export async function confirmLaunch(
   if (pool.baseMint !== i.mint || pool.config !== prep.config_key || pool.creator !== prep.creator) {
     throw new LaunchError("pool_mismatch", "on-chain pool does not match the prepared launch");
   }
-  const spillAccount = getAssociatedTokenAddressSync(new PublicKey(i.mint), deps.spillWallet).toBase58();
+  return recordLaunch(deps.sql, prep, deps.spillWallet);
+}
+
+// Shared by confirmLaunch and the keeper's sweep of launches that landed but were never confirmed.
+export async function recordLaunch(sql: SQL, prep: any, spillWallet: PublicKey): Promise<number> {
+  const i = { mint: prep.mint as string };
+  const deps = { sql };
+  const spillAccount = getAssociatedTokenAddressSync(new PublicKey(i.mint), spillWallet).toBase58();
   const [row] = await deps.sql`
     with s as (select data from settings where version = ${prep.settings_version}),
     l as (

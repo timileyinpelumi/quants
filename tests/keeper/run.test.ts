@@ -130,3 +130,26 @@ test("a farm creation whose build throws once is retried on the next run", async
   const [p] = await f.sql`select status from stake_pools where launch_id = ${id}`;
   expect(p.status).toBe("ready");
 });
+
+test("the keeper records launches that landed but were never confirmed, and drops stale ones", async () => {
+  const f = await full();
+  const { Keypair } = await import("@solana/web3.js");
+  const LATE = Keypair.generate().publicKey.toBase58(), GONE = Keypair.generate().publicKey.toBase58(), FRESH = Keypair.generate().publicKey.toBase58();
+  f.deps.wallets = { ...f.deps.wallets, spill: Keypair.generate().publicKey.toBase58() };
+  const insertPrepared = (mint: string, pool: string, age: string) => f.sql`
+    insert into prepared_launches (mint, pool, quote_mint, fee_tier_bps, config_key, creator, basket, settings_version, name, symbol, uri, created_at)
+    values (${mint}, ${pool}, ${NATIVE_MINT}, 200, 'Cfg', 'Creator111111111111111111111111111111111111',
+            ${JSON.stringify([{ mint: "Zec1111111111111111111111111111111111111111", weightBps: 10000 }])}::text::jsonb, 1, 'Late', 'LATE', 'https://x', now() - ${age}::interval)`;
+  await insertPrepared(LATE, "LatePool", "10 minutes");
+  await insertPrepared(GONE, "GonePool", "2 days");
+  await insertPrepared(FRESH, "FreshPool", "10 seconds");
+  f.meteora.pools.set("LatePool", { baseMint: LATE, config: "Cfg", creator: "Creator111111111111111111111111111111111111" });
+  f.meteora.pools.set("FreshPool", { baseMint: FRESH, config: "Cfg", creator: "Creator111111111111111111111111111111111111" });
+  await runKeeper(f.deps);
+  const launches = (await f.sql`select mint from launches order by mint`).map((r: any) => r.mint);
+  expect(launches).toEqual([LATE]);
+  const [sp] = await f.sql`select sp.status from stake_pools sp join launches l on l.id = sp.launch_id where l.mint = ${LATE}`;
+  expect(sp.status).toBeDefined();
+  const prepared = (await f.sql`select mint from prepared_launches order by mint`).map((r: any) => r.mint);
+  expect(prepared).not.toContain(GONE);
+});
