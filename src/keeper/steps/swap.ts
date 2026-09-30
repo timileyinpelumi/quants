@@ -28,15 +28,11 @@ export async function swapStep(deps: KeeperDeps, launch: LaunchRow, s: Versioned
     }
     const q = await deps.jupiter.quote(input, outputMint, amountIn, s.slippageBps);
     if (!q || q.priceImpactBps > s.slippageBps) continue;
-    try {
-      await runTxStep(deps.sql, deps.chain, {
-        launchId: launch.id, idemKey, kind: "swap", settingsVersion: s.version,
-        detail: { inputMint: input, outputMint, amountIn: amountIn.toString(), quotedOut: q.outAmount.toString() },
-        build: () => deps.jupiter.buildSwap(q),
-        resolve: swapResolver(deps),
-      });
-    } catch (e) {
-      console.error(`swap ${idemKey} failed to build`, e);
-    }
+    await runTxStep(deps.sql, deps.chain, {
+      launchId: launch.id, idemKey, stepKey: `swap:${launch.id}:${outputMint}`, kind: "swap", settingsVersion: s.version,
+      detail: { inputMint: input, outputMint, amountIn: amountIn.toString(), quotedOut: q.outAmount.toString() },
+      build: () => deps.jupiter.buildSwap(q),
+      resolve: swapResolver(deps),
+    });
   }
 }

@@ -16,7 +16,7 @@ export async function penaltyStep(deps: KeeperDeps, launch: LaunchRow, s: Versio
   for (const t of tiers) {
     if ((await deps.staking.slashedAmount(t.farm)) === 0n) continue;
     await runTxStep(deps.sql, deps.chain, {
-      launchId: launch.id, idemKey: `collect_penalty:${launch.id}:${runId}:${t.tier_id}`, kind: "collect_penalty", settingsVersion: s.version,
+      launchId: launch.id, idemKey: `collect_penalty:${launch.id}:${runId}:${t.tier_id}`, stepKey: `collect_penalty:${launch.id}:${t.tier_id}`, kind: "collect_penalty", settingsVersion: s.version,
       detail: { farm: t.farm, mint: launch.mint },
       build: () => deps.staking.buildCollectPenalty(t.farm, pool.spill_account),
       resolve: collectResolver(deps),
@@ -25,7 +25,7 @@ export async function penaltyStep(deps: KeeperDeps, launch: LaunchRow, s: Versio
   const amount = await getBalance(deps.sql, launch.id, "penalty", launch.mint);
   if (amount === 0n) return;
   await runTxStep(deps.sql, deps.chain, {
-    launchId: launch.id, idemKey: `burn:${launch.id}:${runId}`, kind: "burn", settingsVersion: s.version,
+    launchId: launch.id, idemKey: `burn:${launch.id}:${runId}`, stepKey: `burn:${launch.id}`, kind: "burn", settingsVersion: s.version,
     detail: { mint: launch.mint, amount: amount.toString() },
     build: () => deps.chain.buildBurn(launch.mint, amount),
     resolve: burnResolver,

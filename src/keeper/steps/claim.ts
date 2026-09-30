@@ -15,7 +15,7 @@ async function claimCurve(deps: KeeperDeps, launch: LaunchRow, s: VersionedSetti
   const amount = await deps.meteora.pendingPartnerQuoteFee(launch.pool);
   if (amount === 0n) return "skipped";
   return runTxStep(deps.sql, deps.chain, {
-    launchId: launch.id, idemKey, kind: "claim", settingsVersion: s.version, resolve: claimResolver(deps),
+    launchId: launch.id, idemKey, stepKey: `claim:${launch.id}:curve`, kind: "claim", settingsVersion: s.version, resolve: claimResolver(deps),
     detail: { source: "dbc", quoteMint: launch.quoteMint, amount: amount.toString() },
     build: () => deps.meteora.buildClaimPartnerFee(launch.pool, amount),
   });
@@ -27,7 +27,7 @@ export async function claimStep(deps: KeeperDeps, launch: LaunchRow, s: Versione
   if (!launch.dammPool || !launch.dammPosition || !launch.dammPositionNftAccount) return "skipped";
   const p = { dammPool: launch.dammPool, position: launch.dammPosition, positionNftAccount: launch.dammPositionNftAccount };
   return runTxStep(deps.sql, deps.chain, {
-    launchId: launch.id, idemKey: `claim:${launch.id}:${runId}`, kind: "claim", settingsVersion: s.version, resolve: claimResolver(deps),
+    launchId: launch.id, idemKey: `claim:${launch.id}:${runId}`, stepKey: `claim:${launch.id}:damm`, kind: "claim", settingsVersion: s.version, resolve: claimResolver(deps),
     detail: { source: "damm", quoteMint: launch.quoteMint },
     build: () => deps.meteora.buildClaimPositionFee(p),
   });

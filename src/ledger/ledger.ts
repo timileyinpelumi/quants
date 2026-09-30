@@ -10,7 +10,8 @@ export interface StepRow {
   detail: Record<string, any>; settingsVersion: number | null;
 }
 export type DeltaResolver = (row: StepRow, signature: string) => Promise<Delta[]>;
-export interface StepInput { launchId: number; idemKey: string; kind: StepKind; settingsVersion: number | null; detail: Record<string, any> }
+// stepKey identifies the same logical step across keeper runs (idemKey minus the run id); defaults to idemKey.
+export interface StepInput { launchId: number; idemKey: string; stepKey?: string; kind: StepKind; settingsVersion: number | null; detail: Record<string, any> }
 
 const toRow = (r: any): StepRow => ({
   id: Number(r.id), launchId: Number(r.launch_id), idemKey: r.idem_key, kind: r.kind, status: r.status,
@@ -22,8 +23,8 @@ export const json = (v: unknown) => JSON.stringify(v, (_k, x) => (typeof x === "
 
 export async function beginStep(sql: SQL, a: StepInput): Promise<StepRow> {
   const [r] = await sql`
-    insert into distributions (launch_id, idem_key, kind, status, settings_version, detail)
-    values (${a.launchId}, ${a.idemKey}, ${a.kind}, 'pending', ${a.settingsVersion}, ${json(a.detail)}::text::jsonb)
+    insert into distributions (launch_id, idem_key, step_key, kind, status, settings_version, detail)
+    values (${a.launchId}, ${a.idemKey}, ${a.stepKey ?? a.idemKey}, ${a.kind}, 'pending', ${a.settingsVersion}, ${json(a.detail)}::text::jsonb)
     on conflict (idem_key) do update set updated_at = now()
     returning *`;
   return toRow(r);
@@ -39,8 +40,27 @@ export async function resetToPending(sql: SQL, id: number) {
     where id = ${id} and status = 'sent'`;
 }
 
-export async function failStep(sql: SQL, id: number, error: string) {
-  await sql`update distributions set status = 'failed', error = ${error}, updated_at = now() where id = ${id} and status in ('pending', 'sent')`;
+export async function failStep(sql: SQL, id: number, error: string, countAttempt = false) {
+  await sql`update distributions set status = 'failed', error = ${error}, attempts = attempts + ${countAttempt ? 1 : 0}, updated_at = now()
+    where id = ${id} and status in ('pending', 'sent')`;
+}
+
+export async function retryFailed(sql: SQL, id: number) {
+  await sql`update distributions set status = 'pending', signature = null, last_valid_block_height = null, error = null, updated_at = now()
+    where id = ${id} and status = 'failed'`;
+}
+
+// Abandoned rows never reached the chain, so they do not count toward the retry cap.
+export async function failuresSinceConfirmed(sql: SQL, stepKey: string): Promise<number> {
+  const [r] = await sql`select count(*)::int as n from distributions
+    where step_key = ${stepKey} and status = 'failed' and coalesce(error, '') <> 'abandoned before send'
+      and id > coalesce((select max(id) from distributions where step_key = ${stepKey} and status = 'confirmed'), 0)`;
+  return r.n;
+}
+
+export async function launchesWithSentSteps(sql: SQL): Promise<Set<number>> {
+  const rows = await sql`select distinct launch_id from distributions where status = 'sent'`;
+  return new Set(rows.map((r: any) => Number(r.launch_id)));
 }
 
 // CHECK (amount >= 0) is evaluated on the proposed row before ON CONFLICT, so debits must go through a plain UPDATE.

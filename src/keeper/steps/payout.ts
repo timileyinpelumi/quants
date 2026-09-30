@@ -17,7 +17,7 @@ export async function payoutStep(deps: KeeperDeps, launch: LaunchRow, s: Version
     const amount = await getBalance(deps.sql, launch.id, t.bucket, mint);
     if (amount === 0n || amount < t.min) continue;
     await runTxStep(deps.sql, deps.chain, {
-      launchId: launch.id, idemKey: `payout:${launch.id}:${runId}:${t.bucket}`, kind: "payout", settingsVersion: s.version,
+      launchId: launch.id, idemKey: `payout:${launch.id}:${runId}:${t.bucket}`, stepKey: `payout:${launch.id}:${t.bucket}`, kind: "payout", settingsVersion: s.version,
       detail: { bucket: t.bucket, mint, amount: amount.toString(), to: t.to },
       build: () => deps.chain.buildTransfer(mint, t.to, amount),
       resolve: payoutResolver,

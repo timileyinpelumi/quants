@@ -2,7 +2,7 @@ import type { KeeperDeps } from "./deps";
 import { loadLaunches, type LaunchRow } from "./launch-row";
 import { makeResolvers } from "./resolvers";
 import { loadLatestSettings, type VersionedSettings } from "../domain/settings";
-import { abandonUnsent, ledgerTotals, openSentSteps } from "../ledger/ledger";
+import { abandonUnsent, launchesWithSentSteps, ledgerTotals, openSentSteps } from "../ledger/ledger";
 import { resolveSent } from "../ledger/run-step";
 import { graduateStep } from "./steps/graduate";
 import { claimStep } from "./steps/claim";
@@ -19,7 +19,11 @@ export async function resume(deps: KeeperDeps) {
   await abandonUnsent(deps.sql);
   const resolvers = makeResolvers(deps);
   for (const row of await openSentSteps(deps.sql)) {
-    await resolveSent(deps.sql, deps.chain, row, resolvers[row.kind]);
+    try {
+      await resolveSent(deps.sql, deps.chain, row, resolvers[row.kind]);
+    } catch (e) {
+      console.error(`resume ${row.idemKey} failed`, e);
+    }
   }
 }
 
@@ -51,7 +55,10 @@ export async function runKeeper(deps: KeeperDeps) {
   const runId = crypto.randomUUID();
   const launches = await loadLaunches(deps.sql, deps.ourtokenMint);
   const errors: { launchId: number; error: string }[] = [];
+  // A launch with a transaction still in flight is skipped: its balances are not final until that step resolves.
+  const inFlight = await launchesWithSentSteps(deps.sql);
   for (const launch of launches) {
+    if (inFlight.has(launch.id)) continue;
     try {
       await processLaunch(deps, launch, settings, runId);
     } catch (e) {

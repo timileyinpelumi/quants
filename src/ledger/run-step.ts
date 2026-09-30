@@ -1,6 +1,6 @@
 import type { SQL } from "bun";
 import type { ChainPort, SignedTx } from "../chain/port";
-import { beginStep, confirmStep, failStep, markSent, resetToPending, type Delta, type DeltaResolver, type StepInput, type StepRow } from "./ledger";
+import { beginStep, confirmStep, failStep, failuresSinceConfirmed, markSent, resetToPending, retryFailed, type Delta, type DeltaResolver, type StepInput, type StepRow } from "./ledger";
 
 export const MAX_ATTEMPTS = 5;
 export type Outcome = "confirmed" | "failed" | "pending";
@@ -29,14 +29,26 @@ export async function runTxStep(
   sql: SQL, chain: ChainPort,
   spec: StepInput & { build: (row: StepRow) => Promise<SignedTx>; resolve: DeltaResolver },
 ): Promise<Outcome> {
+  if (spec.stepKey && spec.stepKey !== spec.idemKey && (await failuresSinceConfirmed(sql, spec.stepKey)) >= MAX_ATTEMPTS) return "failed";
   let row = await beginStep(sql, spec);
-  if (row.status === "confirmed" || row.status === "failed") return row.status;
+  if (row.status === "confirmed") return "confirmed";
+  if (row.status === "failed") {
+    if (row.attempts >= MAX_ATTEMPTS) return "failed";
+    await retryFailed(sql, row.id);
+    row = { ...row, status: "pending", signature: null, lastValidBlockHeight: null };
+  }
   if (row.status === "sent") {
     const r = await resolveSent(sql, chain, row, spec.resolve);
     if (r !== "expired") return r;
     row = { ...row, status: "pending", signature: null, lastValidBlockHeight: null };
   }
-  const tx = await spec.build(row);
+  let tx: SignedTx;
+  try {
+    tx = await spec.build(row);
+  } catch (e) {
+    await failStep(sql, row.id, `build failed: ${e}`, true);
+    return "failed";
+  }
   await markSent(sql, row.id, tx.signature, tx.lastValidBlockHeight);
   row = { ...row, status: "sent", signature: tx.signature, lastValidBlockHeight: tx.lastValidBlockHeight, attempts: row.attempts + 1 };
   try {

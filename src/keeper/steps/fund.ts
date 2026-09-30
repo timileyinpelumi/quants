@@ -25,7 +25,7 @@ export async function fundStep(deps: KeeperDeps, launch: LaunchRow, s: Versioned
       const rs = await deps.staking.rewardState(farm, mint);
       const rawRps = kaminoRawRps(rs.available + amount, s.rewardPeriodSeconds, rs.rpsDecimals);
       await runTxStep(deps.sql, deps.chain, {
-        launchId: launch.id, idemKey: `fund:${launch.id}:${runId}:${tierId}:${mint}`, kind: "fund", settingsVersion: s.version,
+        launchId: launch.id, idemKey: `fund:${launch.id}:${runId}:${tierId}:${mint}`, stepKey: `fund:${launch.id}:${tierId}:${mint}`, kind: "fund", settingsVersion: s.version,
         detail: { farm, rewardMint: mint, amount: amount.toString(), rawRps: rawRps.toString() },
         build: () => deps.staking.buildFund({ farm, rewardMint: mint, amount, rawRps, decimals: rs.decimals }),
         resolve: fundResolver,

@@ -9,7 +9,10 @@ export class FakeMeteora implements MeteoraPort {
   launches: LaunchTxInput[] = [];
   constructor(private chain: FakeChain) {}
   async pendingPartnerQuoteFee(pool: string) { return this.partnerFee.get(pool) ?? 0n; }
-  async buildClaimPartnerFee(pool: string) { return this.chain.tx(`claim-${pool}`); }
+  async buildClaimPartnerFee(pool: string) {
+    const t = this.chain.tx(`claim-${pool}`);
+    return { ...t, send: async () => { await t.send(); this.partnerFee.set(pool, 0n); } };
+  }
   async buildClaimPositionFee(p: GraduatedPosition) { return this.chain.tx(`claimpos-${p.dammPool}`); }
   async curveState(pool: string) { return this.curve.get(pool) ?? { migrated: false, complete: false }; }
   async buildMigrate(pool: string) { return this.chain.tx(`migrate-${pool}`); }

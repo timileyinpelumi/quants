@@ -63,3 +63,70 @@ test("one launch failing does not stop the others", async () => {
   expect(r.errors.length).toBe(1);
   expect(await getBalance(f.sql, good, "unsplit", NATIVE_MINT) + await getBalance(f.sql, good, "basket", NATIVE_MINT)).toBeGreaterThan(0n);
 });
+
+function transfersEndAs(f: Awaited<ReturnType<typeof full>>, state: "unknown" | "failed") {
+  const orig = f.chain.buildTransfer.bind(f.chain);
+  const built: string[] = [];
+  f.chain.buildTransfer = async (...a) => {
+    const t = await orig(...a);
+    built.push(t.signature);
+    return { ...t, send: async () => { await t.send(); f.chain.states.set(t.signature, state); } };
+  };
+  return { built, restore: () => { f.chain.buildTransfer = orig; } };
+}
+
+test("restart with a transfer still in flight does not pay the balance a second time", async () => {
+  const f = await full();
+  const id = await insertLaunch(f.sql, { pool: "P9" });
+  f.meteora.partnerFee.set("P9", 100_000_000n);
+  const t = transfersEndAs(f, "unknown");
+  await runKeeper(f.deps);
+  expect(t.built.length).toBe(1);
+  await runKeeper(f.deps);
+  expect(t.built.length).toBe(1);
+  f.chain.states.set(t.built[0]!, "confirmed");
+  t.restore();
+  const r = await runKeeper(f.deps);
+  expect(r.errors).toEqual([]);
+  expect(t.built.length).toBe(1);
+  expect(await getBalance(f.sql, id, "treasury", NATIVE_MINT)).toBe(0n);
+});
+
+test("a row whose resolver throws does not stop other launches", async () => {
+  const f = await full();
+  const stuck = await insertLaunch(f.sql, { pool: "S1" });
+  const good = await insertLaunch(f.sql, { pool: "G1" });
+  const row = await beginStep(f.sql, { launchId: stuck, idemKey: "claim:bad", kind: "claim", settingsVersion: 1, detail: { source: "damm", quoteMint: NATIVE_MINT } });
+  await markSent(f.sql, row.id, "landed", 10_000n);
+  f.chain.states.set("landed", "confirmed");
+  f.chain.received = async () => { throw new Error("rpc lag"); };
+  f.meteora.partnerFee.set("G1", 1_000n);
+  const r = await runKeeper(f.deps);
+  expect(await getBalance(f.sql, good, "unsplit", NATIVE_MINT) + await getBalance(f.sql, good, "basket", NATIVE_MINT)).toBeGreaterThan(0n);
+  expect(r.errors).toEqual([]);
+});
+
+test("a transfer that fails on-chain every run stops after MAX_ATTEMPTS runs", async () => {
+  const f = await full();
+  const id = await insertLaunch(f.sql, { pool: "P10" });
+  f.meteora.partnerFee.set("P10", 100_000_000n);
+  const t = transfersEndAs(f, "failed");
+  for (let i = 0; i < 8; i++) await runKeeper(f.deps);
+  expect(t.built.length).toBe(5);
+  expect(await getBalance(f.sql, id, "treasury", NATIVE_MINT)).toBe(25_000_000n);
+});
+
+test("a farm creation whose build throws once is retried on the next run", async () => {
+  const f = await full();
+  const id = await insertLaunch(f.sql, { pool: "P11" });
+  await f.sql`insert into baskets values (${id}, 'ZEC', 10000)`;
+  await f.sql`insert into stake_pools values (${id}, 'kamino', 3000, 'SpillAta', 'pending')`;
+  await f.sql`insert into stake_tiers (launch_id, tier_id, lock_seconds, multiplier_bps) values (${id}, '7d', 604800, 10000)`;
+  const orig = f.staking.buildCreateFarm.bind(f.staking);
+  let calls = 0;
+  f.staking.buildCreateFarm = async (...a) => { if (calls++ === 0) throw new Error("rpc blip"); return orig(...a); };
+  await runKeeper(f.deps);
+  await runKeeper(f.deps);
+  const [p] = await f.sql`select status from stake_pools where launch_id = ${id}`;
+  expect(p.status).toBe("ready");
+});
