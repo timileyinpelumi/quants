@@ -1,4 +1,4 @@
-# Launchpad design
+# Quants design
 
 Date: 2026-09-30
 Status: draft, awaiting review
@@ -179,4 +179,4 @@ Our own staking program, deferred. It would replace the workarounds: exact multi
 - OURTOKEN mint address and token program.
 - Time to get a DBC token badge from Meteora.
 - Whether Kamino accepts rate changes on a farm with active stakers the way the design assumes (phase 0).
-- Project name (`launchpad` is a working name).
+- Project name: quants (decided 2026-09-30).
