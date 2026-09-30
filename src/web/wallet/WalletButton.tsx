@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 import { Avatar } from "@/web/ui/Avatar";
+import { Jazzicon } from "@/web/ui/Jazzicon";
 import { fmtAmount, shortAddr } from "@/web/ui/format";
 
 type Held = { mint: string; amount: string; decimals: number; symbol: string | null; name: string | null; image: string | null; kind: "launch" | "platform" | "reward" | "other" };
@@ -31,7 +32,7 @@ export function WalletButton() {
         aria-label={`Wallet ${owner}`}
         className="flex items-center gap-2.5 pl-1.5 pr-4 min-h-11 rounded-full bg-raised-2 border border-white/10 hover:border-white/25 cursor-pointer"
       >
-        <Avatar seed={owner} label={owner} size={30} />
+        <Jazzicon address={owner} size={30} />
         <span className="font-mono text-sm">{shortAddr(owner)}</span>
       </button>
       {open && <AccountModal owner={owner} onClose={() => setOpen(false)} />}
@@ -72,7 +73,7 @@ function AccountModal({ owner, onClose }: { owner: string; onClose: () => void }
       <button type="button" aria-label="Close" onClick={onClose} className="absolute inset-0 bg-black/60 backdrop-blur-sm cursor-default" />
       <div role="dialog" aria-modal="true" aria-label="Your wallet" className="panel relative w-full md:w-[420px] max-h-[85vh] flex flex-col rounded-b-none md:rounded-[32px]">
         <div className="flex items-center gap-4 p-6 pb-4">
-          <Avatar seed={owner} label={owner} size={52} />
+          <Jazzicon address={owner} size={52} />
           <div className="flex flex-col gap-1 min-w-0 flex-1">
             <span className="font-mono text-base truncate">{shortAddr(owner)}</span>
             <button type="button" onClick={copy} className="self-start text-[13px] text-lime cursor-pointer min-h-6">{copied ? "Copied" : "Copy address"}</button>

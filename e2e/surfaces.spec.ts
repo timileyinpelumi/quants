@@ -36,6 +36,9 @@ test("wallet modal shows SOL and token balances and links to stakes", async ({ p
   await dialog.getByRole("link", { name: "Your stakes" }).click();
   await expect(page).toHaveURL(/\/portfolio$/);
   await expect(page.getByRole("heading", { name: "Portfolio" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Native" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Tokens launched here" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Stakes" })).toBeVisible();
 });
 
 test("docs, terms, portfolio and 404 render", async ({ page }) => {
