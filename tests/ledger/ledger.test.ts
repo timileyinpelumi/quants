@@ -55,3 +55,25 @@ test("ledgerTotals groups penalty under spill and the rest under keeper", async 
   expect(t.get(`keeper:${M}`)).toBe(15n);
   expect(t.get(`spill:${M}`)).toBe(3n);
 });
+
+test("a debit against an existing balance succeeds and moves the funds", async () => {
+  const sql = await freshDb();
+  const launchId = await insertLaunch(sql);
+  const a = await beginStep(sql, { launchId, idemKey: "credit", kind: "claim", settingsVersion: 1, detail: {} });
+  await confirmStep(sql, a, [{ bucket: "unsplit", mint: M, amount: 100n }]);
+  const b = await beginStep(sql, { launchId, idemKey: "move", kind: "split", settingsVersion: 1, detail: {} });
+  expect(await confirmStep(sql, b, [{ bucket: "unsplit", mint: M, amount: -100n }, { bucket: "basket", mint: M, amount: 100n }])).toBe(true);
+  expect(await getBalance(sql, launchId, "unsplit", M)).toBe(0n);
+  expect(await getBalance(sql, launchId, "basket", M)).toBe(100n);
+});
+
+test("a debit larger than the existing balance rejects the step", async () => {
+  const sql = await freshDb();
+  const launchId = await insertLaunch(sql);
+  const a = await beginStep(sql, { launchId, idemKey: "credit", kind: "claim", settingsVersion: 1, detail: {} });
+  await confirmStep(sql, a, [{ bucket: "unsplit", mint: M, amount: 100n }]);
+  const b = await beginStep(sql, { launchId, idemKey: "over", kind: "split", settingsVersion: 1, detail: {} });
+  await expect(confirmStep(sql, b, [{ bucket: "unsplit", mint: M, amount: -101n }, { bucket: "basket", mint: M, amount: 101n }])).rejects.toThrow();
+  expect(await getBalance(sql, launchId, "unsplit", M)).toBe(100n);
+  expect(await getBalance(sql, launchId, "basket", M)).toBe(0n);
+});

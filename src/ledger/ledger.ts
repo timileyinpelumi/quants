@@ -43,6 +43,7 @@ export async function failStep(sql: SQL, id: number, error: string) {
   await sql`update distributions set status = 'failed', error = ${error}, updated_at = now() where id = ${id} and status in ('pending', 'sent')`;
 }
 
+// CHECK (amount >= 0) is evaluated on the proposed row before ON CONFLICT, so debits must go through a plain UPDATE.
 export async function confirmStep(sql: SQL, row: StepRow, deltas: Delta[], detail: Record<string, any> = {}): Promise<boolean> {
   const payload = json(deltas.map((d) => ({ bucket: d.bucket, mint: d.mint, amount: d.amount.toString() })));
   const [r] = await sql`
@@ -53,10 +54,14 @@ export async function confirmStep(sql: SQL, row: StepRow, deltas: Delta[], detai
       select x.bucket, x.mint, sum(x.amount::numeric) as amount
       from jsonb_to_recordset(${payload}::text::jsonb) as x(bucket text, mint text, amount text)
       group by x.bucket, x.mint
+    ), upd as (
+      update escrow e set amount = e.amount + d.amount
+      from s, d where e.launch_id = s.launch_id and e.bucket = d.bucket and e.mint = d.mint
+      returning e.bucket, e.mint
     ), ins as (
       insert into escrow (launch_id, bucket, mint, amount)
       select s.launch_id, d.bucket, d.mint, d.amount from s cross join d
-      on conflict (launch_id, bucket, mint) do update set amount = escrow.amount + excluded.amount
+      where not exists (select 1 from escrow e where e.launch_id = s.launch_id and e.bucket = d.bucket and e.mint = d.mint)
       returning 1
     )
     select (select count(*) from s)::int as updated`;
