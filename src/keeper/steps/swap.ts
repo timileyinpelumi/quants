@@ -26,7 +26,10 @@ export async function swapStep(deps: KeeperDeps, launch: LaunchRow, s: Versioned
       });
       continue;
     }
-    const q = await deps.jupiter.quote(input, outputMint, amountIn, s.slippageBps);
+    const q = await deps.jupiter.quote(input, outputMint, amountIn, s.slippageBps).catch((e) => {
+      console.error(`quote for ${outputMint} failed`, e);
+      return null;
+    });
     if (!q || q.priceImpactBps > s.slippageBps) continue;
     await runTxStep(deps.sql, deps.chain, {
       launchId: launch.id, idemKey, stepKey: `swap:${launch.id}:${outputMint}`, kind: "swap", settingsVersion: s.version,
