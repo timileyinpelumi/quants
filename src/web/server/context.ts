@@ -8,7 +8,7 @@ import { KaminoBackend } from "@/staking/kamino";
 import type { StakingAdapter } from "@/staking/adapter";
 import { JupiterLive, type JupiterPort } from "@/jupiter/port";
 import { PinataRest, type PinataPort } from "./pinata";
-import type { ChartSource } from "./chart";
+import { GeckoChart, type ChartSource } from "./chart";
 
 export interface WebContext {
   sql: SQL;
@@ -28,10 +28,8 @@ export interface WebContext {
 }
 
 let ctx: WebContext | null = null;
-let factories: { chart?: () => ChartSource } = {};
 
 export const setContextForTests = (c: WebContext | null) => { ctx = c; };
-export const registerFactories = (f: typeof factories) => { factories = { ...factories, ...f }; };
 
 export function getContext(): WebContext {
   if (ctx) return ctx;
@@ -46,7 +44,7 @@ export function getContext(): WebContext {
     staking: new KaminoBackend(chain, e.RPC_URL!, e.KAMINO_GLOBAL_CONFIG!),
     jupiter: new JupiterLive(e.JUPITER_BASE_URL ?? "https://api.jup.ag/swap/v1", chain, fetch, e.JUPITER_API_KEY),
     pinata: new PinataRest(e.PINATA_JWT!),
-    chart: factories.chart!(),
+    chart: new GeckoChart(e.GECKO_BASE ?? "https://api.geckoterminal.com/api/v2"),
     configKeys: JSON.parse(readFileSync(e.CONFIG_KEYS_PATH ?? "config-keys.json", "utf8")),
     keeperAddress: e.KEEPER_ADDRESS!,
     spillWallet: new PublicKey(e.SPILL_ADDRESS!),
