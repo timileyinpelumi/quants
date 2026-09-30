@@ -4,9 +4,12 @@
   "type": "module",
   "dependencies": {
     "@kamino-finance/farms-sdk": "4.0.1",
+    "@meteora-ag/cp-amm-sdk": "1.5.1",
+    "@meteora-ag/dynamic-bonding-curve-sdk": "1.5.13",
     "@solana/kit": "^7",
     "@solana/spl-token": "^0.4.13",
     "@solana/web3.js": "^1.98",
+    "bn.js": "^5.2.5",
     "decimal.js": "^10.6.0"
   }
 }
