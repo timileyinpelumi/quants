@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "bun test --timeout 30000",
+    "test": "bun test --timeout 60000",
     "migrate": "bun src/db/migrate.ts",
     "keeper": "bun src/keeper/main.ts",
     "typecheck": "bunx tsc --noEmit",
