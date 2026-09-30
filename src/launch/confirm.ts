@@ -25,12 +25,14 @@ export async function confirmLaunch(
   const [row] = await deps.sql`
     with s as (select data from settings where version = ${prep.settings_version}),
     l as (
-      insert into launches (mint, pool, quote_mint, fee_tier_bps, config_key, creator, status, settings_version)
-      values (${i.mint}, ${prep.pool}, ${prep.quote_mint}, ${prep.fee_tier_bps}, ${prep.config_key}, ${prep.creator}, 'live', ${prep.settings_version})
+      insert into launches (mint, pool, quote_mint, fee_tier_bps, config_key, creator, status, settings_version, name, symbol, uri, image)
+      values (${i.mint}, ${prep.pool}, ${prep.quote_mint}, ${prep.fee_tier_bps}, ${prep.config_key}, ${prep.creator}, 'live', ${prep.settings_version},
+              ${prep.name}, ${prep.symbol}, ${prep.uri}, ${prep.image})
       on conflict (mint) do nothing returning id
     ), b as (
-      insert into baskets (launch_id, reward_mint, weight_bps)
-      select l.id, x.mint, x."weightBps" from l cross join jsonb_to_recordset(${JSON.stringify(prep.basket)}::text::jsonb) as x(mint text, "weightBps" int)
+      insert into baskets (launch_id, reward_mint, weight_bps, symbol, decimals)
+      select l.id, x.mint, x."weightBps", x.symbol, x.decimals
+      from l cross join jsonb_to_recordset(${JSON.stringify(prep.basket)}::text::jsonb) as x(mint text, "weightBps" int, symbol text, decimals int)
     ), p as (
       insert into stake_pools (launch_id, backend, max_penalty_bps, spill_account, status)
       select l.id, s.data->>'defaultBackend', (s.data->>'maxPenaltyBps')::int, ${spillAccount}, 'pending' from l, s

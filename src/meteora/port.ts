@@ -16,6 +16,7 @@ export interface MeteoraPort {
   buildClaimPositionFee(p: GraduatedPosition): Promise<SignedTx>;
   curveState(pool: string): Promise<{ migrated: boolean; complete: boolean }>;
   poolInfo(pool: string): Promise<{ baseMint: string; config: string; creator: string } | null>;
+  curveProgress(pool: string): Promise<{ quoteReserve: bigint; threshold: bigint; migrated: boolean }>;
   buildMigrate(pool: string): Promise<SignedTx>;
   findGraduatedPosition(configKey: string, baseMint: string, quoteMint: string): Promise<GraduatedPosition | null>;
   buildLaunchTx(input: LaunchTxInput): Promise<{ tx: Transaction; baseMint: Keypair; pool: string }>;
@@ -61,6 +62,14 @@ export class MeteoraLive implements MeteoraPort {
     const cfg = await this.dbc.state.getPoolConfig(p.poolState.config);
     if (!cfg) throw new Error(`config ${p.poolState.config.toBase58()} not found`);
     return { migrated: p.poolState.isMigrated !== 0, complete: p.poolState.quoteReserve.gte(cfg.migrationQuoteThreshold) };
+  }
+
+  async curveProgress(pool: string) {
+    const p = await this.dbc.state.getPool(pool);
+    if (!p) throw new Error(`pool ${pool} not found`);
+    const cfg = await this.dbc.state.getPoolConfig(p.poolState.config);
+    if (!cfg) throw new Error(`config ${p.poolState.config.toBase58()} not found`);
+    return { quoteReserve: BigInt(p.poolState.quoteReserve.toString()), threshold: BigInt(cfg.migrationQuoteThreshold.toString()), migrated: p.poolState.isMigrated !== 0 };
   }
 
   async poolInfo(pool: string) {

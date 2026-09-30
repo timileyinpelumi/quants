@@ -16,10 +16,11 @@ const launchInput = (ourtokenMint: string) => z.object({
   name: z.string().trim().min(1).max(32),
   symbol: z.string().regex(/^[A-Za-z0-9]{1,10}$/),
   uri: z.string().url().startsWith("https://"),
+  image: z.string().url().startsWith("https://").optional(),
   creator: addr,
   quoteMint: z.enum([NATIVE_MINT, ourtokenMint] as [string, string]),
   feeTierBps: z.number().refine((v) => (FEE_TIERS_BPS as readonly number[]).includes(v)),
-  basket: z.array(z.object({ mint: addr, weightBps: z.number().int().positive() })).min(1).max(3)
+  basket: z.array(z.object({ mint: addr, weightBps: z.number().int().positive(), symbol: z.string().max(20).optional(), decimals: z.number().int().min(0).max(18).optional() })).min(1).max(3)
     .refine((b) => new Set(b.map((x) => x.mint)).size === b.length, "duplicate basket token")
     .refine((b) => b.reduce((a, x) => a + x.weightBps, 0) === 10_000, "weights must sum to 10000"),
   devBuyQuoteAmount: uint,
@@ -57,9 +58,9 @@ export async function prepareLaunch(
     devBuyQuoteAmount: input.devBuyQuoteAmount, devBuyMinOut: input.devBuyMinOut,
   });
   const mint = baseMint.publicKey.toBase58();
-  await deps.sql`insert into prepared_launches (mint, pool, quote_mint, fee_tier_bps, config_key, creator, basket, settings_version)
+  await deps.sql`insert into prepared_launches (mint, pool, quote_mint, fee_tier_bps, config_key, creator, basket, settings_version, name, symbol, uri, image)
     values (${mint}, ${pool}, ${input.quoteMint}, ${input.feeTierBps}, ${configKey}, ${input.creator},
-            ${JSON.stringify(input.basket)}::text::jsonb, ${settings.version})`;
+            ${JSON.stringify(input.basket)}::text::jsonb, ${settings.version}, ${input.name}, ${input.symbol}, ${input.uri}, ${input.image ?? null})`;
   return {
     transaction: tx.serialize({ requireAllSignatures: false }).toString("base64"),
     mint,

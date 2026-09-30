@@ -1,0 +1,69 @@
+import { test, expect } from "bun:test";
+import { makeWebContext } from "../helpers/web-context";
+import { prepareLaunch } from "../../src/launch/prepare";
+import { confirmLaunch } from "../../src/launch/confirm";
+import { listLaunches, launchDetail } from "../../src/web/server/reads";
+import { beginStep, confirmStep } from "../../src/ledger/ledger";
+import { GET as detailRoute } from "../../src/app/api/launches/[mint]/route";
+import { NATIVE_MINT } from "../../src/domain/types";
+
+const ZEC = "Zec1111111111111111111111111111111111111111";
+const CREATOR = "Creator111111111111111111111111111111111111";
+
+async function launch(c: Awaited<ReturnType<typeof makeWebContext>>, symbol: string) {
+  const p = await prepareLaunch(
+    { sql: c.sql, meteora: c.meteora, configKeys: c.configKeys, ourtokenMint: c.ourtokenMint, keeperAddress: c.keeperAddress, isVerified: async () => true, tokenProgramOf: c.tokenProgramOf },
+    { name: `${symbol} Coin`, symbol, uri: "https://ipfs.io/ipfs/m", image: "https://ipfs.io/ipfs/i", creator: CREATOR, quoteMint: NATIVE_MINT, feeTierBps: 200,
+      basket: [{ mint: ZEC, weightBps: 10_000, symbol: "ZEC", decimals: 8 }] },
+  );
+  (c.meteora as any).pools.set(p.pool, { baseMint: p.mint, config: "CfgSol200", creator: CREATOR });
+  const id = await confirmLaunch({ sql: c.sql, conn: { getSignatureStatuses: async () => ({ value: [{ err: null }] }) } as any, meteora: c.meteora, spillWallet: c.spillWallet }, { signature: "s", mint: p.mint });
+  return { ...p, id };
+}
+
+async function step(c: any, launchId: number, key: string, kind: string, detail: object) {
+  const r = await beginStep(c.sql, { launchId, idemKey: key, kind: kind as any, settingsVersion: 1, detail });
+  await confirmStep(c.sql, r, []);
+}
+
+test("listLaunches returns newest first with metadata and burned totals", async () => {
+  const c = await makeWebContext();
+  const a = await launch(c, "CAT");
+  const b = await launch(c, "DOG");
+  await step(c, a.id, "burn1", "burn", { mint: a.mint, amount: "300" });
+  const list = await listLaunches(c.sql, {});
+  expect(list.map((l) => l.symbol)).toEqual(["DOG", "CAT"]);
+  expect(list[1]!.burned).toBe("300");
+  expect(list[1]!.basket).toEqual([{ mint: ZEC, symbol: "ZEC" }]);
+  expect(list[1]!.image).toBe("https://ipfs.io/ipfs/i");
+  expect((await listLaunches(c.sql, { graduated: true })).length).toBe(0);
+  void b;
+});
+
+test("launchDetail sums paid out and burned, and weights tier shares by multiplier", async () => {
+  const c = await makeWebContext();
+  const a = await launch(c, "CAT");
+  const tiers = await c.sql`select tier_id from stake_tiers where launch_id = ${a.id} order by lock_seconds`;
+  for (const t of tiers) await c.sql`update stake_tiers set farm = ${"farm-" + t.tier_id} where launch_id = ${a.id} and tier_id = ${t.tier_id}`;
+  const staking = c.staking as any;
+  staking.staked.set("farm-7d", 100n).set("farm-180d", 100n);
+  (c.meteora as any).progress.set(a.pool, { quoteReserve: 40n, threshold: 80n, migrated: false });
+  await step(c, a.id, "f1", "fund", { farm: "farm-7d", rewardMint: ZEC, amount: "100" });
+  await step(c, a.id, "f2", "fund", { farm: "farm-180d", rewardMint: ZEC, amount: "50" });
+  await step(c, a.id, "b1", "burn", { mint: a.mint, amount: "300" });
+  const d = (await launchDetail(c, a.mint))!;
+  expect(d.launch.symbol).toBe("CAT");
+  expect(d.basket).toEqual([{ mint: ZEC, symbol: "ZEC", decimals: 8, weightBps: 10_000, paidOut: "150" }]);
+  expect(d.burned).toBe("300");
+  expect(d.tiers.map((t) => t.sharePct)).toEqual([25, 0, 0, 75]);
+  expect(d.tiers[0]!.staked).toBe("100");
+  expect(d.curve).toEqual({ quoteReserve: "40", threshold: "80", migrated: false });
+  expect(await launchDetail(c, "unknown")).toBeNull();
+});
+
+test("detail route returns 404 json for an unknown mint", async () => {
+  await makeWebContext();
+  const r = await detailRoute(new Request("http://x"), { params: Promise.resolve({ mint: "nope" }) });
+  expect(r.status).toBe(404);
+  expect((await r.json()).error.code).toBe("not_found");
+});

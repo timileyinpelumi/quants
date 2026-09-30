@@ -54,6 +54,7 @@ test.skipIf(!up)("launch, claim partner fee, graduate, find position, claim posi
     await sendAndConfirmTransaction(conn, swap, [buyer]);
   }
   expect(await m.curveState(pool)).toEqual({ migrated: false, complete: true });
+  expect((await m.curveProgress(pool)).quoteReserve).toBeGreaterThanOrEqual((await m.curveProgress(pool)).threshold);
   expect(await m.findGraduatedPosition(config.publicKey.toBase58(), baseMint.publicKey.toBase58(), NATIVE_MINT)).toBeNull();
 
   await run(await m.buildMigrate(pool));
