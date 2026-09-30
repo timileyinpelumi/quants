@@ -100,6 +100,7 @@ docker compose up -d
 solana-test-validator ... (flags in "Local end-to-end run" above)
 bun run seed                                  # writes .env.local and config-keys.json, launches CAT and DOG
 bun --env-file=.env.local scripts/keeper-once.ts
-bun run dev                                   # http://localhost:3000, connect "Test Wallet"
+bun run dev                                   # http://localhost:3000 (webpack dev server), connect "Test Wallet"
+# Do not run `bun run build` while the dev server is running: both write to .next.
 set -a; source .env.local; set +a; bun run e2e
 ```
