@@ -18,4 +18,11 @@ export class FakeStaking implements StakingAdapter {
   async buildFund(i: { farm: string; rewardMint: string; amount: bigint; rawRps: bigint }) { this.funded.push(i); return this.chain.tx("fund"); }
   async slashedAmount(farm: string) { return this.slashed.get(farm) ?? 0n; }
   async buildCollectPenalty() { return this.chain.tx("collect"); }
+  positions = new Map<string, import("../../src/staking/adapter").StakePosition>();
+  built: { action: string; owner: string; farm: string; amount?: bigint }[] = [];
+  async position(owner: string, farm: string) { return this.positions.get(`${owner}:${farm}`) ?? null; }
+  async buildStakeTx(owner: string, farm: string, _m: string, amount: bigint) { this.built.push({ action: "stake", owner, farm, amount }); return "dHg="; }
+  async buildClaimTx(owner: string, farm: string) { this.built.push({ action: "claim", owner, farm }); return "dHg="; }
+  async buildExitTx(owner: string, farm: string) { this.built.push({ action: "exit", owner, farm }); return "dHg="; }
+  async buildWithdrawTx(owner: string, farm: string) { this.built.push({ action: "withdraw", owner, farm }); return "dHg="; }
 }

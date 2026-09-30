@@ -1,12 +1,15 @@
-import { Keypair, PublicKey, SystemProgram, Transaction } from "@solana/web3.js";
+import { Keypair, PublicKey, SystemProgram, Transaction, type TransactionInstruction } from "@solana/web3.js";
 import { createAssociatedTokenAccountIdempotentInstruction, createSyncNativeInstruction, getAssociatedTokenAddressSync, NATIVE_MINT, TOKEN_PROGRAM_ID } from "@solana/spl-token";
 import { Farms, FarmConfigOption, getWithdrawSlashedAmountInstruction } from "@kamino-finance/farms-sdk";
-import { address, createSolanaRpc } from "@solana/kit";
+import { address, createNoopSigner, createSolanaRpc, none } from "@solana/kit";
 import Decimal from "decimal.js";
-import type { StakingAdapter } from "./adapter";
+import type { StakePosition, StakingAdapter } from "./adapter";
 import { fromKitInstruction, kitSigner, type SolanaChain } from "../chain/solana";
 
 const TOKEN_PROGRAM = address(TOKEN_PROGRAM_ID.toBase58());
+const WAD = 10n ** 18n;
+const EMPTY_MINT = "11111111111111111111111111111111";
+const userSigner = (owner: string) => createNoopSigner(address(owner));
 
 export class KaminoBackend implements StakingAdapter {
   readonly backend = "kamino" as const;
@@ -90,5 +93,66 @@ export class KaminoBackend implements StakingAdapter {
       farmVault: s.farmVault, farmVaultsAuthority: s.farmVaultsAuthority, tokenProgram: TOKEN_PROGRAM,
     });
     return this.chain.signLegacy(new Transaction().add(fromKitInstruction(ix)), []);
+  }
+
+  private async unsigned(ixs: TransactionInstruction[], owner: string): Promise<string> {
+    const tx = new Transaction().add(...ixs);
+    tx.feePayer = new PublicKey(owner);
+    tx.recentBlockhash = (await this.chain.conn.getLatestBlockhash("confirmed")).blockhash;
+    return tx.serialize({ requireAllSignatures: false, verifySignatures: false }).toString("base64");
+  }
+
+  private async userState(owner: string, farm: string) {
+    const [u] = await this.farms.getUserStatesForUserAndFarm(address(owner), address(farm));
+    return u ?? null;
+  }
+
+  async position(owner: string, farm: string): Promise<StakePosition | null> {
+    const u = await this.userState(owner, farm);
+    if (!u) return null;
+    const fs = await this.state(farm);
+    const now = new Decimal(Math.floor(Date.now() / 1000));
+    const { userPendingRewardAmounts } = this.farms.getUserPendingRewards(u.userState, fs, now, null);
+    const pending = fs.rewardInfos
+      .map((r, i) => {
+        const d = userPendingRewardAmounts[i]!;
+        // The SDK's estimate is NaN when the farm has no stake left; the stored unclaimed amount is then exact.
+        const amount = d.isFinite() ? (d.gt(0) ? BigInt(d.floor().toFixed(0)) : 0n) : u.userState.rewardsIssuedUnclaimed[i]!;
+        return { mint: r.token.mint as string, amount };
+      })
+      .filter((r) => r.mint !== EMPTY_MINT);
+    return {
+      staked: u.userState.activeStakeScaled / WAD,
+      activeShares: u.userState.activeStakeScaled,
+      lastStakeTs: Number(u.userState.lastStakeTs),
+      lockSeconds: Number(fs.lockingDuration),
+      pending,
+    };
+  }
+
+  async buildStakeTx(owner: string, farm: string, stakeMint: string, amount: bigint): Promise<string> {
+    const ixs: TransactionInstruction[] = [];
+    if (!(await this.userState(owner, farm))) ixs.push(fromKitInstruction(await this.farms.createNewUserIx(userSigner(owner), address(farm))));
+    ixs.push(fromKitInstruction(await this.farms.stakeIx(userSigner(owner), address(farm), new Decimal(amount.toString()), address(stakeMint), none())));
+    return this.unsigned(ixs, owner);
+  }
+
+  async buildClaimTx(owner: string, farm: string): Promise<string> {
+    const ixs = await this.farms.claimForUserForFarmAllRewardsIx(userSigner(owner), address(owner), address(farm), false);
+    return this.unsigned(ixs.map(fromKitInstruction), owner);
+  }
+
+  // Unstake takes stake shares scaled by 1e18, not token amounts (see docs/spikes/kamino.md).
+  async buildExitTx(owner: string, farm: string, stakeMint: string): Promise<string> {
+    const u = await this.userState(owner, farm);
+    if (!u || u.userState.activeStakeScaled === 0n) throw new Error("nothing staked");
+    return this.unsigned([
+      fromKitInstruction(await this.farms.unstakeIx(userSigner(owner), address(farm), new Decimal(u.userState.activeStakeScaled.toString()), none())),
+      fromKitInstruction(await this.farms.withdrawUnstakedDepositIx(userSigner(owner), u.key, address(farm), address(stakeMint))),
+    ], owner);
+  }
+
+  buildWithdrawTx(owner: string, farm: string, stakeMint: string): Promise<string> {
+    return this.buildExitTx(owner, farm, stakeMint);
   }
 }
