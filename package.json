@@ -6,7 +6,10 @@
     "test": "bun test --timeout 30000",
     "migrate": "bun src/db/migrate.ts",
     "keeper": "bun src/keeper/main.ts",
-    "typecheck": "bunx tsc --noEmit"
+    "typecheck": "bunx tsc --noEmit",
+    "dev": "bun --bun next dev",
+    "build": "bun --bun next build",
+    "start": "bun --bun next start"
   },
   "dependencies": {
     "@kamino-finance/farms-sdk": "4.0.1",
@@ -15,16 +18,31 @@
     "@solana/compat": "^7",
     "@solana/kit": "^7",
     "@solana/spl-token": "^0.4.13",
+    "@solana/wallet-adapter-base": "^0.9.28",
+    "@solana/wallet-adapter-react": "0.15.40",
+    "@solana/wallet-adapter-react-ui": "0.9.40",
     "@solana/web3.js": "^1.98",
     "bn.js": "^5.2.5",
     "bs58": "^6.0.0",
     "decimal.js": "^10.6.0",
+    "image-size": "2",
+    "jose": "6",
+    "lightweight-charts": "5.2.1",
+    "next": "16.3.8",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "tweetnacl": "^1.0.3",
     "zod": "^4.6.5"
   },
   "devDependencies": {
+    "@playwright/test": "1.63.0",
+    "@tailwindcss/postcss": "4.3.3",
     "@types/bn.js": "^5.2.0",
     "@types/bun": "^1.4.2",
     "@types/node": "^26.6.3",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "tailwindcss": "4.3.3",
     "typescript": "^7.0.2"
   }
 }

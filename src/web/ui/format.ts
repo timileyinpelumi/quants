@@ -1,0 +1,28 @@
+export function fmtAmount(base: bigint | string, decimals: number, maxFrac = 4): string {
+  const v = typeof base === "string" ? BigInt(base) : base;
+  const neg = v < 0n;
+  const abs = neg ? -v : v;
+  const unit = 10n ** BigInt(decimals);
+  const whole = (abs / unit).toLocaleString("en-US");
+  const frac = (abs % unit).toString().padStart(decimals, "0").slice(0, maxFrac).replace(/0+$/, "");
+  return `${neg ? "-" : ""}${whole}${frac ? "." + frac : ""}`;
+}
+
+export function fmtCompact(n: number): string {
+  const units: [number, string][] = [[1e9, "B"], [1e6, "M"], [1e3, "K"]];
+  for (const [v, s] of units) if (Math.abs(n) >= v) return `${(n / v).toFixed(1).replace(/\.0$/, "")}${s}`;
+  return String(Math.round(n));
+}
+
+export const shortAddr = (a: string) => `${a.slice(0, 4)}…${a.slice(-4)}`;
+
+const PAIRS: [string, string][] = [
+  ["#FFB86B", "#FF7A59"], ["#F9D976", "#F4B400"], ["#FFC1E3", "#FF7AB6"], ["#9FE7FF", "#4FB8FF"],
+  ["#C8FF3D", "#7BD61F"], ["#BDB2FF", "#8B7BFF"], ["#A7F3D0", "#34D399"],
+];
+
+export function avatarGradient(seed: string): [string, string] {
+  let h = 0;
+  for (const c of seed) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+  return PAIRS[h % PAIRS.length]!;
+}

@@ -1,3 +1,9 @@
 node_modules
 .env
 test-ledger
+.next
+next-env.d.ts
+*.tsbuildinfo
+test-results
+playwright-report
+.env.e2e
