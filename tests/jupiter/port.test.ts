@@ -40,3 +40,13 @@ test("searchVerified keeps verified classic SPL tokens only", async () => {
   expect((await j.searchVerified("a")).map((t) => t.mint)).toEqual(["A"]);
   expect(url).toBe("https://api.jup.ag/tokens/v2/search?query=a");
 });
+
+test("popularVerified reads top tokens and keeps verified classic SPL only", async () => {
+  let url = "";
+  const j = new JupiterLive("https://api.jup.ag/swap/v1", {} as any, async (u) => { url = String(u); return new Response(JSON.stringify([
+    { id: "S", symbol: "SOL", name: "Solana", icon: null, decimals: 9, isVerified: true, tokenProgram: "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA" },
+    { id: "P", symbol: "PUMP", name: "Pump", icon: null, decimals: 6, isVerified: true, tokenProgram: "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb" },
+  ])); });
+  expect((await j.popularVerified()).map((t) => t.symbol)).toEqual(["SOL"]);
+  expect(url).toBe("https://api.jup.ag/tokens/v2/toporganicscore/24h?limit=100");
+});

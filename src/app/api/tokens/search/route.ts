@@ -6,7 +6,8 @@ export const dynamic = "force-dynamic";
 export async function GET(req: Request) {
   try {
     const q = new URL(req.url).searchParams.get("q")?.trim() ?? "";
-    if (q.length < 2) return json({ tokens: [] });
+    if (q.length === 0) return json({ tokens: await getContext().jupiter.popularVerified(), popular: true });
+    if (q.length < 2 || q.length > 64) return json({ tokens: [] });
     return json({ tokens: (await getContext().jupiter.searchVerified(q)).slice(0, 20) });
   } catch (e) {
     return jsonError(e);

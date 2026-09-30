@@ -10,10 +10,14 @@ export interface JupiterPort {
   buildUnsignedSwap(q: SwapQuote, user: string): Promise<{ base64: string; lastValidBlockHeight: bigint }>;
   isVerified(mint: string): Promise<boolean>;
   searchVerified(query: string): Promise<VerifiedToken[]>;
+  popularVerified(): Promise<VerifiedToken[]>;
 }
 
 type Fetch = (url: string | URL, init?: RequestInit) => Promise<Response>;
 const CLASSIC_TOKEN_PROGRAM = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
+const keepClassicVerified = (rows: TokenRow[]): VerifiedToken[] => rows
+  .filter((t) => t.isVerified === true && t.tokenProgram === CLASSIC_TOKEN_PROGRAM)
+  .map((t) => ({ mint: t.id, symbol: t.symbol, name: t.name, icon: t.icon ?? null, decimals: t.decimals, tokenProgram: t.tokenProgram! }));
 type TokenRow = { id: string; symbol: string; name: string; icon?: string | null; decimals: number; tags?: string[]; isVerified?: boolean; tokenProgram?: string };
 
 export class JupiterLive implements JupiterPort {
@@ -55,6 +59,17 @@ export class JupiterLive implements JupiterPort {
     return { base64: swapTransaction, lastValidBlockHeight: BigInt(lastValidBlockHeight) };
   }
 
+  private popular: { at: number; list: VerifiedToken[] } | null = null;
+
+  async popularVerified(): Promise<VerifiedToken[]> {
+    if (this.popular && Date.now() - this.popular.at < 600_000) return this.popular.list;
+    const res = await this.fetchFn(`${this.tokensBase}/toporganicscore/24h?limit=100`, { headers: this.headers() });
+    if (!res.ok) return this.popular?.list ?? [];
+    const list = keepClassicVerified(await res.json() as TokenRow[]);
+    this.popular = { at: Date.now(), list };
+    return list;
+  }
+
   private async search(query: string): Promise<TokenRow[]> {
     const res = await this.fetchFn(`${this.tokensBase}/search?query=${encodeURIComponent(query)}`, { headers: this.headers() });
     if (!res.ok) return [];
@@ -67,8 +82,6 @@ export class JupiterLive implements JupiterPort {
   }
 
   async searchVerified(query: string): Promise<VerifiedToken[]> {
-    return (await this.search(query))
-      .filter((t) => t.isVerified === true && t.tokenProgram === CLASSIC_TOKEN_PROGRAM)
-      .map((t) => ({ mint: t.id, symbol: t.symbol, name: t.name, icon: t.icon ?? null, decimals: t.decimals, tokenProgram: t.tokenProgram! }));
+    return keepClassicVerified(await this.search(query));
   }
 }

@@ -34,6 +34,7 @@ function withLocalTokens(j: JupiterPort, list: string | undefined): JupiterPort 
   return Object.assign(Object.create(j), {
     searchVerified: async (q: string) => tokens.filter((t) => `${t.symbol} ${t.name} ${t.mint}`.toLowerCase().includes(q.toLowerCase())),
     isVerified: async (m: string) => tokens.some((t) => t.mint === m),
+    popularVerified: async () => tokens,
   });
 }
 

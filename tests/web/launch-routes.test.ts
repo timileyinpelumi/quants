@@ -76,3 +76,11 @@ test("basket symbols and decimals come from the server, not the request", async 
   const basket = typeof p.basket === "string" ? JSON.parse(p.basket) : p.basket;
   expect(basket[0]).toMatchObject({ symbol: "ZEC", decimals: 8 });
 });
+
+test("an empty search returns popular tokens", async () => {
+  const c = await makeWebContext();
+  (c.jupiter as any).popularVerified = async () => [{ mint: "S", symbol: "SOL", name: "Solana", icon: null, decimals: 9, tokenProgram: "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA" }];
+  const j = await (await search(new Request("http://x/api/tokens/search?q="))).json();
+  expect(j.tokens.map((t: any) => t.symbol)).toEqual(["SOL"]);
+  expect(j.popular).toBe(true);
+});

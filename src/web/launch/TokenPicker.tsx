@@ -14,6 +14,7 @@ export function TokenPicker({ open, onClose, onPick, taken }: {
   const [q, setQ] = useState("");
   const [found, setFound] = useState<PickedToken[]>([]);
   const [state, setState] = useState<"idle" | "searching" | "done" | "error">("idle");
+  const [popular, setPopular] = useState<PickedToken[] | null>(null);
   const input = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -22,10 +23,14 @@ export function TokenPicker({ open, onClose, onPick, taken }: {
     setFound([]);
     setState("idle");
     const t = setTimeout(() => input.current?.focus(), 30);
+    if (popular === null) {
+      fetch("/api/tokens/search?q=").then((r) => r.json()).then((j) => setPopular(j.tokens ?? [])).catch(() => setPopular([]));
+    }
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
     window.addEventListener("keydown", onKey);
     document.body.style.overflow = "hidden";
     return () => { clearTimeout(t); window.removeEventListener("keydown", onKey); document.body.style.overflow = ""; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, onClose]);
 
   useEffect(() => {
@@ -45,6 +50,9 @@ export function TokenPicker({ open, onClose, onPick, taken }: {
   }, [q]);
 
   if (!open) return null;
+  const browsing = q.trim().length < 2;
+  const needle = q.trim().toLowerCase();
+  const list = browsing ? (popular ?? []).filter((t) => !needle || `${t.symbol} ${t.name}`.toLowerCase().includes(needle)) : found;
 
   return (
     <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center p-0 md:p-6">
@@ -64,11 +72,11 @@ export function TokenPicker({ open, onClose, onPick, taken }: {
           </label>
         </div>
         <div className="flex-1 overflow-y-auto px-3 pb-4 min-h-48">
-          {state === "idle" && <p className="m-0 px-3 py-6 text-sm text-muted">Search for a verified token. Stakers of your token will earn it.</p>}
-          {state === "searching" && found.length === 0 && <p className="m-0 px-3 py-6 text-sm text-muted">Searching</p>}
-          {state === "error" && <p className="m-0 px-3 py-6 text-sm text-burn">Search is not answering right now. Try again in a moment.</p>}
-          {state === "done" && found.length === 0 && <p className="m-0 px-3 py-6 text-sm text-muted">No verified token matches that.</p>}
-          {found.map((t) => {
+          {browsing && <p className="m-0 px-3 pt-1 pb-2 text-[13px] text-muted">{popular === null ? "Loading popular tokens" : popular.length ? "Popular" : "Search for a verified token. Stakers of your token will earn it."}</p>}
+          {!browsing && state === "searching" && found.length === 0 && <p className="m-0 px-3 py-6 text-sm text-muted">Searching</p>}
+          {!browsing && state === "error" && <p className="m-0 px-3 py-6 text-sm text-burn">Search is not answering right now. Try again in a moment.</p>}
+          {!browsing && state === "done" && found.length === 0 && <p className="m-0 px-3 py-6 text-sm text-muted">No verified token matches that.</p>}
+          {list.map((t) => {
             const added = taken.includes(t.mint);
             return (
               <button

@@ -22,5 +22,6 @@ export function localJupiter(chain: SolanaChain, rewardMints: string[]): Jupiter
     async buildUnsignedSwap() { throw new Error("no Jupiter on a local validator"); },
     async isVerified() { return true; },
     async searchVerified() { return []; },
+    async popularVerified() { return []; },
   };
 }
