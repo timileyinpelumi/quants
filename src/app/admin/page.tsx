@@ -5,7 +5,7 @@ export const dynamic = "force-dynamic";
 
 export default function AdminPage() {
   return (
-    <div className="min-h-screen bg-stake">
+    <div className="flex-1 bg-stake">
       <Header active="admin" />
       <AdminApp />
     </div>

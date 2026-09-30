@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 export default async function LaunchPage() {
   const s = await loadLatestSettings(getContext().sql);
   return (
-    <div className="min-h-screen bg-launch">
+    <div className="flex-1 bg-launch">
       <Header active="launch" />
       <LaunchForm split={s.split} tiers={s.tiers} launchFeeLamports={s.launchFeeLamports.toString()} maxPenaltyBps={s.maxPenaltyBps} />
     </div>

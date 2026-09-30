@@ -56,6 +56,7 @@ test.skipIf(!up)("user stake, pending rewards, claim, early exit and claim after
   expect(p1.staked).toBe(1_000_000n);
   expect(p1.lockSeconds).toBe(120);
   expect(p1.lastStakeTs).toBeGreaterThan(0);
+  expect(await kamino.userFarms(owner)).toEqual([f]);
 
   await Bun.sleep(4_000);
   const p2 = (await kamino.position(owner, f))!;

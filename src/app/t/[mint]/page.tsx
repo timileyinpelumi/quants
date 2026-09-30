@@ -28,7 +28,7 @@ export default async function TokenPage({ params }: { params: Promise<{ mint: st
   const progress = d.curve.migrated || BigInt(d.curve.threshold) === 0n ? 100 : Math.min(100, Number((BigInt(d.curve.quoteReserve) * 100n) / BigInt(d.curve.threshold)));
 
   return (
-    <div className="min-h-screen bg-token">
+    <div className="flex-1 bg-token">
       <Header active="token" />
       <main className="flex flex-col gap-10 px-4 md:px-16 pt-8 md:pt-12 pb-16">
         <section className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_auto] gap-8 items-end">
@@ -69,7 +69,7 @@ export default async function TokenPage({ params }: { params: Promise<{ mint: st
 
         <section className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_400px] gap-8">
           <Chart mint={mint} />
-          <TradePanel mint={mint} quoteMint={launch.quoteMint} />
+          <TradePanel mint={mint} symbol={symbol} quoteMint={launch.quoteMint} quoteSymbol={pairSymbol} quoteDecimals={quoteDecimals} />
         </section>
 
         <section className="grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-8">

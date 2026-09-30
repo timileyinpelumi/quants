@@ -110,7 +110,7 @@ const env = {
   PINATA_JWT: "stub",
   DEV_UPLOADS_BASE: "http://localhost:3000/dev-uploads",
   ALLOW_LOCAL_URIS: "1",
-  ADMIN_WALLETS: admin.publicKey.toBase58(),
+  ADMIN_WALLETS: [admin.publicKey.toBase58(), tester.publicKey.toBase58()].join(","),
   ADMIN_SESSION_SECRET: Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString("hex"),
   LOCAL_REWARD_MINTS: Object.values(rewards).map((m) => m.toBase58()).join(","),
   LOCAL_TOKEN_LIST: JSON.stringify(Object.entries(rewards).map(([symbol, m]) => ({ mint: m.toBase58(), symbol, name: symbol, icon: null, decimals: symbol === "ZEC" ? 8 : 6, tokenProgram: "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA" }))),

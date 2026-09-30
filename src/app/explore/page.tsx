@@ -15,7 +15,7 @@ export default async function ExplorePage({ searchParams }: { searchParams: Prom
   const tab = (on: boolean) => `px-5 min-h-11 flex items-center rounded-full text-sm font-semibold ${on ? "bg-raised-2 border border-white/10 text-ink" : "text-muted hover:text-ink"}`;
 
   return (
-    <div className="min-h-screen bg-launch">
+    <div className="flex-1 bg-launch">
       <Header active="explore" />
       <main className="flex flex-col gap-8 px-4 md:px-16 pt-10 md:pt-14 pb-16">
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">

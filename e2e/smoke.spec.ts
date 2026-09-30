@@ -5,12 +5,12 @@ const keeperPass = () => execSync("bun --env-file=.env.local scripts/keeper-once
 const symbol = `E${Math.random().toString(36).slice(2, 8).toUpperCase().replace(/[^A-Z0-9]/g, "X")}`;
 
 async function connect(page: Page) {
-  const btn = page.getByRole("button", { name: /Select Wallet|Connect/ }).first();
+  const btn = page.getByRole("button", { name: "Connect wallet" }).first();
   if (await btn.isVisible()) {
     await btn.click();
     await page.getByRole("button", { name: /Test Wallet/ }).click();
   }
-  await expect(page.getByRole("button", { name: /…|\.\./ }).first()).toBeVisible();
+  await expect(page.getByRole("button", { name: /^Wallet / })).toBeVisible();
 }
 
 test("launch, see the token, stake, exit early and see the burn", async ({ page }) => {

@@ -31,6 +31,16 @@ export class FakeChart implements ChartSource {
   async market() { return this.fail ? null : this.market_; }
 }
 
+export class FakeTrade {
+  calls: any[] = [];
+  built: any[] = [];
+  async quote(target: any, side: any, amountIn: bigint, slippageBps: number) {
+    this.calls.push({ target, side, amountIn, slippageBps });
+    return { amountIn, filledIn: amountIn, amountOut: 1000n, minOut: 990n, fee: 20n, venue: target.dammPool ? "damm" as const : "curve" as const };
+  }
+  async buildSwapTx(target: any, side: any, amountIn: bigint, minOut: bigint, owner: string) { this.built.push({ target, side, amountIn, minOut, owner }); return "c3dhcA=="; }
+}
+
 export async function makeWebContext(over: Partial<WebContext> = {}) {
   const sql = await freshDb();
   await saveSettings(sql, defaultSettings(OURS), "t");
@@ -43,6 +53,7 @@ export async function makeWebContext(over: Partial<WebContext> = {}) {
     jupiter: new FakeJupiter(chain),
     pinata: new FakePinata(),
     chart: new FakeChart(),
+    trade: new FakeTrade(),
     configKeys: { [`${NATIVE_MINT}:200`]: "CfgSol200", [`${OURS}:200`]: "CfgOurs200" },
     keeperAddress: "Keeper1111111111111111111111111111111111111",
     spillWallet: Keypair.generate().publicKey,

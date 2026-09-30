@@ -107,6 +107,11 @@ export class KaminoBackend implements StakingAdapter {
     return u ?? null;
   }
 
+  async userFarms(owner: string): Promise<string[]> {
+    const states = await this.farms.getAllUserStatesForUser(address(owner));
+    return [...new Set(states.map((s) => s.userState.farmState as string))];
+  }
+
   async position(owner: string, farm: string): Promise<StakePosition | null> {
     const u = await this.userState(owner, farm);
     if (!u) return null;
