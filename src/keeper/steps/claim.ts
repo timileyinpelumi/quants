@@ -11,17 +11,24 @@ export const claimResolver = (deps: KeeperDeps): DeltaResolver => async (row, si
 };
 
 // DBC partner fees only grow, so claiming with maxQuoteAmount = amount transfers exactly amount.
-export async function claimStep(deps: KeeperDeps, launch: LaunchRow, s: VersionedSettings, runId: string): Promise<Outcome | "skipped"> {
-  const base = { launchId: launch.id, idemKey: `claim:${launch.id}:${runId}`, kind: "claim" as const, settingsVersion: s.version, resolve: claimResolver(deps) };
-  if (launch.status === "graduated") {
-    if (!launch.dammPool || !launch.dammPosition || !launch.dammPositionNftAccount) return "skipped";
-    const p = { dammPool: launch.dammPool, position: launch.dammPosition, positionNftAccount: launch.dammPositionNftAccount };
-    return runTxStep(deps.sql, deps.chain, { ...base, detail: { source: "damm", quoteMint: launch.quoteMint }, build: () => deps.meteora.buildClaimPositionFee(p) });
-  }
+async function claimCurve(deps: KeeperDeps, launch: LaunchRow, s: VersionedSettings, idemKey: string): Promise<Outcome | "skipped"> {
   const amount = await deps.meteora.pendingPartnerQuoteFee(launch.pool);
   if (amount === 0n) return "skipped";
   return runTxStep(deps.sql, deps.chain, {
-    ...base, detail: { source: "dbc", quoteMint: launch.quoteMint, amount: amount.toString() },
+    launchId: launch.id, idemKey, kind: "claim", settingsVersion: s.version, resolve: claimResolver(deps),
+    detail: { source: "dbc", quoteMint: launch.quoteMint, amount: amount.toString() },
     build: () => deps.meteora.buildClaimPartnerFee(launch.pool, amount),
+  });
+}
+
+export async function claimStep(deps: KeeperDeps, launch: LaunchRow, s: VersionedSettings, runId: string): Promise<Outcome | "skipped"> {
+  if (launch.status !== "graduated") return claimCurve(deps, launch, s, `claim:${launch.id}:${runId}`);
+  await claimCurve(deps, launch, s, `claim:${launch.id}:${runId}:curve`);
+  if (!launch.dammPool || !launch.dammPosition || !launch.dammPositionNftAccount) return "skipped";
+  const p = { dammPool: launch.dammPool, position: launch.dammPosition, positionNftAccount: launch.dammPositionNftAccount };
+  return runTxStep(deps.sql, deps.chain, {
+    launchId: launch.id, idemKey: `claim:${launch.id}:${runId}`, kind: "claim", settingsVersion: s.version, resolve: claimResolver(deps),
+    detail: { source: "damm", quoteMint: launch.quoteMint },
+    build: () => deps.meteora.buildClaimPositionFee(p),
   });
 }

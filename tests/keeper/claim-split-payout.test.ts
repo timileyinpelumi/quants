@@ -72,3 +72,15 @@ test("graduated launches claim from the DAMM position and credit the measured am
   expect(await claimStep(deps, launch!, settings, "r1")).toBe("confirmed");
   expect(await getBalance(sql, id, "unsplit", NATIVE_MINT)).toBe(777n);
 });
+
+test("a graduated launch still claims partner fee left on the bonding curve", async () => {
+  const { sql, chain, meteora, deps, settings } = await keeperFixture();
+  const id = await insertLaunch(sql, { pool: "P6", status: "graduated" });
+  await sql`update launches set damm_pool = 'D6', damm_position = 'Pos6', damm_position_nft_account = 'Nft6' where id = ${id}`;
+  meteora.partnerFee.set("P6", 500n);
+  const orig = chain.tx.bind(chain);
+  chain.tx = (label) => { const t = orig(label); if (label.startsWith("claimpos")) chain.receipts.set(t.signature, 100n); return t; };
+  const [launch] = await loadLaunches(sql, deps.ourtokenMint);
+  await claimStep(deps, launch!, settings, "r1");
+  expect(await getBalance(sql, id, "unsplit", NATIVE_MINT)).toBe(600n);
+});
