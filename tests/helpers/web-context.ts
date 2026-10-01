@@ -8,6 +8,7 @@ import { setContextForTests, type WebContext } from "../../src/web/server/contex
 import { TokenIcons } from "../../src/web/server/icons";
 import { JupiterPrices } from "../../src/indexer/prices";
 import { resetRateLimits } from "../../src/web/server/http";
+import { resetStakeCache } from "../../src/web/server/stake";
 import type { PinataPort } from "../../src/web/server/pinata";
 import { defaultSettings, saveSettings } from "../../src/domain/settings";
 import { NATIVE_MINT } from "../../src/domain/types";
@@ -61,5 +62,6 @@ export async function makeWebContext(over: Partial<WebContext> = {}) {
   };
   setContextForTests(ctx);
   resetRateLimits();
+  resetStakeCache();
   return Object.assign(ctx, { fakeChain: chain });
 }

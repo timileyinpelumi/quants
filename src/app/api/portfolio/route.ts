@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { getContext } from "@/web/server/context";
 import { json, jsonError, rateLimit } from "@/web/server/http";
-import { positions } from "@/web/server/stake";
+import { positions, stakedFarms } from "@/web/server/stake";
 
 export const dynamic = "force-dynamic";
 
@@ -12,7 +12,7 @@ export async function GET(req: Request) {
     rateLimit(req, "portfolio", 30);
     const c = getContext();
     const owner = addr.parse(new URL(req.url).searchParams.get("owner") ?? "");
-    const farms = await c.staking.userFarms(owner);
+    const farms = await stakedFarms(c, owner);
     if (farms.length === 0) return json({ launches: [] });
     const rows = await c.sql`
       select distinct l.mint, l.symbol, l.name, l.image, l.id from stake_tiers st join launches l on l.id = st.launch_id

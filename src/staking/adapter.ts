@@ -14,7 +14,8 @@ export interface StakingAdapter {
   slashedAmount(farm: string): Promise<bigint>;
   buildCollectPenalty(farm: string, spillAccount: string): Promise<SignedTx>;
   position(owner: string, farm: string): Promise<StakePosition | null>;
-  userFarms(owner: string): Promise<string[]>;
+  /** The subset of `farms` the owner has a user state in. */
+  userFarms(owner: string, farms: string[]): Promise<string[]>;
   buildStakeTx(owner: string, farm: string, stakeMint: string, amount: bigint): Promise<string>;
   buildClaimTx(owner: string, farm: string): Promise<string>;
   buildExitTx(owner: string, farm: string, stakeMint: string): Promise<string>;

@@ -3,6 +3,7 @@ import type { WebContext } from "./context";
 import { LaunchError } from "@/launch/prepare";
 import { earlyExitPenalty } from "@/domain/penalty";
 import { BPS } from "@/domain/types";
+import { ttlCache } from "@/domain/lru";
 
 const addr = z.string().regex(/^[1-9A-HJ-NP-Za-km-z]{32,44}$/, "Wallet address is not valid");
 
@@ -10,6 +11,17 @@ export interface PositionView {
   tierId: string; farm: string; multiplierBps: number; lockSeconds: number; staked: string; unlocksAt: number; locked: boolean;
   pending: { mint: string; symbol: string | null; decimals: number | null; amount: string }[];
   exitPreview: { back: string; burned: string; penaltyBps: number; daysLeft: number } | null;
+}
+
+const farmsByOwner = ttlCache<string[]>(20_000, 2_000);
+export const resetStakeCache = () => farmsByOwner.clear();
+
+/** Our farms the owner has a user state in, cached briefly per owner. */
+export function stakedFarms(ctx: WebContext, owner: string): Promise<string[]> {
+  return farmsByOwner.get(owner, async () => {
+    const known = (await ctx.sql`select distinct farm from stake_tiers where farm is not null`).map((r: any) => r.farm as string);
+    return known.length ? ctx.staking.userFarms(owner, known) : [];
+  });
 }
 
 async function launchStake(ctx: WebContext, mint: string) {
