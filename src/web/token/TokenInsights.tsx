@@ -176,7 +176,7 @@ export function TokenInsights({ mint, symbol, quoteSymbol }: { mint: string; sym
           {(live?.traders.length ?? 0) >= LIVE_TRADERS && (
             <LoadMore done={tradersNext === null} state={tradersState} onMore={loadTraders} doneText="No more traders" />
           )}
-          <p className="m-0 pt-3 text-[12px] text-faint">Profit uses each wallet&apos;s average buy price and today&apos;s price for what it still holds. Tokens moved in from elsewhere are not counted.</p>
+          <p className="m-0 pt-3 text-[12px] text-faint">Profit is based on each wallet&apos;s average buy price and the current price. Transfers in are not counted.</p>
         </div>
       )}
 
@@ -201,7 +201,7 @@ export function TokenInsights({ mint, symbol, quoteSymbol }: { mint: string; sym
                 </div>
               ))}
             </div>
-            <p className="m-0 text-[12px] text-faint">Top 10 leaves out the bonding curve and the pool, which hold tokens for trading. Staked is what sits in this token&apos;s Kamino farms.</p>
+            <p className="m-0 text-[12px] text-faint">Top 10 excludes the bonding curve and the pool. Staked counts tokens in this token&apos;s Kamino farms.</p>
           </div>
         )
       )}
