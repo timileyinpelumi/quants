@@ -10,6 +10,7 @@ export function TokenLiveProvider({ mint, initial, children }: { mint: string; i
   const [live, setLive] = useState(initial);
   const router = useRouter();
   const status = useRef(initial?.status);
+  const opening = useRef(initial?.staking != null);
 
   useEffect(() => {
     let stop = false;
@@ -24,6 +25,9 @@ export function TokenLiveProvider({ mint, initial, children }: { mint: string; i
             // graduation moves trading to a new pool, which the server render picks up
             if (status.current && next.status !== status.current) router.refresh();
             status.current = next.status;
+            // staking opening enables the stake buttons, which come from the server render
+            if (opening.current && next.staking === null) router.refresh();
+            opening.current = next.staking !== null;
           }
         } catch { /* keep the last data */ }
       }

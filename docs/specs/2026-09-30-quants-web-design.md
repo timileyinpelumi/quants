@@ -53,7 +53,7 @@ Lists are flat divider rows, never cards. Copy is plain and has no hyphens or da
 
 ### Launch (`/`)
 
-Numbered sections as in the canvas: token (image, name, symbol), pair and fee, reward basket, first buy, then links (website, X, Telegram) and description. A summary panel shows the fee split, lock tiers, launch fee, graduation target and the Launch button.
+Numbered sections as in the canvas: token (image, name, symbol), pair and fee, reward basket, first buy, then links (website, X, Telegram) and description. A summary panel shows the fee split, lock tiers, the farm setup the stakers' share pays before staking opens, graduation target and the Launch button. There is no launch fee.
 
 Flow: upload image and metadata (`POST /api/metadata`) → `POST /api/launch/prepare` → wallet signs (with a Jupiter SOL to OURTOKEN swap first when the pair is OURTOKEN and there is a first buy; both signed in one approval) → send → `POST /api/launch/confirm` → go to the token page.
 
@@ -108,5 +108,5 @@ One VPS runs Postgres, the web app (`bun --bun next start`) and the keeper as sy
 
 - Route handlers are unit tested with fakes (same ports as plan 1).
 - Staking user transactions are tested on the local validator.
-- One Playwright smoke run against the local validator: launch with a test wallet, see the token page, stake, exit early, check the burn row.
+- One Playwright smoke run against the local validator: launch with a test wallet, see the token page, see staking progress below 100%, trade on the curve until staking opens, stake, exit early, check the burn row.
 - `next build` and `tsc` pass.

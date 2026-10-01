@@ -1,5 +1,17 @@
 import type { SQL } from "bun";
 import type { WebContext } from "./context";
+import { opensAt } from "@/domain/launch-cost";
+
+export type StakingOpens = { percent: number; rentLamports: string; neededLamports: string | null };
+type PoolRow = { status: string; rent_lamports: string | number | bigint | null; basket_value_lamports: string | number | bigint } | undefined;
+
+/** How close a launch is to opening staking; null once its farms are ready or when it has no stake pool. */
+export function stakingOpens(p: PoolRow): StakingOpens | null {
+  if (!p || p.status === "ready") return null;
+  if (p.rent_lamports == null) return { percent: 0, rentLamports: "0", neededLamports: null };
+  const rent = BigInt(p.rent_lamports), value = BigInt(p.basket_value_lamports);
+  return { percent: opensAt({ valueLamports: value, rentLamports: rent }), rentLamports: rent.toString(), neededLamports: (value >= rent ? 0n : rent - value).toString() };
+}
 
 export interface LaunchListItem {
   mint: string; name: string | null; symbol: string | null; image: string | null; pool: string; quoteMint: string;
@@ -33,6 +45,7 @@ export interface LaunchDetail {
   burned: string;
   maxPenaltyBps: number;
   stakeReady: boolean;
+  stakingOpens: StakingOpens | null;
   curve: { quoteReserve: string; threshold: string; migrated: boolean };
 }
 
@@ -45,7 +58,7 @@ export async function launchDetail(ctx: WebContext, mint: string): Promise<Launc
       coalesce((select sum((d.detail->>'amount')::numeric) from distributions d
                 where d.launch_id = b.launch_id and d.kind = 'fund' and d.status = 'confirmed' and d.detail->>'rewardMint' = b.reward_mint), 0)::text as paid
     from baskets b where b.launch_id = ${row.id} order by b.weight_bps desc, b.reward_mint`;
-  const [pool] = await ctx.sql`select status, max_penalty_bps from stake_pools where launch_id = ${row.id}`;
+  const [pool] = await ctx.sql`select status, max_penalty_bps, rent_lamports, basket_value_lamports from stake_pools where launch_id = ${row.id}`;
   const tierRows = await ctx.sql`select tier_id, lock_seconds, multiplier_bps, farm from stake_tiers where launch_id = ${row.id} order by lock_seconds`;
   const staked: (bigint | null)[] = await Promise.all(tierRows.map((t: any) => (t.farm ? ctx.staking.totalStaked(t.farm).catch(() => null) : Promise.resolve(0n))));
   const weights = tierRows.map((t: any, i: number) => (staked[i] ?? 0n) * BigInt(t.multiplier_bps));
@@ -61,6 +74,7 @@ export async function launchDetail(ctx: WebContext, mint: string): Promise<Launc
     burned: item!.burned,
     maxPenaltyBps: pool?.max_penalty_bps ?? 0,
     stakeReady: pool?.status === "ready",
+    stakingOpens: stakingOpens(pool),
     curve: { quoteReserve: progress.quoteReserve.toString(), threshold: progress.threshold.toString(), migrated: progress.migrated },
   };
 }

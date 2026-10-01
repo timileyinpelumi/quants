@@ -1,4 +1,4 @@
-import { Keypair, PublicKey, SystemProgram, Transaction } from "@solana/web3.js";
+import { Keypair, PublicKey, Transaction } from "@solana/web3.js";
 import BN from "bn.js";
 import { DynamicBondingCurveClient, calculateQuoteToBaseFromAmountIn, deriveDbcPoolAddress, deriveDammV2PoolAddress } from "@meteora-ag/dynamic-bonding-curve-sdk";
 import { CpAmm, getTokenProgram } from "@meteora-ag/cp-amm-sdk";
@@ -8,7 +8,7 @@ import type { SolanaChain } from "../chain/solana";
 export interface GraduatedPosition { dammPool: string; position: string; positionNftAccount: string }
 export interface LaunchTxInput {
   name: string; symbol: string; uri: string; creator: string; configKey: string; quoteMint: string;
-  launchFeeLamports: bigint; feeReceiver: string; devBuyQuoteAmount: bigint; devBuyMinOut: bigint;
+  devBuyQuoteAmount: bigint; devBuyMinOut: bigint;
 }
 export interface MeteoraPort {
   pendingPartnerQuoteFee(pool: string): Promise<bigint>;
@@ -114,9 +114,7 @@ export class MeteoraLive implements MeteoraPort {
         ? { buyer: creator, buyAmount: new BN(input.devBuyQuoteAmount.toString()), minimumAmountOut: new BN(input.devBuyMinOut.toString()), referralTokenAccount: null }
         : undefined,
     });
-    const tx = new Transaction()
-      .add(SystemProgram.transfer({ fromPubkey: creator, toPubkey: pk(input.feeReceiver), lamports: input.launchFeeLamports }))
-      .add(...create.instructions);
+    const tx = new Transaction().add(...create.instructions);
     const { blockhash } = await this.chain.conn.getLatestBlockhash("confirmed");
     tx.recentBlockhash = blockhash;
     tx.feePayer = creator;

@@ -14,7 +14,7 @@ type Settings = {
   split: { basketBps: number; platformBps: number; creatorBps: number };
   creatorPayoutMin: Record<string, string>;
   tiers: Tier[];
-  maxPenaltyBps: number; rewardPeriodSeconds: number; slippageBps: number; launchFeeLamports: string;
+  maxPenaltyBps: number; rewardPeriodSeconds: number; slippageBps: number;
   devBuyCapBps: number; keeperIntervalSeconds: number; defaultBackend: "kamino";
 };
 type Status = { lastActivity: string | null; failed: { id: number; mint: string; symbol: string | null; kind: string; error: string; attempts: number; at: string }[]; failedNext: number | null; inFlight: { mint: string; symbol: string | null }[] };
@@ -175,7 +175,6 @@ export function AdminApp({ pairs }: { pairs: Pair[] }) {
             <Num label="Max early exit penalty" suffix="%" value={pct(settings.maxPenaltyBps)} onChange={(v) => set({ maxPenaltyBps: toBps(v) })} />
             <Num label="Reward stream period" suffix="hours" value={settings.rewardPeriodSeconds / 3600} onChange={(v) => set({ rewardPeriodSeconds: Math.round(Number(v) * 3600) })} />
             <Num label="Swap slippage cap" suffix="%" value={pct(settings.slippageBps)} onChange={(v) => set({ slippageBps: toBps(v) })} />
-            <Num label="Platform launch fee (farm rent is added per launch)" suffix="SOL" value={Number(settings.launchFeeLamports) / 1e9} onChange={(v) => set({ launchFeeLamports: String(Math.round(Number(v) * 1e9)) })} />
             <Num label="Creator payout minimum" suffix="SOL" value={Number(settings.creatorPayoutMin[SOL] ?? "0") / 1e9} onChange={(v) => set({ creatorPayoutMin: { ...settings.creatorPayoutMin, [SOL]: String(Math.round(Number(v) * 1e9)) } })} />
             <Num label="First buy cap" suffix="% of supply" value={pct(settings.devBuyCapBps)} onChange={(v) => set({ devBuyCapBps: toBps(v) })} />
             <Num label="Keeper interval" suffix="minutes" value={settings.keeperIntervalSeconds / 60} onChange={(v) => set({ keeperIntervalSeconds: Math.round(Number(v) * 60) })} />

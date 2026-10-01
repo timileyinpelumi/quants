@@ -36,7 +36,7 @@ test.skipIf(!up)("reads buys and sells on the curve and on the graduated pool fr
   }), [keeper, config]);
   const { tx, baseMint, pool } = await m.buildLaunchTx({
     name: "Cat", symbol: "CAT", uri: "https://example.com/c.json", creator: creator.publicKey.toBase58(), configKey: config.publicKey.toBase58(),
-    quoteMint: NATIVE_MINT, launchFeeLamports: 0n, feeReceiver: keeper.publicKey.toBase58(), devBuyQuoteAmount: 0n, devBuyMinOut: 0n,
+    quoteMint: NATIVE_MINT, devBuyQuoteAmount: 0n, devBuyMinOut: 0n,
   });
   tx.partialSign(creator);
   await conn.confirmTransaction(await conn.sendRawTransaction(tx.serialize()), "confirmed");

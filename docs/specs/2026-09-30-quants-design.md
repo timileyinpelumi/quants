@@ -53,7 +53,7 @@ Next.js on Bun. Wallet adapter for signing.
   7. Fee tier.
   8. Reward basket: 1 to 3 tokens from the Jupiter verified list, with optional weights that sum to 100 (default equal).
   9. Dev buy (optional): SOL amount or % of supply, capped by an admin setting.
-  10. Summary panel: quote, fee, split, basket, lock tiers, launch fee, dev buy, graduation threshold.
+  10. Summary panel: quote, fee, split, basket, lock tiers, the farm setup the stakers' share pays before staking opens, dev buy, graduation threshold.
 - **Token page**: price chart, trade through the Jupiter plugin, basket, staking stats (total staked per tier, rewards paid, penalties burned).
 - **Staking page**: stake with a tier, view positions, claim rewards, exit early with the penalty shown before signing, withdraw after lock.
 - **Admin page**: settings (below), basket override per launch, keeper status, failed steps.
@@ -64,7 +64,7 @@ Admin access is by wallet signature against an allowlist of admin wallets.
 
 Same Next.js app.
 
-- `POST /api/launch/prepare`: validates input, uploads image and metadata, picks the config key for (quote, fee tier), returns an unsigned transaction. The transaction contains the launch fee transfer and `createPoolWithFirstBuy` (or `createPool` with no dev buy). An OURTOKEN-quoted dev buy adds a Jupiter SOL to OURTOKEN swap before it. One wallet approval.
+- `POST /api/launch/prepare`: validates input, uploads image and metadata, picks the config key for (quote, fee tier), returns an unsigned transaction. The transaction contains `createPoolWithFirstBuy` (or `createPool` with no dev buy). An OURTOKEN-quoted dev buy adds a Jupiter SOL to OURTOKEN swap before it. One wallet approval.
 - `POST /api/launch/confirm`: takes the signature, verifies the pool on-chain, records the launch, and queues farm creation.
 - Read endpoints for tokens, stake stats and distributions.
 
@@ -72,7 +72,7 @@ Same Next.js app.
 
 - `launches`: mint, pool, quote mint, fee tier, config key, creator, status (`live`, `graduating`, `graduated`), created at.
 - `baskets`: launch, reward mint, weight.
-- `stake_pools`: launch, backend (`kamino`), per tier: tier id, lock seconds, multiplier, farm address.
+- `stake_pools`: launch, backend (`kamino`), per tier: tier id, lock seconds, multiplier, farm address; the farm rent and the basket's latest value in SOL, which give the progress toward opening staking.
 - `settings`: versioned rows. Each new version is a new row; the keeper reads the latest.
 - `distributions`: one row per on-chain step with type (`claim`, `split`, `swap`, `fund`, `set_rate`, `collect_penalty`, `burn`, `migrate`, `payout`), amounts, status (`pending`, `sent`, `confirmed`, `failed`), transaction signature, settings version used.
 - `escrow`: basket share owed per launch per reward mint, not yet funded.
@@ -119,7 +119,7 @@ v1 has one implementation, `KaminoBackend`. The backend name is stored on each s
   - withdrawal cooldown 0,
   - slashed amount spill address = the launch's spill account.
 - Farm admin is a platform wallet.
-- Rent is about 0.06 SOL per farm. It is covered by a flat launch fee paid in the launch transaction (setting, default 0.3 SOL).
+- Rent is about 0.06 SOL per farm. There is no launch fee: staking opens once the launch's stakers' share of fees covers the rent (`launchCost`), which the keeper then debits from the basket escrow and spends creating the farms. Until then the basket share accrues in escrow in the quote token.
 
 ### 7. Meteora setup
 
@@ -140,7 +140,6 @@ All editable from the admin page. Changes create a new version.
 | Max early exit penalty | 30% | launches created after the change |
 | Reward stream period | 24 hours | next funding |
 | Swap slippage cap | 1% | next swap |
-| Launch fee | 0.3 SOL | next launch |
 | Dev buy cap | 50% of supply | next launch |
 | Keeper interval | 10 minutes | next run |
 | Default staking backend | kamino | launches created after the change |

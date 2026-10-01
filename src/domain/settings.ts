@@ -16,7 +16,6 @@ const Schema = z.object({
   maxPenaltyBps: z.number().int().min(1).max(9_999),
   rewardPeriodSeconds: z.number().int().min(3_600),
   slippageBps: z.number().int().min(1).max(1_000),
-  launchFeeLamports: big,
   devBuyCapBps: z.number().int().min(0).max(7_500),
   keeperIntervalSeconds: z.number().int().min(60),
   defaultBackend: z.literal("kamino"),
@@ -24,7 +23,7 @@ const Schema = z.object({
 
 export type Settings = {
   split: FeeSplit; creatorPayoutMin: Record<string, bigint>; tiers: LockTier[]; maxPenaltyBps: number;
-  rewardPeriodSeconds: number; slippageBps: number; launchFeeLamports: bigint; devBuyCapBps: number;
+  rewardPeriodSeconds: number; slippageBps: number; devBuyCapBps: number;
   keeperIntervalSeconds: number; defaultBackend: "kamino";
 };
 export type VersionedSettings = Settings & { version: number };
@@ -47,7 +46,6 @@ export function defaultSettings(ourtokenMint: string): Settings {
     maxPenaltyBps: 3000,
     rewardPeriodSeconds: DAY,
     slippageBps: 100,
-    launchFeeLamports: 50_000_000n,
     devBuyCapBps: 5000,
     keeperIntervalSeconds: 600,
     defaultBackend: "kamino",

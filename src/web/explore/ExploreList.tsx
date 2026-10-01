@@ -5,6 +5,7 @@ import { CoinStack, CoinTag } from "@/web/ui/CoinStack";
 import { fmtAgo, fmtCompact, shortAddr } from "@/web/ui/format";
 import { LoadMore, getJson, usePaged } from "@/web/ui/LoadMore";
 import type { TokenRow } from "@/web/server/landing";
+import { StakingAt } from "@/web/ui/StakingAt";
 
 const COLS = "md:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)_minmax(0,0.7fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.3fr)]";
 const PAGE = 30;
@@ -31,6 +32,7 @@ export function ExploreList({ initial, nextOffset, query }: { initial: TokenRow[
               <span className="flex items-baseline gap-2 min-w-0">
                 <span className="font-display font-bold text-lg truncate">{t.symbol}</span>
                 <span className="font-mono text-[12px] text-faint shrink-0">{fmtAgo(t.createdAt)}</span>
+                <StakingAt pct={t.stakingPct} />
               </span>
               <span className="text-[13px] text-muted truncate flex items-center gap-1.5">{t.name ?? shortAddr(t.mint)} · <CoinTag coin={t.quote} size={14} /></span>
             </span>

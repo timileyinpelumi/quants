@@ -14,7 +14,7 @@ export const dynamic = "force-dynamic";
 const SOL = "So11111111111111111111111111111111111111112";
 const sections = [
   ["glance", "At a glance"], ["how", "How it works"], ["launch", "Launching a token"], ["fees", "Where fees go"], ["basket", "The reward basket"],
-  ["staking", "Staking and lock tiers"], ["early", "Leaving early"], ["graduation", "Graduation"], ["risks", "Risks"], ["wallets", "Wallets and programs"], ["faq", "Questions"],
+  ["opens", "When staking opens"], ["staking", "Staking and lock tiers"], ["early", "Leaving early"], ["graduation", "Graduation"], ["risks", "Risks"], ["wallets", "Wallets and programs"], ["faq", "Questions"],
 ] as const;
 
 function H2({ id, children }: { id: string; children: React.ReactNode }) {
@@ -45,7 +45,10 @@ export default async function DocsPage() {
   const SOL_MINT = "So11111111111111111111111111111111111111112";
   const solUsd = (await usdPrices(ctx, [SOL_MINT]).catch(() => ({} as Record<string, number | null>)))[SOL_MINT] ?? null;
   const sol = (lamports: bigint) => `${fmtAmount(lamports, 9, 3)} SOL${solUsd ? ` (about $${(Number(lamports) / 1e9 * solUsd).toFixed(2)})` : ""}`;
-  const one = launchCost(s, 1), three = launchCost(s, 3), ten = launchCost(s, 10);
+  const one = launchCost(s, 1).rent, three = launchCost(s, 3).rent, ten = launchCost(s, 10).rent;
+  // Stakers get basketBps of what is left after Meteora's 20%.
+  const stakerShare = (feeBps: number) => (feeBps / 10_000) * 0.8 * (s.split.basketBps / 10_000);
+  const volumeToOpen = (rent: bigint, feeBps: number) => Math.ceil(Number(rent) / 1e9 / stakerShare(feeBps));
   const pct = (bps: number) => `${bps / 100}%`;
   const solGrad = quoteCoins()[0]!.graduation;
 
@@ -63,13 +66,10 @@ export default async function DocsPage() {
 
         <article className="flex flex-col gap-6 max-w-3xl">
           <h1 className="m-0 font-display font-black text-[40px] md:text-[56px] leading-[1.02] tracking-[-0.03em]">How quants works</h1>
-          <P>quants launches tokens whose trading fees pay the people who stake them. This page covers launch costs, where every fee goes, and how staking and early exits work.</P>
+          <P>quants launches tokens whose trading fees pay the people who stake them. This page covers launching, where every fee goes, when staking opens, and how staking and early exits work.</P>
 
           <H2 id="glance">At a glance</H2>
           <Table head={["", "Value"]} rows={[
-            ["Launch fee with 1 reward token", sol(one.total)],
-            ["Launch fee with 3 reward tokens", sol(three.total)],
-            ["Launch fee with 10 reward tokens", sol(ten.total)],
             ["Trading fee, set by the creator", "1%, 2%, 3% or 5%"],
             ["Share of fees that buys staker rewards", `${pct(s.split.basketBps)} after Meteora's 20%`],
             ["Reward tokens per launch", "Up to 10"],
@@ -78,6 +78,7 @@ export default async function DocsPage() {
             ["Graduates to Meteora DAMM v2 at", `${solGrad} SOL raised, or the amount below for other pairs`],
             ["Lock tiers", s.tiers.map((t) => `${lockShort(t.lockSeconds)} ${t.multiplierBps / 10_000}x`).join(", ")],
             ["Most an early exit can burn", pct(s.maxPenaltyBps)],
+            ["Staking opens when the stakers' share has paid for the farms", `${sol(three)} with 3 reward tokens`],
           ]} />
 
           <H2 id="how">How it works</H2>
@@ -86,7 +87,8 @@ export default async function DocsPage() {
 
           <H2 id="launch">Launching a token</H2>
           <P>Pick a name, a symbol and a square image, then pick the pair token: {quoteCoins().map((c) => c.symbol).join(", ")}. Choose a trading fee of 1%, 2%, 3% or 5% and pick your reward basket. An optional first buy of your own token goes in the same approval. It is paid in SOL and swapped to the pair token if needed.</P>
-          <P>Every token has a supply of 1,000,000,000. Launching costs a platform fee of {sol(s.launchFeeLamports)} plus the cost of setting up the staking farms: rent for one Kamino farm per lock tier with accounts for each reward token, and the transaction fees to create them. That comes to {sol(three.total)} in all for a three token basket, plus the network fee for your own transaction. A first buy is capped at {pct(s.devBuyCapBps)} of supply.</P>
+          <P>Every token has a supply of 1,000,000,000. Launching costs only the network fee for your own transaction and any first buy. A first buy is capped at {pct(s.devBuyCapBps)} of supply.</P>
+          <P>Staking does not open at launch. The staking farms are paid for out of the stakers&apos; share of trading fees, so a token can be staked once it has traded enough. See <a href="#opens" className="text-lime">When staking opens</a>.</P>
 
           <H2 id="fees">Where fees go</H2>
           <P>Meteora keeps 20% of each trading fee. Of what is left:</P>
@@ -107,13 +109,20 @@ export default async function DocsPage() {
               ["Creator", f(kept * s.split.creatorBps / 10_000)],
             ];
           })()} />
-          <P>Fees are collected every few minutes. The creator share is sent to the creator once it passes {fmtAmount(s.creatorPayoutMin[SOL] ?? 0n, 9)} SOL.</P>
+          <P>Fees are collected every few minutes. The creator share is sent to the creator once it passes {fmtAmount(s.creatorPayoutMin[SOL] ?? 0n, 9)} SOL. Until staking opens, the stakers&apos; share is held for the token and first pays for its staking farms.</P>
 
           <H2 id="basket">The reward basket</H2>
           <P>The basket is up to ten verified tokens with weights that add up to 100%. The basket share of every fee is swapped into those tokens and streamed to stakers over about {Math.round(s.rewardPeriodSeconds / 3600)} hours. If nobody is staked yet, rewards wait until someone is. The basket is fixed once staking opens for a token.</P>
 
+          <H2 id="opens">When staking opens</H2>
+          <P>Staking a token needs one Kamino farm per lock tier ({s.tiers.length}), with an account for each reward token, plus the transaction fees to set them up. The stakers&apos; share of trading fees is held until it covers that cost, which is then taken from it to create the farms. Staking opens right after, and from then on the whole stakers&apos; share buys rewards.</P>
+          <Table head={["Reward tokens", "Farm setup"]} rows={[["1", sol(one)], ["3", sol(three)], ["10", sol(ten)]]} />
+          <P>Stakers get {pct(s.split.basketBps)} of each trading fee after Meteora&apos;s 20%. So with 3 reward tokens, staking opens after about this much trading volume:</P>
+          <Table head={["Trading fee", "Volume to open staking"]} rows={[100, 200, 300, 500].map((bps) => [pct(bps), `${volumeToOpen(three, bps).toLocaleString("en-US")} SOL`])} />
+          <P>Tokens paired with something other than SOL count their stakers&apos; share at its value in SOL. Each token page shows how far along it is, as a percent and as the amount still needed.</P>
+
           <H2 id="staking">Staking and lock tiers</H2>
-          <P>Stake a launched token into one of these locks. A bigger multiplier means a bigger share of the rewards for the same amount staked.</P>
+          <P>Once staking opens, stake a launched token into one of these locks. A bigger multiplier means a bigger share of the rewards for the same amount staked.</P>
           <Table head={["Lock", "Multiplier", "Share of 1,000 staked, against 1,000 at 1x"]} rows={s.tiers.map((t) => {
             const m = t.multiplierBps / 10_000;
             return [lockLabel(t.lockSeconds), `${m}x`, `${Math.round((m / (m + 1)) * 100)}%`];
@@ -148,6 +157,7 @@ export default async function DocsPage() {
 
           <H2 id="faq">Questions</H2>
           {[
+            ["Why can't I stake a token right after launch?", "Its stakers' share of trading fees first pays for the staking farms. The token page shows the percent toward opening."],
             ["Can quants take my stake?", "No. Stakes sit in Kamino Farms under your wallet. quants can fund rewards but cannot move your stake."],
             ["Why at most ten reward tokens?", "Kamino farms hold ten reward tokens each. Fewer tokens also means bigger payouts per token."],
             ["What if a reward token cannot be bought?", "Its share waits and is bought on a later run. The other basket tokens are unaffected."],

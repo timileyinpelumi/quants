@@ -8,6 +8,7 @@ import { iconsFor } from "@/web/server/icons";
 import { quoteCoins } from "@/domain/quotes";
 import { CoinStack, CoinTag } from "@/web/ui/CoinStack";
 import { landing, type TokenRow } from "@/web/server/landing";
+import { StakingAt } from "@/web/ui/StakingAt";
 
 export const dynamic = "force-dynamic";
 
@@ -38,6 +39,7 @@ function Column({ title, href, empty, rows, right }: { title: string; href: stri
             <span className="flex items-baseline gap-2 min-w-0">
               <span className="font-display font-bold truncate">{t.symbol}</span>
               <span className="font-mono text-[12px] text-faint shrink-0">{fmtAgo(t.createdAt)}</span>
+              <StakingAt pct={t.stakingPct} />
             </span>
             <span className="text-[12px] text-muted truncate flex items-center gap-1.5">Earns <CoinStack coins={t.basket} size={14} max={3} /></span>
           </span>
@@ -99,7 +101,7 @@ export default async function HomePage() {
               <span className="flex items-center gap-3 min-w-0">
                 <Avatar seed={t.mint} label={t.symbol} image={t.image} size={40} />
                 <span className="flex flex-col min-w-0">
-                  <span className="font-display font-bold truncate">{t.symbol}</span>
+                  <span className="flex items-baseline gap-2 min-w-0"><span className="font-display font-bold truncate">{t.symbol}</span><StakingAt pct={t.stakingPct} /></span>
                   <span className="text-[12px] text-muted truncate flex items-center gap-1.5">{t.name ?? shortAddr(t.mint)} · <CoinTag coin={t.quote} size={12} /></span>
                 </span>
               </span>

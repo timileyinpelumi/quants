@@ -11,6 +11,6 @@ const none: DeltaResolver = async () => [];
 export function makeResolvers(deps: KeeperDeps): Record<StepKind, DeltaResolver> {
   return {
     claim: claimResolver(deps), payout: payoutResolver, split: none,
-    swap: swapResolver(deps), fund: fundResolver, collect_penalty: collectResolver(deps), burn: burnResolver, migrate: none, create_farm: none, configure_farm: none,
+    swap: swapResolver(deps), fund: fundResolver, collect_penalty: collectResolver(deps), burn: burnResolver, migrate: none, create_farm: none, configure_farm: none, rent: none,
   };
 }

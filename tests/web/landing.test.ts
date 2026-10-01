@@ -61,6 +61,18 @@ test("home lists trending, new, about to graduate, graduated and recent trades",
   expect(d.recent.map((t) => t.symbol)).toEqual(["GGG", "BBB", "AAA", "AAA", "BBB"]);
 });
 
+test("token rows show staking progress until staking opens", async () => {
+  const sql = await freshDb();
+  const a = await launch(sql, "AAA", 3);
+  const b = await launch(sql, "BBB", 2);
+  await launch(sql, "CCC", 1);
+  await sql`insert into stake_pools (launch_id, backend, max_penalty_bps, spill_account, status, rent_lamports, basket_value_lamports)
+    values (${a}, 'kamino', 3000, 's', 'pending', 1000, 420), (${b}, 'kamino', 3000, 's', 'ready', 1000, 1000)`;
+  const rows = await exploreTokens(sql, { sort: "new" }, NOW);
+  expect(rows.map((t) => [t.symbol, t.stakingPct])).toEqual([["CCC", null], ["BBB", null], ["AAA", 42]]);
+  expect((await landing(sql, NOW)).newest.find((t) => t.symbol === "AAA")!.stakingPct).toBe(42);
+});
+
 test("explore sorts, filters and searches", async () => {
   const sql = await freshDb();
   const a = await launch(sql, "AAA", 48);

@@ -42,11 +42,10 @@ async function postJson<T>(url: string, body: unknown): Promise<T> {
   return j as T;
 }
 
-export function LaunchForm({ split, tiers, launchFeeLamports, maxPenaltyBps, quotes }: {
+export function LaunchForm({ split, tiers, maxPenaltyBps, quotes }: {
   quotes: QuoteOption[];
   split: { basketBps: number; platformBps: number; creatorBps: number };
   tiers: Tier[];
-  launchFeeLamports: string;
   maxPenaltyBps: number;
 }) {
   const router = useRouter();
@@ -98,7 +97,7 @@ export function LaunchForm({ split, tiers, launchFeeLamports, maxPenaltyBps, quo
 
   const busy = status !== "idle";
   const solUsd = useUsd([SOL])[SOL];
-  const cost = launchCost({ launchFeeLamports: BigInt(launchFeeLamports), tiers }, Math.max(1, basket.length));
+  const { rent } = launchCost({ tiers }, Math.max(1, basket.length));
   const solText = (lamports: bigint) => `${fmtAmount(lamports, 9, 3)} SOL`;
   const usdOf = (lamports: bigint) => usdText(Number(lamports) / 1e9, solUsd);
   const pairQuote = quotes.find((q) => q.mint === pair);
@@ -305,9 +304,10 @@ export function LaunchForm({ split, tiers, launchFeeLamports, maxPenaltyBps, quo
         </div>
 
         <div className="flex flex-col text-sm border-t line pt-3">
-          <span className="flex justify-between py-1.5"><span className="text-muted">Launch fee</span><span className="font-mono text-right">{solText(cost.total)}{usdOf(cost.total) && <span className="block text-[12px] text-faint">≈ {usdOf(cost.total)}</span>}</span></span>
-          <span className="flex justify-between pb-1.5 text-[13px] text-muted"><span>Staking farms, one per lock tier ({tiers.length})</span><span className="font-mono">{solText(cost.rent)}</span></span>
-          <span className="flex justify-between pb-1.5 text-[13px] text-muted"><span>Platform</span><span className="font-mono">{solText(cost.fee)}</span></span>
+          <span className="flex flex-col gap-0.5 py-1.5">
+            <span className="flex justify-between"><span className="text-muted">Staking opens</span><span className="font-mono text-right">after {solText(rent)}{usdOf(rent) && <span className="block text-[12px] text-faint">≈ {usdOf(rent)}</span>}</span></span>
+            <span className="text-[13px] text-muted leading-normal">The stakers&apos; share of trading fees first pays for the staking farms, one per lock tier ({tiers.length}). Staking opens once it covers that.</span>
+          </span>
           <span className="flex justify-between py-1.5"><span className="text-muted">Graduates at</span><span className="font-mono">{pairQuote ? `${pairQuote.graduation.toLocaleString("en-US")} ${pairQuote.symbol} raised` : ""}</span></span>
           <span className="flex justify-between py-1.5"><span className="text-muted">Supply</span><span className="font-mono">1,000,000,000</span></span>
         </div>

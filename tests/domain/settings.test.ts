@@ -15,7 +15,7 @@ test("defaults match the spec", () => {
   expect(s.maxPenaltyBps).toBe(3000);
   expect(s.rewardPeriodSeconds).toBe(86_400);
   expect(s.slippageBps).toBe(100);
-  expect(s.launchFeeLamports).toBe(50_000_000n);
+  expect("launchFeeLamports" in s).toBe(false);
   expect(s.creatorPayoutMin[NATIVE_MINT]).toBe(50_000_000n);
   expect(s.devBuyCapBps).toBe(5000);
   expect(s.keeperIntervalSeconds).toBe(600);
@@ -49,5 +49,9 @@ test("save creates a new version and load returns the latest with bigints intact
   const latest = await loadLatestSettings(sql);
   expect(latest.version).toBe(v2);
   expect(latest.split.basketBps).toBe(7000);
-  expect(latest.launchFeeLamports).toBe(50_000_000n);
+});
+
+test("settings saved with a launch fee still load", () => {
+  const s = parseSettings({ ...defaultSettings(OURS), launchFeeLamports: "300000000" });
+  expect("launchFeeLamports" in s).toBe(false);
 });

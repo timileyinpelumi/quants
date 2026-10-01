@@ -137,6 +137,11 @@ test("basket override replaces a pending launch's basket and is refused once far
   expect(ok.status).toBe(200);
   const rows = await c.sql`select reward_mint, weight_bps from baskets where launch_id = ${l.id} order by weight_bps desc`;
   expect(rows.map((r: any) => r.weight_bps)).toEqual([6000, 4000]);
+  // the rent is sized for the basket, so taking it fixes the basket too
+  await c.sql`insert into distributions (launch_id, idem_key, step_key, kind, status, detail) values (${l.id}, 'rent:x', 'rent:x', 'rent', 'confirmed', '{}')`;
+  const afterRent = await basketRoute(withCookie(cookie, { method: "POST", body: JSON.stringify(body) }));
+  expect(afterRent.status).toBe(400);
+  await c.sql`delete from distributions where launch_id = ${l.id}`;
   await c.sql`insert into stake_tiers values (${l.id}, '7d', 604800, 10000, 'FarmA')`;
   const late = await basketRoute(withCookie(cookie, { method: "POST", body: JSON.stringify(body) }));
   expect(late.status).toBe(400);

@@ -2,6 +2,9 @@ import { test, expect, type Page } from "@playwright/test";
 import { execSync } from "node:child_process";
 
 const keeperPass = () => execSync("bun --env-file=.env.local scripts/keeper-once.ts", { stdio: "pipe", timeout: 180_000 }).toString();
+// Buy and sell rounds on the curve; at a 2% fee, 6 rounds of 5 SOL pay the stakers' share past the farm setup of 7 tiers and 2 rewards.
+const trade = (mint: string, rounds: number) =>
+  execSync(`bun --env-file=.env.local scripts/trade-curve.ts ${mint} ${rounds} 5`, { stdio: "pipe", timeout: 180_000 }).toString();
 const symbol = `E${Math.random().toString(36).slice(2, 8).toUpperCase().replace(/[^A-Z0-9]/g, "X")}`;
 
 async function connect(page: Page) {
@@ -13,7 +16,7 @@ async function connect(page: Page) {
   await expect(page.getByRole("button", { name: /^Wallet / })).toBeVisible();
 }
 
-test("launch, see the token, stake, exit early and see the burn", async ({ page }) => {
+test("launch, trade until staking opens, stake, exit early and see the burn", async ({ page }) => {
   await page.goto("/launch");
   await connect(page);
 
@@ -26,6 +29,8 @@ test("launch, see the token, stake, exit early and see the burn", async ({ page 
   await picker.getByRole("checkbox", { name: /CATE/ }).click();
   await picker.getByRole("button", { name: "Add 2 tokens" }).click();
   await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect(page.getByText(/Staking opens once it covers that/)).toBeVisible();
+  await expect(page.getByText("Launch fee")).toHaveCount(0);
   await page.getByPlaceholder("0").first().fill("1");
   await page.getByRole("button", { name: `Launch ${symbol}` }).click();
   await page.waitForURL(/\/t\/[1-9A-HJ-NP-Za-km-z]{32,44}$/, { timeout: 120_000 });
@@ -35,9 +40,22 @@ test("launch, see the token, stake, exit early and see the burn", async ({ page 
   await expect(page.getByText(`Stake ${symbol}, earn`)).toBeVisible();
   await expect(page.getByText("180 days")).toBeVisible();
 
+  // The first buy's fees alone do not cover the farms, so staking stays closed and shows its progress.
   keeperPass();
   await page.goto(`/t/${mint}/stake`);
-  await expect(page.getByText("Staking opens a few minutes after launch")).toHaveCount(0);
+  await expect(page.getByText("Staking opens at 100%")).toBeVisible();
+  const before = Number((await page.getByLabel("Staking progress").getByText(/^\d+%$/).textContent())!.replace("%", ""));
+  expect(before).toBeGreaterThan(0);
+  expect(before).toBeLessThan(100);
+  await expect(page.getByText(/SOL .*to go/)).toBeVisible();
+  await expect(page.getByRole("button", { name: /^Stake for / })).toBeDisabled();
+  await page.goto("/explore?sort=new");
+  await expect(page.getByText(`Staking at ${before}%`).first()).toBeVisible();
+
+  trade(mint, 6);
+  keeperPass();
+  await page.goto(`/t/${mint}/stake`);
+  await expect(page.getByText("Staking opens at 100%")).toHaveCount(0);
   await page.getByRole("button", { name: /2x\s*30 days/ }).click();
   await page.getByRole("button", { name: "Max" }).click();
   await page.getByRole("button", { name: "Stake for 30 days" }).click();

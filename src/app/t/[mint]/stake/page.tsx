@@ -30,6 +30,7 @@ export default async function StakePage({ params }: { params: Promise<{ mint: st
         tiers={d.tiers.map((t) => ({ id: t.tierId, lockSeconds: t.lockSeconds, multiplierBps: t.multiplierBps }))}
         maxPenaltyBps={d.maxPenaltyBps}
         ready={d.stakeReady}
+        opens={d.stakingOpens}
       />
     </div>
   );

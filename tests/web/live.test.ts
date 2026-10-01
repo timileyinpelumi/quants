@@ -86,3 +86,17 @@ test("live route returns market, graduation, activity, traders and trades for a 
   expect(j.holders).toBeNull();
   expect((await GET(new Request("http://x"), { params: Promise.resolve({ mint: "nope" }) })).status).toBe(404);
 });
+
+test("live route carries the staking progress until staking opens", async () => {
+  const { makeWebContext } = await import("../helpers/web-context");
+  const { GET } = await import("../../src/app/api/token/[mint]/live/route");
+  const { sql } = await makeWebContext();
+  const id = await insertLaunch(sql, { mint: "LIVE2" });
+  await sql`insert into stake_pools (launch_id, backend, max_penalty_bps, spill_account, status, rent_lamports, basket_value_lamports)
+    values (${id}, 'kamino', 3000, 'Spill', 'pending', 400, 100)`;
+  const get = async () => (await GET(new Request("http://x"), { params: Promise.resolve({ mint: "LIVE2" }) })).json();
+  expect((await get()).staking).toEqual({ percent: 25, rentLamports: "400", neededLamports: "300" });
+  await sql`update stake_pools set status = 'ready' where launch_id = ${id}`;
+  await Bun.sleep(2_100);
+  expect((await get()).staking).toBeNull();
+});

@@ -1,7 +1,7 @@
 import type { SQL } from "bun";
 import type { Bucket } from "../domain/types";
 
-export type StepKind = "claim" | "split" | "payout" | "swap" | "fund" | "collect_penalty" | "burn" | "migrate" | "create_farm" | "configure_farm";
+export type StepKind = "claim" | "split" | "payout" | "swap" | "fund" | "collect_penalty" | "burn" | "migrate" | "create_farm" | "configure_farm" | "rent";
 export type StepStatus = "pending" | "sent" | "confirmed" | "failed";
 export interface Delta { bucket: Bucket; mint: string; amount: bigint }
 export interface StepRow {

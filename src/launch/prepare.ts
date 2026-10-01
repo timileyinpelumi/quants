@@ -4,7 +4,6 @@ import type { MeteoraPort } from "../meteora/port";
 import { configKeyName, FEE_TIERS_BPS } from "../meteora/config";
 import { loadLatestSettings } from "../domain/settings";
 import { NATIVE_MINT } from "../domain/types";
-import { launchCost } from "../domain/launch-cost";
 
 export class LaunchError extends Error {
   constructor(public code: "invalid_input" | "basket_not_verified" | "basket_unsupported" | "dev_buy_too_large" | "not_found_on_chain" | "pool_mismatch", message: string) { super(message); }
@@ -36,7 +35,7 @@ const CLASSIC_TOKEN_PROGRAM = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
 const SUPPLY_BASE_UNITS = 1_000_000_000n * 1_000_000n;
 
 export async function prepareLaunch(
-  deps: { sql: SQL; meteora: MeteoraPort; configKeys: Record<string, string>; quoteMints: string[]; keeperAddress: string;
+  deps: { sql: SQL; meteora: MeteoraPort; configKeys: Record<string, string>; quoteMints: string[];
     isVerified: (mint: string) => Promise<boolean>; tokenProgramOf: (mint: string) => Promise<string> },
   raw: unknown,
 ) {
@@ -63,7 +62,6 @@ export async function prepareLaunch(
   }
   const { tx, baseMint, pool } = await deps.meteora.buildLaunchTx({
     name: input.name, symbol: input.symbol, uri: input.uri, creator: input.creator, configKey, quoteMint: input.quoteMint,
-    launchFeeLamports: launchCost(settings, input.basket.length).total, feeReceiver: deps.keeperAddress,
     devBuyQuoteAmount: input.devBuyQuoteAmount, devBuyMinOut: input.devBuyMinOut,
   });
   const mint = baseMint.publicKey.toBase58();

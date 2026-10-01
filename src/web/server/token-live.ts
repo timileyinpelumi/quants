@@ -3,6 +3,7 @@ import { deriveDbcPoolAuthority, deriveDammV2PoolAuthority } from "@meteora-ag/d
 import type { WebContext } from "./context";
 import { market, type Market } from "./chart";
 import { recentTrades, type TradeRow } from "./landing";
+import { stakingOpens, type StakingOpens } from "./reads";
 import { activity, curveProgress, holders, topTraders, type Activity, type HolderChain, type Holders, type Trader } from "./live";
 
 const TOKEN_PROGRAM = new PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA");
@@ -19,6 +20,7 @@ export type TokenLive = {
   traders: Trader[];
   holders: Holders | null;
   creator: string;
+  staking: StakingOpens | null;
   at: number;
 };
 
@@ -90,13 +92,14 @@ export async function tokenLive(ctx: WebContext, mint: string): Promise<TokenLiv
   const value = (async (): Promise<TokenLive> => {
     const id = Number(l.id);
     const m = await market(ctx.sql, id);
-    const [curve, trades, act, traders, hs] = await Promise.all([
+    const [curve, trades, act, traders, hs, [pool]] = await Promise.all([
       curveProgress(ctx.sql, id), recentTrades(ctx.sql, id, 25), activity(ctx.sql, id), topTraders(ctx.sql, id, m?.price ?? 0, 10),
       holdersFor(ctx, { id, mint, creator: l.creator }),
+      ctx.sql`select status, rent_lamports, basket_value_lamports from stake_pools where launch_id = ${id}`,
     ]);
     return {
       status: l.status, market: m, quoteUsd: m?.priceUsd != null && m.price ? m.priceUsd / m.price : null,
-      curve, trades, activity: act, traders, holders: hs, creator: l.creator, at: Date.now(),
+      curve, trades, activity: act, traders, holders: hs, creator: l.creator, staking: stakingOpens(pool), at: Date.now(),
     };
   })();
   liveCache.set(mint, { at: Date.now(), value });

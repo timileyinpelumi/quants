@@ -66,7 +66,7 @@ test.skipIf(!up)("the keeper registers all 10 reward mints on one farm", async (
 test.skipIf(!up)("the launch cost estimate covers what the keeper spends", async () => {
   const all = defaultSettings("x").tiers;
   for (const [n, t] of [[1, 1], [3, 1], [10, 1], [1, all.length], [3, all.length], [10, all.length]] as const) {
-    const s = { launchFeeLamports: 0n, tiers: all.slice(0, t) };
+    const s = { tiers: all.slice(0, t) };
     const { spent } = await keeperFarm(n, s.tiers);
     const estimate = launchCost(s, n).rent;
     console.log(`${t} farms, ${n} rewards: spent ${spent} lamports, estimate ${estimate}`);

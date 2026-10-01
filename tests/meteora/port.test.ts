@@ -1,5 +1,5 @@
 import { test, expect } from "bun:test";
-import { Connection, Keypair, LAMPORTS_PER_SOL, PublicKey, sendAndConfirmTransaction } from "@solana/web3.js";
+import { Connection, Keypair, LAMPORTS_PER_SOL, PublicKey, SystemProgram, sendAndConfirmTransaction } from "@solana/web3.js";
 import BN from "bn.js";
 import { getAssociatedTokenAddressSync } from "@solana/spl-token";
 import { DynamicBondingCurveClient, SwapMode, deriveDbcPoolAuthority, deriveDammV2PoolAuthority } from "@meteora-ag/dynamic-bonding-curve-sdk";
@@ -36,12 +36,12 @@ test.skipIf(!up)("launch, claim partner fee, graduate, find position, claim posi
   const keeperBefore = await conn.getBalance(keeper.publicKey);
   const { tx, baseMint, pool } = await m.buildLaunchTx({
     name: "Cat", symbol: "CAT", uri: "https://example.com/cat.json", creator: creator.publicKey.toBase58(),
-    configKey: config.publicKey.toBase58(), quoteMint: NATIVE_MINT, launchFeeLamports: 300_000_000n,
-    feeReceiver: keeper.publicKey.toBase58(), devBuyQuoteAmount: 1_000_000_000n, devBuyMinOut: 0n,
+    configKey: config.publicKey.toBase58(), quoteMint: NATIVE_MINT, devBuyQuoteAmount: 1_000_000_000n, devBuyMinOut: 0n,
   });
+  expect(tx.instructions.some((ix) => ix.programId.equals(SystemProgram.programId) && ix.keys.some((k) => k.pubkey.equals(keeper.publicKey)))).toBe(false);
   tx.partialSign(creator);
   await conn.confirmTransaction(await conn.sendRawTransaction(tx.serialize()));
-  expect(await conn.getBalance(keeper.publicKey)).toBe(keeperBefore + 300_000_000);
+  expect(await conn.getBalance(keeper.publicKey)).toBe(keeperBefore);
   const bought = BigInt((await conn.getTokenAccountBalance(getAssociatedTokenAddressSync(baseMint.publicKey, creator.publicKey))).value.amount);
   const maxOut = await m.firstBuyMaxOut(config.publicKey.toBase58(), 1_000_000_000n);
   expect(bought).toBeGreaterThan(0n);

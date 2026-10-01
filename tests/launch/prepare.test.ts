@@ -1,4 +1,3 @@
-import { launchCost } from "../../src/domain/launch-cost";
 import { test, expect } from "bun:test";
 import { freshDb } from "../helpers/db";
 import { FakeChain } from "../helpers/fake-chain";
@@ -8,7 +7,6 @@ import { defaultSettings, saveSettings } from "../../src/domain/settings";
 import { NATIVE_MINT } from "../../src/domain/types";
 
 const OURS = "OURS1111111111111111111111111111111111111111";
-const KEEPER = "Keeper1111111111111111111111111111111111111";
 const configKeys = { [`${NATIVE_MINT}:200`]: "CfgSol200", [`${OURS}:200`]: "CfgOurs200" };
 const valid = {
   name: "Cat", symbol: "CAT", uri: "https://x.test/cat.json", creator: "Creator111111111111111111111111111111111111",
@@ -20,17 +18,16 @@ async function setup(verified = true, tokenProgram = "TokenkegQfeZyiNwAJbNbGKPFX
   const sql = await freshDb();
   await saveSettings(sql, defaultSettings(OURS), "test");
   const meteora = new FakeMeteora(new FakeChain());
-  return { sql, meteora, deps: { sql, meteora, configKeys, quoteMints: [NATIVE_MINT, OURS], keeperAddress: KEEPER, isVerified: async () => verified, tokenProgramOf: async () => tokenProgram } };
+  return { sql, meteora, deps: { sql, meteora, configKeys, quoteMints: [NATIVE_MINT, OURS], isVerified: async () => verified, tokenProgramOf: async () => tokenProgram } };
 }
 
-test("prepares a transaction against the right config key with the launch fee", async () => {
+test("prepares a transaction against the right config key with no launch fee", async () => {
   const { deps, meteora } = await setup();
   const r = await prepareLaunch(deps, valid);
   expect(r.pool).toStartWith("pool-");
   expect(typeof r.transaction).toBe("string");
   expect(meteora.launches[0]!.configKey).toBe("CfgSol200");
-  expect(meteora.launches[0]!.launchFeeLamports).toBe(launchCost(defaultSettings(OURS), valid.basket.length).total);
-  expect(meteora.launches[0]!.feeReceiver).toBe(KEEPER);
+  expect(Object.keys(meteora.launches[0]!).filter((k) => /fee/i.test(k))).toEqual([]);
 });
 
 test("rejects bad input", async () => {

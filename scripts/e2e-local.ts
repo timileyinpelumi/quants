@@ -55,7 +55,7 @@ log("3. database migrated, default settings saved");
 
 const meteora = new MeteoraLive(chain, DAMM_CUSTOM);
 const prepared = await prepareLaunch(
-  { sql, meteora, configKeys, quoteMints: [NATIVE_MINT, ours.toBase58()], keeperAddress: keeper.publicKey.toBase58(), isVerified: async () => true,
+  { sql, meteora, configKeys, quoteMints: [NATIVE_MINT, ours.toBase58()], isVerified: async () => true,
     tokenProgramOf: async (m: string) => (await conn.getAccountInfo(new PublicKey(m)))!.owner.toBase58() },
   { name: "Cat", symbol: "CAT", uri: "https://example.com/cat.json", creator: creator.publicKey.toBase58(), quoteMint: NATIVE_MINT, feeTierBps: 200,
     basket: [{ mint: zec.toBase58(), weightBps: 10_000 }], devBuyQuoteAmount: "100000000" },
@@ -71,7 +71,15 @@ const swap = async (who: Keypair, amount: BN, sell: boolean) =>
   sendAndConfirmTransaction(conn, await client.pool.swap2({ owner: who.publicKey, pool: new PublicKey(prepared.pool), swapMode: SwapMode.PartialFill, amountIn: amount, minimumAmountOut: new BN(0), swapBaseForQuote: sell, referralTokenAccount: null }), [who]);
 for (let i = 0; i < 20; i++) await swap(trader, new BN(LAMPORTS_PER_SOL / 2), false);
 await swap(staker, new BN(LAMPORTS_PER_SOL), false);
-log("5. 21 buys on the curve");
+// Staking opens once the stakers' share pays for the farms, so add buy and sell volume past that.
+const traderCat = getAssociatedTokenAddressSync(new PublicKey(prepared.mint), trader.publicKey);
+for (let i = 0; i < 5; i++) {
+  const before = BigInt((await conn.getTokenAccountBalance(traderCat)).value.amount);
+  await swap(trader, new BN(5 * LAMPORTS_PER_SOL), false);
+  const got = BigInt((await conn.getTokenAccountBalance(traderCat)).value.amount) - before;
+  await swap(trader, new BN(got.toString()), true);
+}
+log("5. 21 buys and 5 round trips on the curve");
 
 // Local stand-in for Jupiter: mints ZEC to the keeper 1:1 against SOL base units.
 const jupiter: JupiterPort = {

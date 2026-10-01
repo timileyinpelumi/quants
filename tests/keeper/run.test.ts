@@ -6,6 +6,7 @@ import { FakeJupiter } from "../helpers/fake-jupiter";
 import { runKeeper, resume, reconcile, ReconcileError } from "../../src/keeper/run";
 import { beginStep, markSent, getBalance, confirmStep } from "../../src/ledger/ledger";
 import { NATIVE_MINT } from "../../src/domain/types";
+import { launchCost } from "../../src/domain/launch-cost";
 
 async function full() {
   const f = await keeperFixture();
@@ -16,7 +17,7 @@ async function full() {
   return { ...f, staking, jupiter, deps: { ...f.deps, staking, jupiter } };
 }
 
-test("a full run claims, splits, pays out, creates farms, swaps and funds", async () => {
+test("a full run claims, splits, pays out, takes the farm rent, creates farms, swaps and funds", async () => {
   const f = await full();
   const id = await insertLaunch(f.sql, { mint: "CAT", pool: "P1" });
   await f.sql`insert into baskets values (${id}, 'ZEC', 10000)`;
@@ -27,7 +28,7 @@ test("a full run claims, splits, pays out, creates farms, swaps and funds", asyn
   const r = await runKeeper(f.deps);
   expect(r.errors).toEqual([]);
   expect(f.staking.funded.length).toBe(1);
-  expect(f.staking.funded[0]!.amount).toBe(600_000_000n);
+  expect(f.staking.funded[0]!.amount).toBe(600_000_000n - launchCost({ tiers: [{ id: "7d", lockSeconds: 604800, multiplierBps: 10000 }] }, 1).rent);
   expect(await getBalance(f.sql, id, "reward", "ZEC")).toBe(0n);
 });
 
@@ -122,6 +123,8 @@ test("a farm creation whose build throws once is retried on the next run", async
   await f.sql`insert into baskets values (${id}, 'ZEC', 10000)`;
   await f.sql`insert into stake_pools values (${id}, 'kamino', 3000, 'SpillAta', 'pending')`;
   await f.sql`insert into stake_tiers (launch_id, tier_id, lock_seconds, multiplier_bps) values (${id}, '7d', 604800, 10000)`;
+  f.meteora.partnerFee.set("P11", 1_000_000_000n);
+  f.chain.balances.set("Keeper:ZEC", 10n ** 18n);
   const orig = f.staking.buildCreateFarm.bind(f.staking);
   let calls = 0;
   f.staking.buildCreateFarm = async (...a) => { if (calls++ === 0) throw new Error("rpc blip"); return orig(...a); };

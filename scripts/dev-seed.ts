@@ -1,7 +1,7 @@
 // Seeds a local validator and Postgres with config keys, a Kamino global config and example launches,
 // then writes .env.local and config-keys.json so `bun run dev` and `scripts/keeper-once.ts` work against them.
 import { Connection, Keypair, LAMPORTS_PER_SOL, PublicKey, Transaction, sendAndConfirmTransaction } from "@solana/web3.js";
-import { createMint, getOrCreateAssociatedTokenAccount, mintTo } from "@solana/spl-token";
+import { createMint, getAssociatedTokenAddressSync, getOrCreateAssociatedTokenAccount, mintTo } from "@solana/spl-token";
 import { DynamicBondingCurveClient, SwapMode, deriveDbcPoolAuthority, deriveDammV2PoolAuthority } from "@meteora-ag/dynamic-bonding-curve-sdk";
 import { Farms, GlobalConfigOption } from "@kamino-finance/farms-sdk";
 import { address, createSolanaRpc } from "@solana/kit";
@@ -73,7 +73,7 @@ await saveSettings(sql, defaultSettings(ours.toBase58()), "seed");
 
 const chain = new SolanaChain(conn, keeper, spill);
 const meteora = new MeteoraLive(chain, DAMM_CUSTOM);
-const deps = { sql, meteora, configKeys, quoteMints: [NATIVE_MINT, ours.toBase58()], keeperAddress: keeper.publicKey.toBase58(), isVerified: async () => true,
+const deps = { sql, meteora, configKeys, quoteMints: [NATIVE_MINT, ours.toBase58()], isVerified: async () => true,
   tokenProgramOf: async (m: string) => (await conn.getAccountInfo(new PublicKey(m)))!.owner.toBase58() };
 
 async function launch(name: string, symbol: string, basket: { mint: PublicKey; symbol: string; decimals: number; weightBps: number }[]) {
@@ -100,6 +100,15 @@ const dog = await launch("Dog Wif Basket", "DOG", [{ mint: rewards.ZEC, symbol: 
 for (let i = 0; i < 12; i++) await buy(trader, cat.pool, 2);
 for (const who of [tester, admin]) await buy(who, cat.pool, 3);
 for (let i = 0; i < 4; i++) await buy(trader, dog.pool, 1);
+// Enough buy and sell volume on CAT for its stakers' share to pay for its farms, so the next keeper run opens staking. DOG stays closed.
+const traderCat = getAssociatedTokenAddressSync(new PublicKey(cat.mint), trader.publicKey);
+const held = async () => BigInt((await conn.getTokenAccountBalance(traderCat)).value.amount);
+for (let i = 0; i < 4; i++) {
+  const before = await held();
+  await buy(trader, cat.pool, 5);
+  const got = (await held()) - before;
+  await sendAndConfirmTransaction(conn, await client.pool.swap2({ owner: trader.publicKey, pool: new PublicKey(cat.pool), swapMode: SwapMode.PartialFill, amountIn: new BN(got.toString()), minimumAmountOut: new BN(0), swapBaseForQuote: true, referralTokenAccount: null }), [trader]);
+}
 log(`launched CAT ${cat.mint} and DOG ${dog.mint}, traded both`);
 
 // Test wallet also gets each non-SOL quote coin so those pairs can be tried by hand.

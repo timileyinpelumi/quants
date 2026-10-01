@@ -17,7 +17,7 @@ export default async function LaunchPage() {
   return (
     <div className="flex-1 bg-launch">
       <Header active="launch" />
-      <LaunchForm split={s.split} tiers={s.tiers} launchFeeLamports={s.launchFeeLamports.toString()} maxPenaltyBps={s.maxPenaltyBps} quotes={quotes} />
+      <LaunchForm split={s.split} tiers={s.tiers} maxPenaltyBps={s.maxPenaltyBps} quotes={quotes} />
     </div>
   );
 }

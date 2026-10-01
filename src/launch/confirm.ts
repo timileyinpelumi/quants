@@ -3,6 +3,8 @@ import { PublicKey, type Connection } from "@solana/web3.js";
 import { getAssociatedTokenAddressSync } from "@solana/spl-token";
 import { LaunchError } from "./prepare";
 import type { MeteoraPort } from "../meteora/port";
+import { launchCost } from "../domain/launch-cost";
+import { parseSettings } from "../domain/settings";
 
 // Everything except the mint and signature comes from what prepareLaunch stored, checked against the pool on-chain.
 export async function confirmLaunch(
@@ -29,6 +31,9 @@ export async function recordLaunch(sql: SQL, prep: any, spillWallet: PublicKey):
   const i = { mint: prep.mint as string };
   const deps = { sql };
   const spillAccount = getAssociatedTokenAddressSync(new PublicKey(i.mint), spillWallet).toBase58();
+  const [sv] = await sql`select data from settings where version = ${prep.settings_version}`;
+  const basket = typeof prep.basket === "string" ? JSON.parse(prep.basket) : prep.basket;
+  const rent = sv ? launchCost(parseSettings(sv.data), basket.length).rent.toString() : null;
   const [row] = await deps.sql`
     with s as (select data from settings where version = ${prep.settings_version}),
     l as (
@@ -41,8 +46,8 @@ export async function recordLaunch(sql: SQL, prep: any, spillWallet: PublicKey):
       select l.id, x.mint, x."weightBps", x.symbol, x.decimals
       from l cross join jsonb_to_recordset(${JSON.stringify(prep.basket)}::text::jsonb) as x(mint text, "weightBps" int, symbol text, decimals int)
     ), p as (
-      insert into stake_pools (launch_id, backend, max_penalty_bps, spill_account, status)
-      select l.id, s.data->>'defaultBackend', (s.data->>'maxPenaltyBps')::int, ${spillAccount}, 'pending' from l, s
+      insert into stake_pools (launch_id, backend, max_penalty_bps, spill_account, status, rent_lamports)
+      select l.id, s.data->>'defaultBackend', (s.data->>'maxPenaltyBps')::int, ${spillAccount}, 'pending', ${rent}::bigint from l, s
       returning launch_id
     ), t as (
       insert into stake_tiers (launch_id, tier_id, lock_seconds, multiplier_bps)

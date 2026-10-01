@@ -21,7 +21,7 @@ Copy `.env.example` to `.env` and fill in:
 
 ## Wallets
 
-- **Keeper.** Fee claimer on every DBC config, owner of every graduated LP position, admin of every Kamino farm. Holds claimed fees between keeper runs and pays rent for farms. Launch fees (0.3 SOL each) are paid to it to cover that rent. Keep at least 1 SOL above what the ledger says it owes.
+- **Keeper.** Fee claimer on every DBC config, owner of every graduated LP position, admin of every Kamino farm. Holds claimed fees between keeper runs and pays rent for farms. That rent comes out of each launch's stakers' share (see Staking opens), so the ledger moves it out of the basket before the keeper spends it. Keep at least 1 SOL above what the ledger says it owes for transaction fees and retries.
 - **Spill.** Only receives early-exit penalties from farms. The keeper burns from it. It should never hold anything else.
 - **Treasury.** Receives the platform share. Receive only. It must already exist on-chain (hold at least the rent-exempt minimum of SOL), or small SOL payouts to it fail.
 
@@ -49,6 +49,16 @@ bun run keeper
 ```
 
 It runs every `keeperIntervalSeconds` (default 600) and logs one JSON line per run with `runId`, `launches` and per-launch `errors`.
+
+### Staking opens
+
+There is no launch fee. A new launch's stake pool stays `pending` and its stakers' share (the `basket` bucket in `escrow`) is held in the pair token. Each run the keeper values that balance in SOL (SOL pairs 1:1, other pairs by a Jupiter quote to SOL) and stores it with the farm rent (`launchCost(...).rent` for the pool's tiers and basket) on `stake_pools` as `basket_value_lamports` and `rent_lamports`; pages show the ratio as a percent. On the run the value covers the rent:
+
+1. Non-SOL pairs swap just enough of the basket to SOL (a `swap` row with `detail.toBucket = 'basket'`, step key `rent_swap:<launch>`), sized from the quote plus the slippage cap.
+2. A `rent` row debits the rent from the basket's SOL. A unique index allows one confirmed `rent` row per launch.
+3. The farms are created as before, and the rest of the basket buys rewards from then on.
+
+Launches made under settings that had a launch fee open without a `rent` row, since they paid at launch.
 
 ## Running the trade indexer
 
@@ -93,7 +103,7 @@ solana-test-validator --reset --url https://api.mainnet-beta.solana.com \
 bun scripts/e2e-local.ts
 ```
 
-The script launches a token, trades it, runs the keeper three times (before staking, after staking, after an early exit) and checks the burn reduced the mint supply by the burned amount. Jupiter is not available locally, so a stand-in mints the basket token to the keeper instead of swapping.
+The script launches a token, trades it past the volume that opens staking, runs the keeper three times (before staking, after staking, after an early exit) and checks the burn reduced the mint supply by the burned amount. Jupiter is not available locally, so a stand-in mints the basket token to the keeper instead of swapping. The stand-in in `scripts/lib/local-jupiter.ts` (used by `scripts/keeper-once.ts`) also swaps a pair token to SOL by burning it and paying SOL from an airdropped wallet. `scripts/trade-curve.ts <mint> <rounds>` buys and sells a local launch on its curve to add fees; the seed uses the same approach so CAT opens staking on the first keeper run and DOG stays closed.
 
 ## Web app environment
 
@@ -101,7 +111,7 @@ On top of the keeper variables above, the web app needs:
 
 | Variable | What it is |
 |---|---|
-| `KEEPER_ADDRESS` | Keeper public key; launch fees are paid to it |
+| `KEEPER_ADDRESS` | Keeper public key, listed on the docs page |
 | `SPILL_ADDRESS` | Spill public key; stake pools send penalties to its token accounts |
 | `PINATA_JWT` | Pinata API JWT for image and metadata uploads |
 | `PINATA_GATEWAY` | Your Pinata gateway domain (optional, else ipfs.io links) |

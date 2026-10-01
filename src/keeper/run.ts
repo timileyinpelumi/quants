@@ -9,6 +9,7 @@ import { claimStep } from "./steps/claim";
 import { splitStep } from "./steps/split";
 import { payoutStep } from "./steps/payout";
 import { createFarmsStep } from "./steps/farms";
+import { openStakingStep } from "./steps/open";
 import { swapStep } from "./steps/swap";
 import { fundStep } from "./steps/fund";
 import { penaltyStep } from "./steps/penalty";
@@ -43,9 +44,11 @@ export async function processLaunch(deps: KeeperDeps, launch: LaunchRow, s: Vers
   await claimStep(deps, l, s, runId);
   await splitStep(deps, l, s, runId);
   await payoutStep(deps, l, s, runId);
-  await createFarmsStep(deps, l, s, runId);
-  await swapStep(deps, l, s, runId);
-  await fundStep(deps, l, s, runId);
+  if (await openStakingStep(deps, l, s, runId)) {
+    await createFarmsStep(deps, l, s, runId);
+    await swapStep(deps, l, s, runId);
+    await fundStep(deps, l, s, runId);
+  }
   await penaltyStep(deps, l, s, runId);
 }
 

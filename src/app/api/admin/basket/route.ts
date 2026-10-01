@@ -29,7 +29,7 @@ export async function POST(req: Request) {
     const [r] = await c.sql`
       with started as (
         select exists(select 1 from stake_tiers where launch_id = ${l.id} and farm is not null)
-          or exists(select 1 from distributions where launch_id = ${l.id} and kind in ('create_farm', 'configure_farm', 'swap')) as yes
+          or exists(select 1 from distributions where launch_id = ${l.id} and kind in ('create_farm', 'configure_farm', 'swap', 'rent')) as yes
       ), next as (
         select x.mint, x."weightBps" as weight_bps, x.symbol, x.decimals
         from jsonb_to_recordset(${JSON.stringify(b.basket)}::text::jsonb) as x(mint text, "weightBps" int, symbol text, decimals int)

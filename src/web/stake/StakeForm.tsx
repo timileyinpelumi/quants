@@ -5,9 +5,11 @@ import { Button } from "@/web/ui/Button";
 import { fmtAmount, lockLabel, lockShort } from "@/web/ui/format";
 import { useStake, toBase, days, mult, dateOf, STAKE_DECIMALS, type Tier } from "./useStake";
 import { useUsd, usdText } from "@/web/ui/usd";
+import { StakingOpens } from "./StakingOpens";
+import type { StakingOpens as Opens } from "@/web/server/reads";
 
-export function StakeForm({ mint, symbol, tiers, maxPenaltyBps, ready, earns }: {
-  mint: string; symbol: string; tiers: Tier[]; maxPenaltyBps: number; ready: boolean; earns: string;
+export function StakeForm({ mint, symbol, tiers, maxPenaltyBps, ready, earns, opens }: {
+  mint: string; symbol: string; tiers: Tier[]; maxPenaltyBps: number; ready: boolean; earns: string; opens: Opens | null;
 }) {
   const { owner, balance, positions, busy, error, act } = useStake(mint);
   const [tier, setTier] = useState(tiers[Math.min(1, tiers.length - 1)]?.id ?? tiers[0]!.id);
@@ -51,7 +53,7 @@ export function StakeForm({ mint, symbol, tiers, maxPenaltyBps, ready, earns }: 
       </div>
       {lockedHere && <p className="m-0 text-sm text-burn">Adding restarts this {lockLabel(selected.lockSeconds)} lock for the whole position.</p>}
       {tooMuch && <p className="m-0 text-sm text-burn">You hold less {symbol} than that.</p>}
-      {!ready && <p className="m-0 text-sm text-muted">Staking opens a few minutes after launch.</p>}
+      {!ready && <StakingOpens initial={opens} />}
       {error && <p role="alert" className="m-0 text-sm text-burn">{error}</p>}
       <Button size="lg" variant="violet" disabled={!ready || busy !== null || (!!owner && (!amountBase || amountBase <= 0n || tooMuch))}
         onClick={async () => { if (await act("stake", tier, { amount: amountBase?.toString() })) setAmount(""); }}>

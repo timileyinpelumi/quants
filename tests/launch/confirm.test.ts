@@ -8,6 +8,7 @@ import { prepareLaunch } from "../../src/launch/prepare";
 import { confirmLaunch } from "../../src/launch/confirm";
 import { NATIVE_MINT } from "../../src/domain/types";
 import { defaultSettings, saveSettings } from "../../src/domain/settings";
+import { launchCost } from "../../src/domain/launch-cost";
 
 const OURS = "OURS1111111111111111111111111111111111111111";
 const CREATOR = Keypair.generate().publicKey.toBase58();
@@ -22,7 +23,7 @@ async function prepared(opts: { onChainCreator?: string; onChainConfig?: string 
   const meteora = new FakeMeteora(new FakeChain());
   const configKeys = { [`${NATIVE_MINT}:200`]: "CfgSol200" };
   const p = await prepareLaunch(
-    { sql, meteora, configKeys, quoteMints: [NATIVE_MINT, OURS], keeperAddress: "Keeper1111111111111111111111111111111111111", isVerified: async () => true, tokenProgramOf: async () => "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA" },
+    { sql, meteora, configKeys, quoteMints: [NATIVE_MINT, OURS], isVerified: async () => true, tokenProgramOf: async () => "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA" },
     { name: "Cat", symbol: "CAT", uri: "https://x.test/cat.json", creator: CREATOR, quoteMint: NATIVE_MINT, feeTierBps: 200,
       basket: [{ mint: "Zec1111111111111111111111111111111111111111", weightBps: 10_000 }] },
   );
@@ -41,6 +42,8 @@ test("records launch, basket and a pending stake pool from what prepare stored",
   expect(sp.max_penalty_bps).toBe(3000);
   expect(sp.spill_account).toBe(getAssociatedTokenAddressSync(new (await import("@solana/web3.js")).PublicKey(p.mint), SPILL).toBase58());
   expect((await sql`select tier_id from stake_tiers where launch_id = ${id} order by lock_seconds`).map((r: any) => r.tier_id)).toEqual(["12h", "1d", "3d", "7d", "30d", "90d", "180d"]);
+  expect(BigInt(sp.rent_lamports)).toBe(launchCost(defaultSettings(OURS), 1).rent);
+  expect(BigInt(sp.basket_value_lamports)).toBe(0n);
 });
 
 test("confirm is idempotent on mint", async () => {

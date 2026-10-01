@@ -64,7 +64,7 @@ export async function buildStakeAction(ctx: WebContext, actionRaw: string, raw: 
   const action = Action.parse(actionRaw);
   const b = Body.parse(raw);
   const { launch, tiers } = await launchStake(ctx, b.mint);
-  if (launch.status !== "ready") throw new LaunchError("invalid_input", "Staking opens a few minutes after launch");
+  if (launch.status !== "ready") throw new LaunchError("invalid_input", "Staking is not open yet");
   const tier = tiers.find((t: any) => t.tier_id === b.tierId);
   if (!tier?.farm) throw new LaunchError("invalid_input", "That lock tier does not exist");
   if (action === "stake") {

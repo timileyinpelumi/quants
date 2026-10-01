@@ -12,7 +12,7 @@ const CREATOR = "Creator111111111111111111111111111111111111";
 
 async function launch(c: Awaited<ReturnType<typeof makeWebContext>>, symbol: string) {
   const p = await prepareLaunch(
-    { sql: c.sql, meteora: c.meteora, configKeys: c.configKeys, quoteMints: [NATIVE_MINT, c.ourtokenMint], keeperAddress: c.keeperAddress, isVerified: async () => true, tokenProgramOf: c.tokenProgramOf },
+    { sql: c.sql, meteora: c.meteora, configKeys: c.configKeys, quoteMints: [NATIVE_MINT, c.ourtokenMint], isVerified: async () => true, tokenProgramOf: c.tokenProgramOf },
     { name: `${symbol} Coin`, symbol, uri: "https://ipfs.io/ipfs/m", image: "https://ipfs.io/ipfs/i", creator: CREATOR, quoteMint: NATIVE_MINT, feeTierBps: 200,
       basket: [{ mint: ZEC, weightBps: 10_000, symbol: "ZEC", decimals: 8 }] },
   );
@@ -90,4 +90,18 @@ test("a failing stake read shows unknown instead of breaking the page", async ()
   (c.staking as any).totalStaked = async () => { throw new Error("429"); };
   const d = (await launchDetail(c, a.mint))!;
   expect(d.tiers.every((t) => t.staked === null && t.sharePct === 0)).toBe(true);
+});
+
+test("launchDetail shows how close staking is to opening until the farms are ready", async () => {
+  const c = await makeWebContext();
+  const a = await launch(c, "CAT");
+  const [sp] = await c.sql`select rent_lamports from stake_pools where launch_id = ${a.id}`;
+  const rent = BigInt(sp.rent_lamports);
+  const value = (rent * 42n) / 100n + 1n;
+  await c.sql`update stake_pools set basket_value_lamports = ${value.toString()} where launch_id = ${a.id}`;
+  const d = (await launchDetail(c, a.mint))!;
+  expect(d.stakeReady).toBe(false);
+  expect(d.stakingOpens).toEqual({ percent: 42, rentLamports: rent.toString(), neededLamports: (rent - value).toString() });
+  await c.sql`update stake_pools set status = 'ready' where launch_id = ${a.id}`;
+  expect((await launchDetail(c, a.mint))!.stakingOpens).toBeNull();
 });

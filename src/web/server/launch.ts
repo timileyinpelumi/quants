@@ -34,7 +34,7 @@ export async function prepareWithSwap(ctx: WebContext, raw: unknown) {
   }
   const p = await prepareLaunch(
     {
-      sql: ctx.sql, meteora: ctx.meteora, configKeys: ctx.configKeys, quoteMints: quoteCoins().map((c) => c.mint), keeperAddress: ctx.keeperAddress,
+      sql: ctx.sql, meteora: ctx.meteora, configKeys: ctx.configKeys, quoteMints: quoteCoins().map((c) => c.mint),
       isVerified: (m) => ctx.jupiter.isVerified(m), tokenProgramOf: ctx.tokenProgramOf,
     },
     { ...rest, devBuyQuoteAmount: devBuyQuoteAmount.toString(), devBuyMinOut: "0" },

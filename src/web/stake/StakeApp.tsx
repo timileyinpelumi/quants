@@ -5,8 +5,10 @@ import { Flame } from "@/web/ui/Flame";
 import { fmtAmount, lockLabel, lockShort } from "@/web/ui/format";
 import { useStake, toBase, days, mult, dateOf, STAKE_DECIMALS as DECIMALS, type Tier } from "./useStake";
 import { useUsd, usdText } from "@/web/ui/usd";
+import { StakingOpens } from "./StakingOpens";
+import type { StakingOpens as Opens } from "@/web/server/reads";
 
-export function StakeApp({ mint, symbol, tiers, maxPenaltyBps, ready }: { mint: string; symbol: string; tiers: Tier[]; maxPenaltyBps: number; ready: boolean }) {
+export function StakeApp({ mint, symbol, tiers, maxPenaltyBps, ready, opens }: { mint: string; symbol: string; tiers: Tier[]; maxPenaltyBps: number; ready: boolean; opens: Opens | null }) {
   const { owner, balance, positions, busy, error, act: run } = useStake(mint);
   const [tier, setTier] = useState(tiers[Math.min(2, tiers.length - 1)]?.id ?? tiers[0]!.id);
   const [amount, setAmount] = useState("");
@@ -75,7 +77,7 @@ export function StakeApp({ mint, symbol, tiers, maxPenaltyBps, ready }: { mint: 
 
         {lockedHere && <p className="m-0 text-sm text-burn">Adding to this stake restarts the {lockLabel(selected.lockSeconds)} lock for the whole position.</p>}
         {tooMuch && <p className="m-0 text-sm text-burn">You hold less {symbol} than that.</p>}
-        {!ready && <p className="m-0 text-sm text-muted">Staking opens a few minutes after launch.</p>}
+        {!ready && <StakingOpens initial={opens} />}
         {error && <p role="alert" className="m-0 text-sm text-burn">{error}</p>}
 
         <Button

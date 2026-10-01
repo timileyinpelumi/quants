@@ -12,6 +12,7 @@ import { TradePanel } from "@/web/token/TradePanel";
 import { MarketStats, GraduationBar } from "@/web/token/MarketStats";
 import { TokenLiveProvider } from "@/web/token/TokenLive";
 import { TokenInsights } from "@/web/token/TokenInsights";
+import { StakingOpens } from "@/web/stake/StakingOpens";
 import { tokenLive } from "@/web/server/token-live";
 import { iconsFor } from "@/web/server/icons";
 import { quoteCoin, quoteCoins } from "@/domain/quotes";
@@ -72,7 +73,7 @@ export default async function TokenPage({ params }: { params: Promise<{ mint: st
         <section className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_400px] gap-8">
           <Chart mint={mint} quoteSymbol={pairSymbol} />
           <TradePanel mint={mint} symbol={symbol} quoteMint={launch.quoteMint} quoteSymbol={pairSymbol} quoteDecimals={quoteDecimals}
-            stake={{ tiers: d.tiers.map((t) => ({ id: t.tierId, lockSeconds: t.lockSeconds, multiplierBps: t.multiplierBps })), maxPenaltyBps: d.maxPenaltyBps, ready: d.stakeReady, earns }} />
+            stake={{ tiers: d.tiers.map((t) => ({ id: t.tierId, lockSeconds: t.lockSeconds, multiplierBps: t.multiplierBps })), maxPenaltyBps: d.maxPenaltyBps, ready: d.stakeReady, earns, opens: d.stakingOpens }} />
         </section>
 
         <TokenInsights mint={mint} symbol={symbol} quoteSymbol={pairSymbol} />
@@ -121,7 +122,7 @@ export default async function TokenPage({ params }: { params: Promise<{ mint: st
                 <span className="font-mono text-[15px] text-right">{t.sharePct}%</span>
               </div>
             ))}
-            {!d.stakeReady && <p className="m-0 pt-3 text-[13px] text-muted">Staking opens a few minutes after launch.</p>}
+            {!d.stakeReady && <div className="pt-3"><StakingOpens initial={d.stakingOpens} /></div>}
           </div>
         </section>
       </main>

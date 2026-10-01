@@ -10,6 +10,7 @@ import { signAndSendAll } from "@/web/wallet/send";
 import { StakeForm } from "@/web/stake/StakeForm";
 import { useUsd, usdText } from "@/web/ui/usd";
 import type { Tier } from "@/web/stake/useStake";
+import type { StakingOpens } from "@/web/server/reads";
 
 const SOL = "So11111111111111111111111111111111111111112";
 const FEE_RESERVE = 10_000_000n;
@@ -23,7 +24,7 @@ function toBase(v: string, decimals: number): bigint | null {
 
 export function TradePanel({ mint, symbol, quoteMint, quoteSymbol, quoteDecimals, stake }: {
   mint: string; symbol: string; quoteMint: string; quoteSymbol: string; quoteDecimals: number;
-  stake: { tiers: Tier[]; maxPenaltyBps: number; ready: boolean; earns: string };
+  stake: { tiers: Tier[]; maxPenaltyBps: number; ready: boolean; earns: string; opens: StakingOpens | null };
 }) {
   const wallet = useWallet();
   const { connection } = useConnection();

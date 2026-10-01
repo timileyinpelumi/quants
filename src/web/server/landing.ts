@@ -1,5 +1,6 @@
 import type { SQL } from "bun";
 import { quoteCoin } from "@/domain/quotes";
+import { stakingOpens } from "./reads";
 
 export type Icons = (mints: string[]) => Promise<Record<string, string | null>>;
 export type CoinRef = { mint: string; symbol: string; icon: string | null };
@@ -14,6 +15,8 @@ export type TokenRow = {
   quote: CoinRef;
   price: number | null; priceUsd: number | null; mcapUsd: number | null; change24h: number; volume24hUsd: number; trades24h: number;
   progress: number | null;
+  /** Percent of the way to opening staking; null once open. */
+  stakingPct: number | null;
 };
 export type TradeRow = {
   signature: string; eventIndex: number; mint: string; symbol: string; side: "buy" | "sell"; valueUsd: number | null; quoteValue: number; quoteMint: string;
@@ -41,7 +44,8 @@ const ORDER: Record<ExploreSort, string> = {
 
 type RawToken = {
   mint: string; symbol: string; name: string | null; image: string | null; status: string; created_at: Date; quote_mint: string;
-  price: number | null; quote_usd: number | null; vol: number; n: number; change: number; progress: number | null; basket: string | { mint: string; symbol: string }[];
+  price: number | null; quote_usd: number | null; vol: number; n: number; change: number; progress: number | null;
+  pool_status: string | null; rent_lamports: string | null; basket_value_lamports: string | null; basket: string | { mint: string; symbol: string }[];
 };
 
 async function tokenQuery(sql: SQL, o: TokenQuery, now: number): Promise<RawToken[]> {
@@ -51,13 +55,14 @@ async function tokenQuery(sql: SQL, o: TokenQuery, now: number): Promise<RawToke
   return sql`
     select * from (
       select l.id, l.mint, coalesce(l.symbol, left(l.mint, 4)) as symbol, l.name, l.image, l.status, l.created_at, l.quote_mint,
-        last.price, last.quote_usd, d.vol, d.n,
+        last.price, last.quote_usd, d.vol, d.n, sp.status as pool_status, sp.rent_lamports, sp.basket_value_lamports,
         case when last.price is not null and coalesce(ref.price, first.price) <> 0 then (last.price / coalesce(ref.price, first.price) - 1) * 100 else 0 end as change,
         last.price * last.quote_usd * ${SUPPLY} as mcap,
         case when l.status = 'live' and curve.threshold <> 0 then least(100, round((curve.reserve / curve.threshold * 100)::numeric))::int end as progress,
         coalesce((select json_agg(json_build_object('mint', b.reward_mint, 'symbol', coalesce(b.symbol, left(b.reward_mint, 4))) order by b.weight_bps desc, b.reward_mint)
                   from baskets b where b.launch_id = l.id), '[]') as basket
       from launches l
+      left join stake_pools sp on sp.launch_id = l.id
       left join lateral (select price, quote_usd from trades where launch_id = l.id order by slot desc, seq desc limit 1) last on true
       left join lateral (select price from trades where launch_id = l.id and block_time <= ${since} order by slot desc, seq desc limit 1) ref on true
       left join lateral (select price from trades where launch_id = l.id order by slot, seq limit 1) first on true
@@ -85,6 +90,7 @@ async function toTokenRows(rows: RawToken[], icons?: Icons): Promise<TokenRow[]>
       quote: { mint: r.quote_mint, symbol: quoteCoin(r.quote_mint)?.symbol ?? r.quote_mint.slice(0, 4), icon: icon[r.quote_mint] ?? null },
       price: r.price, priceUsd, mcapUsd: priceUsd === null ? null : priceUsd * SUPPLY,
       change24h: r.change, volume24hUsd: Number(r.vol), trades24h: r.n, progress: r.progress,
+      stakingPct: r.pool_status ? stakingOpens({ status: r.pool_status, rent_lamports: r.rent_lamports, basket_value_lamports: r.basket_value_lamports ?? 0 })?.percent ?? null : null,
     };
   });
 }
