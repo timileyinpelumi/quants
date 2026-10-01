@@ -58,9 +58,11 @@ export class SolanaChain implements ChainPort {
 
   async waitForConfirmation(sig: string, lastValidBlockHeight: bigint): Promise<SigState> {
     while (true) {
+      // Height first: a status read after the observed expiry is final.
+      const height = await this.blockHeight();
       const s = await this.status(sig);
       if (s !== "unknown") return s;
-      if ((await this.blockHeight()) > lastValidBlockHeight) return "unknown";
+      if (height > lastValidBlockHeight) return "unknown";
       await Bun.sleep(1_000);
     }
   }

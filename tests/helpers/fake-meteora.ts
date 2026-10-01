@@ -9,7 +9,10 @@ export class FakeMeteora implements MeteoraPort {
   launches: LaunchTxInput[] = [];
   pools = new Map<string, { baseMint: string; config: string; creator: string }>();
   progress = new Map<string, { quoteReserve: bigint; threshold: bigint; migrated: boolean }>();
+  firstBuyQuotes: { configKey: string; amount: bigint }[] = [];
+  firstBuyOut = async (_configKey: string, amount: bigint) => amount;
   constructor(private chain: FakeChain) {}
+  async firstBuyMaxOut(configKey: string, amount: bigint) { this.firstBuyQuotes.push({ configKey, amount }); return this.firstBuyOut(configKey, amount); }
   async pendingPartnerQuoteFee(pool: string) { return this.partnerFee.get(pool) ?? 0n; }
   async buildClaimPartnerFee(pool: string) {
     const t = this.chain.tx(`claim-${pool}`);

@@ -35,3 +35,19 @@ test.skipIf(!up)("transfer, received and burn round trip", async () => {
   expect(await chain.balance(spill.publicKey.toBase58(), mint.toBase58())).toBe(0n);
   expect(await chain.status("1111111111111111111111111111111111111111111111111111111111111111")).toBe("unknown");
 });
+
+test("waitForConfirmation reads the height before the status", async () => {
+  let height = 100;
+  let landed = false;
+  const conn = {
+    getBlockHeight: async () => height,
+    getSignatureStatuses: async () => {
+      const value = [landed ? { err: null, confirmationStatus: "confirmed" } : null];
+      // the node catches up right after answering: past expiry, and the tx is in
+      height = 1_000; landed = true;
+      return { value };
+    },
+  } as any;
+  const chain = new SolanaChain(conn, Keypair.generate(), Keypair.generate());
+  expect(await chain.waitForConfirmation("sig", 200n)).toBe("confirmed");
+});

@@ -32,3 +32,21 @@ test("prices many mints in one request and serves repeats from the cache", async
   expect(urls).toEqual(["https://api.jup.ag/price/v3?ids=A,B,C"]);
   expect(await p.usd("B")).toBe(2);
 });
+
+test("encodes each id in the request URL", async () => {
+  const urls: string[] = [];
+  const p = new JupiterPrices("https://p", undefined, async (u) => { urls.push(String(u)); return Response.json({}); });
+  await p.usdMany(["A&x=1", "B"]);
+  expect(urls).toEqual(["https://p?ids=A%26x%3D1,B"]);
+});
+
+test("the cache holds at most maxEntries mints", async () => {
+  let n = 0;
+  const p = new JupiterPrices("https://p", undefined, async () => { n++; return Response.json({}); }, 60_000, 2);
+  await p.usdMany(["A"]); await p.usdMany(["B"]); await p.usdMany(["C"]);
+  expect(n).toBe(3);
+  await p.usdMany(["A"]);
+  expect(n).toBe(4);
+  await p.usdMany(["C"]);
+  expect(n).toBe(4);
+});

@@ -31,3 +31,13 @@ test("remote images go through the resizing proxy, local ones do not", () => {
   expect(imgSrc("http://localhost:3000/api/dev-uploads/abc", 40)).toBe("http://localhost:3000/api/dev-uploads/abc");
   expect(imgSrc("data:image/png;base64,AAA", 40)).toBe("data:image/png;base64,AAA");
 });
+
+test("the icon cache holds at most maxEntries mints", async () => {
+  let n = 0;
+  const icons = new TokenIcons("https://jup/tokens/v2", undefined, async () => { n++; return Response.json([]); }, 60_000, 2);
+  await icons.get(["A"]); await icons.get(["B"]); await icons.get(["C"]);
+  await icons.get(["A"]);
+  expect(n).toBe(4);
+  await icons.get(["C"]);
+  expect(n).toBe(4);
+});

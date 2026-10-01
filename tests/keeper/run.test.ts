@@ -153,3 +153,27 @@ test("the keeper records launches that landed but were never confirmed, and drop
   const prepared = (await f.sql`select mint from prepared_launches order by mint`).map((r: any) => r.mint);
   expect(prepared).not.toContain(GONE);
 });
+
+test("a flood of prepared launches that never landed does not keep a real one from being swept", async () => {
+  const f = await full();
+  const { Keypair } = await import("@solana/web3.js");
+  f.deps.wallets = { ...f.deps.wallets, spill: Keypair.generate().publicKey.toBase58() };
+  const basket = JSON.stringify([{ mint: "Zec1111111111111111111111111111111111111111", weightBps: 10000 }]);
+  await f.sql`
+    insert into prepared_launches (mint, pool, quote_mint, fee_tier_bps, config_key, creator, basket, settings_version, name, symbol, uri, created_at)
+    select 'Junk' || g, 'JunkPool' || g, ${NATIVE_MINT}, 200, 'Cfg', 'C', ${basket}::text::jsonb, 1, 'J', 'J', 'https://x', now() - interval '20 minutes' - g * interval '1 second'
+    from generate_series(1, 120) g`;
+  await f.sql`
+    insert into prepared_launches (mint, pool, quote_mint, fee_tier_bps, config_key, creator, basket, settings_version, name, symbol, uri, created_at)
+    select 'Old' || g, 'OldPool' || g, ${NATIVE_MINT}, 200, 'Cfg', 'C', ${basket}::text::jsonb, 1, 'J', 'J', 'https://x', now() - interval '3 days'
+    from generate_series(1, 60) g`;
+  const REAL = Keypair.generate().publicKey.toBase58();
+  await f.sql`
+    insert into prepared_launches (mint, pool, quote_mint, fee_tier_bps, config_key, creator, basket, settings_version, name, symbol, uri, created_at)
+    values (${REAL}, 'RealPool', ${NATIVE_MINT}, 200, 'Cfg', 'Creator111111111111111111111111111111111111', ${basket}::text::jsonb, 1, 'Real', 'REAL', 'https://x', now() - interval '5 minutes')`;
+  f.meteora.pools.set("RealPool", { baseMint: REAL, config: "Cfg", creator: "Creator111111111111111111111111111111111111" });
+  await runKeeper(f.deps);
+  expect((await f.sql`select mint from launches`).map((r: any) => r.mint)).toEqual([REAL]);
+  const [{ n }] = await f.sql`select count(*)::int as n from prepared_launches where mint like 'Old%'`;
+  expect(n).toBe(0);
+});

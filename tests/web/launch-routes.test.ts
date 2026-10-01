@@ -56,6 +56,18 @@ test("token search proxies verified tokens and ignores short queries", async () 
   expect((await (await search(new Request("http://x/api/tokens/search?q=z"))).json()).tokens).toEqual([]);
 });
 
+test("token search caches results briefly and is rate limited", async () => {
+  const c = await makeWebContext();
+  let calls = 0;
+  (c.jupiter as any).searchVerified = async () => { calls++; return []; };
+  await search(new Request("http://x/api/tokens/search?q=zec"));
+  await search(new Request("http://x/api/tokens/search?q=ZEC"));
+  expect(calls).toBe(1);
+  const codes = new Set<number>();
+  for (let i = 0; i < 130; i++) codes.add((await search(new Request(`http://x/api/tokens/search?q=q${i}`))).status);
+  expect(codes.has(429)).toBe(true);
+});
+
 test("an invalid creator is refused before any Jupiter call", async () => {
   const c = await makeWebContext();
   let quoted = false;

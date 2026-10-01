@@ -111,14 +111,21 @@ On top of the keeper variables above, the web app needs:
 | `NEXT_PUBLIC_RPC_URL` | RPC the browser uses |
 | `NEXT_PUBLIC_OURTOKEN_MINT`, `NEXT_PUBLIC_OURTOKEN_SYMBOL` | The platform token |
 | `NEXT_PUBLIC_SOL_GRADUATION`, `NEXT_PUBLIC_OURTOKEN_GRADUATION` | Shown on the launch form; must match what the config keys were created with |
+| `SITE_URL` | Public origin, e.g. `https://quants.example`; the admin sign in message names its domain |
+| `TRUST_PROXY` | `1` behind Caddy or on Vercel so rate limits key on `x-forwarded-for`; leave unset when the app is reachable directly |
 
-Never set these in production: `NEXT_PUBLIC_TEST_WALLET_SECRET`, `PINATA_JWT=stub`, `DEV_UPLOADS_BASE`, `ALLOW_LOCAL_URIS`, `LOCAL_TOKEN_LIST`, `LOCAL_REWARD_MINTS`. They exist for the local seed and end to end run only.
+Never set these in production: `NEXT_PUBLIC_TEST_WALLET_SECRET`, `PINATA_JWT=stub`, `DEV_UPLOADS_BASE`, `ALLOW_LOCAL_URIS`, `LOCAL_TOKEN_LIST`, `LOCAL_REWARD_MINTS`. They exist for the local seed and end to end run only. The web app and keeper refuse to start when `PINATA_JWT=stub`, `DEV_UPLOADS_BASE`, `ALLOW_LOCAL_URIS`, `LOCAL_TOKEN_LIST` or `LOCAL_REWARD_MINTS` is set and `RPC_URL` is not localhost or 127.0.0.1. The Vercel preview runs against a tunnelled local validator with `PINATA_JWT=stub` and `LOCAL_TOKEN_LIST`, so it sets `ALLOW_DEV_SWITCHES=1`; nothing else should.
+
+`ADMIN_SESSION_SECRET` must be at least 64 hex characters (`openssl rand -hex 32`); the web app refuses to start otherwise.
 
 ## Deploying to a VPS
 
 1. Install Bun, Node 22 or newer (for the build), Postgres 16 and Caddy. Create a `quants` user. The service files run `/usr/local/bin/bun`, and the Bun installer puts it in your home directory, so copy it there: `sudo install -m 755 ~/.bun/bin/bun /usr/local/bin/bun`. Check the units with `systemd-analyze verify deploy/*.service`.
-2. Clone the repo to `/opt/quants`, write `/opt/quants/.env` with every variable from `.env.example` and put `config-keys.json` next to it.
-3. `bun install`, `bun run migrate`, `bun run build`.
+2. Clone the repo to `/opt/quants` and put `config-keys.json` in it. Split the variables from `.env.example` into two files, both mode 600 and owned by `quants`:
+   - `/opt/quants/keeper.env` (keeper only): `DATABASE_URL`, `RPC_URL`, `KEEPER_KEYPAIR`, `SPILL_KEYPAIR`, `TREASURY_ADDRESS`, `OURTOKEN_MINT`, `KAMINO_GLOBAL_CONFIG`, `DAMM_V2_MIGRATION_CONFIG`, `JUPITER_BASE_URL`, `JUPITER_API_KEY`.
+   - `/opt/quants/web.env` (web and indexer): everything in the web table below plus `DATABASE_URL`, `RPC_URL`, `OURTOKEN_MINT`, `KAMINO_GLOBAL_CONFIG`, `DAMM_V2_MIGRATION_CONFIG`, `JUPITER_API_KEY`, `SITE_URL=https://<your domain>` and `TRUST_PROXY=1`. No keypairs.
+   - Do not leave a `/opt/quants/.env`: Bun and Next load it into every process started there, which would put the keypairs back into the web server.
+3. `bun install`, `bun --env-file=web.env run migrate`, `bun --env-file=web.env run build`.
 4. Copy `deploy/quants-web.service`, `deploy/quants-keeper.service` and `deploy/quants-indexer.service` to `/etc/systemd/system/`, then `systemctl enable --now quants-web quants-keeper quants-indexer`.
 5. Point your domain at the server, set `QUANTS_DOMAIN` for Caddy, copy `deploy/Caddyfile` to `/etc/caddy/Caddyfile` and reload Caddy. It gets a certificate on its own.
 6. Watch the keeper with `journalctl -u quants-keeper -f`. A `ReconcileError` exits the keeper; systemd restarts it after 30 seconds and it exits again until the ledger and wallets agree.

@@ -5,8 +5,8 @@ Wants=network-online.target
 
 [Service]
 WorkingDirectory=/opt/quants
-EnvironmentFile=/opt/quants/.env
-ExecStart=/usr/local/bin/bun --bun next start -p 3000
+EnvironmentFile=/opt/quants/web.env
+ExecStart=/usr/local/bin/bun --bun next start -H 127.0.0.1 -p 3000
 Restart=always
 RestartSec=5
 User=quants

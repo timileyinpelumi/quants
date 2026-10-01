@@ -1,7 +1,7 @@
 import { Keypair, PublicKey, SystemProgram, Transaction, type TransactionInstruction } from "@solana/web3.js";
 import { createAssociatedTokenAccountIdempotentInstruction, createSyncNativeInstruction, getAssociatedTokenAddressSync, NATIVE_MINT, TOKEN_PROGRAM_ID } from "@solana/spl-token";
-import { Farms, FarmConfigOption, getWithdrawSlashedAmountInstruction } from "@kamino-finance/farms-sdk";
-import { address, createNoopSigner, createSolanaRpc, none } from "@solana/kit";
+import { Farms, FarmConfigOption, fetchAllMaybeUserState, getUserStatePDA, getWithdrawSlashedAmountInstruction, type UserState } from "@kamino-finance/farms-sdk";
+import { address, createNoopSigner, createSolanaRpc, none, type Address } from "@solana/kit";
 import Decimal from "decimal.js";
 import type { StakePosition, StakingAdapter } from "./adapter";
 import { fromKitInstruction, kitSigner, type SolanaChain } from "../chain/solana";
@@ -15,8 +15,11 @@ const userSigner = (owner: string) => createNoopSigner(address(owner));
 export class KaminoBackend implements StakingAdapter {
   readonly backend = "kamino" as const;
   private farms: Farms;
+  private rpc;
   constructor(private chain: SolanaChain, rpcUrl: string, private globalConfig: string) {
-    this.farms = new Farms(createSolanaRpc(rpcUrl));
+    const rpc = createSolanaRpc(rpcUrl);
+    this.rpc = rpc;
+    this.farms = new Farms(rpc);
   }
 
   capabilities() { return { earlyExit: true, tiersOnChain: false, rewardsPerTx: REWARDS_PER_TX }; }
@@ -113,14 +116,25 @@ export class KaminoBackend implements StakingAdapter {
     return tx.serialize({ requireAllSignatures: false, verifySignatures: false }).toString("base64");
   }
 
+  // User states live at a PDA of (farm, owner), so they are read directly instead of scanning the farms program.
+  private async userStates(owner: string, farms: string[]) {
+    const keys = await Promise.all(farms.map((f) => getUserStatePDA(this.farms.getProgramID(), address(f), address(owner))));
+    const out: ({ key: Address; userState: UserState } | null)[] = [];
+    for (let i = 0; i < keys.length; i += 100) {
+      const accts = await fetchAllMaybeUserState(this.rpc, keys.slice(i, i + 100), { commitment: "confirmed" });
+      for (const a of accts) out.push(a.exists ? { key: a.address, userState: a.data } : null);
+    }
+    return out;
+  }
+
   private async userState(owner: string, farm: string) {
-    const [u] = await this.farms.getUserStatesForUserAndFarm(address(owner), address(farm));
+    const [u] = await this.userStates(owner, [farm]);
     return u ?? null;
   }
 
-  async userFarms(owner: string): Promise<string[]> {
-    const states = await this.farms.getAllUserStatesForUser(address(owner));
-    return [...new Set(states.map((s) => s.userState.farmState as string))];
+  async userFarms(owner: string, farms: string[]): Promise<string[]> {
+    const states = await this.userStates(owner, farms);
+    return farms.filter((_f, i) => states[i] != null);
   }
 
   async position(owner: string, farm: string): Promise<StakePosition | null> {

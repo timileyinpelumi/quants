@@ -59,6 +59,16 @@ test("exit and withdraw refuse the wrong state with plain messages", async () =>
   expect((await post("dance", { mint: "CATmint", tierId: "7d", owner: OWNER })).status).toBe(400);
 });
 
+test("positions and stake actions are rate limited", async () => {
+  await setup();
+  const codes = new Set<number>();
+  for (let i = 0; i < 70; i++) codes.add((await get(OWNER)).status);
+  expect(codes.has(429)).toBe(true);
+  const stakeCodes = new Set<number>();
+  for (let i = 0; i < 40; i++) stakeCodes.add((await post("claim", { mint: "CATmint", tierId: "7d", owner: OWNER })).status);
+  expect(stakeCodes.has(429)).toBe(true);
+});
+
 test("staking is refused while the pool is pending", async () => {
   const c = await setup();
   await c.sql`update stake_pools set status = 'pending'`;

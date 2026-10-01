@@ -14,12 +14,12 @@ import { beginStep, failStep } from "../../src/ledger/ledger";
 
 const cookieOf = (r: Response) => r.headers.get("set-cookie")!.split(";")[0]!;
 
-async function signIn(kp: Keypair, tamper = false) {
-  const n = await nonceRoute();
+async function signIn(kp: Keypair, tamper = false, sessionUrl = "http://x") {
+  const n = await nonceRoute(new Request("http://x", { method: "POST" }));
   const { message } = await n.json();
   const signed = tamper ? message.replace(/Nonce: \w+/, "Nonce: deadbeef") : message;
   const signature = bs58.encode(nacl.sign.detached(new TextEncoder().encode(signed), kp.secretKey));
-  return sessionRoute(new Request("http://x", { method: "POST", headers: { cookie: cookieOf(n) }, body: JSON.stringify({ wallet: kp.publicKey.toBase58(), signature }) }));
+  return sessionRoute(new Request(sessionUrl, { method: "POST", headers: { cookie: cookieOf(n) }, body: JSON.stringify({ wallet: kp.publicKey.toBase58(), signature }) }));
 }
 const withCookie = (cookie: string, init: RequestInit = {}) => new Request("http://x", { ...init, headers: { ...(init.headers ?? {}), cookie } });
 
@@ -38,6 +38,31 @@ test("non admin wallets, tampered messages and missing cookies are refused", asy
   expect((await signIn(Keypair.generate())).status).toBe(403);
   expect((await signIn(ADMIN, true)).status).toBe(401);
   expect((await getSettings(new Request("http://x"))).status).toBe(401);
+});
+
+test("the sign in message names the site, its URI and when it was issued", async () => {
+  await makeWebContext();
+  const { message } = await (await nonceRoute(new Request("https://quants.example/api/admin/nonce", { method: "POST" }))).json();
+  expect(message).toStartWith("quants.example wants you to sign in to quants admin");
+  expect(message).toContain("URI: https://quants.example");
+  expect(message).toMatch(/Issued At: \d{4}-\d\d-\d\dT/);
+});
+
+test("a signature collected for one host is refused on another", async () => {
+  await makeWebContext();
+  expect((await signIn(ADMIN, false, "http://evil.test")).status).toBe(401);
+});
+
+test("SITE_URL fixes the domain regardless of the request host", async () => {
+  await makeWebContext();
+  process.env.SITE_URL = "https://quants.example";
+  try {
+    const { message } = await (await nonceRoute(new Request("http://x", { method: "POST" }))).json();
+    expect(message).toStartWith("quants.example wants you");
+    expect((await signIn(ADMIN)).status).toBe(200);
+  } finally {
+    delete process.env.SITE_URL;
+  }
 });
 
 test("an expired nonce is refused", async () => {
@@ -128,6 +153,11 @@ test("basket override can keep a token that was already in the basket", async ()
     { mint: "Zec1111111111111111111111111111111111111111", weightBps: 5000 }, { mint: "Cate111111111111111111111111111111111111111", weightBps: 5000 }] }) }));
   expect(r.status).toBe(200);
   expect((await c.sql`select count(*)::int n from baskets where launch_id = ${l.id}`)[0].n).toBe(2);
+  const r2 = await basketRoute(withCookie(cookie, { method: "POST", body: JSON.stringify({ mint: "M2", basket: [
+    { mint: "Cate111111111111111111111111111111111111111", weightBps: 10000, symbol: "CATE", decimals: 6 }] }) }));
+  expect(r2.status).toBe(200);
+  const rows = await c.sql`select reward_mint, weight_bps, symbol, decimals from baskets where launch_id = ${l.id}`;
+  expect(rows.map((x: any) => [x.reward_mint, x.weight_bps, x.symbol, x.decimals])).toEqual([["Cate111111111111111111111111111111111111111", 10000, "CATE", 6]]);
 });
 
 test("basket override is refused once any farm or swap exists", async () => {
@@ -143,7 +173,7 @@ test("basket override is refused once any farm or swap exists", async () => {
 
 test("a nonce and signature can only open one session", async () => {
   await makeWebContext();
-  const n = await nonceRoute();
+  const n = await nonceRoute(new Request("http://x", { method: "POST" }));
   const { message } = await n.json();
   const signature = bs58.encode(nacl.sign.detached(new TextEncoder().encode(message), ADMIN.secretKey));
   const req = () => sessionRoute(new Request("http://x", { method: "POST", headers: { cookie: cookieOf(n) }, body: JSON.stringify({ wallet: ADMIN.publicKey.toBase58(), signature }) }));

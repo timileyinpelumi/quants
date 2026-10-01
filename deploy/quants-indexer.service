@@ -5,7 +5,7 @@ Wants=network-online.target
 
 [Service]
 WorkingDirectory=/opt/quants
-EnvironmentFile=/opt/quants/.env
+EnvironmentFile=/opt/quants/web.env
 ExecStart=/usr/local/bin/bun src/indexer/main.ts
 Restart=on-failure
 RestartSec=10
