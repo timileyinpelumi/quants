@@ -52,7 +52,7 @@ export default async function TokenPage({ params }: { params: Promise<{ mint: st
             <span className="shrink-0" style={{ filter: "drop-shadow(0 20px 40px rgba(255,122,89,0.25))" }}>
               <Avatar seed={mint} label={symbol} image={launch.image} size={96} />
             </span>
-            <div className="flex flex-col gap-2 min-w-0">
+            <div className="flex flex-1 flex-col gap-2 min-w-0">
               <div className="flex items-baseline gap-3.5 flex-wrap">
                 <h1 className="m-0 font-display font-black text-[40px] md:text-[56px] tracking-[-0.03em] leading-none">{symbol}</h1>
                 {launch.name && <span className="text-lg text-muted">{launch.name}</span>}

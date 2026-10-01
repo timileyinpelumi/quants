@@ -3,7 +3,9 @@ import { fmtCompact, fmtPrice } from "@/web/ui/format";
 import { useTokenLive } from "./TokenLive";
 
 export function MarketStats({ quoteSymbol }: { quoteSymbol: string }) {
-  const m = useTokenLive()?.market ?? null;
+  const live = useTokenLive();
+  const m = live?.market ?? null;
+  const changes = (live?.activity ?? []).filter((a) => a.change !== null);
   const dash = <span className="font-sans font-normal text-base text-faint">No trades yet</span>;
   const price = m && (m.priceUsd !== null ? `$${fmtPrice(m.priceUsd)}` : `${fmtPrice(m.price)} ${quoteSymbol}`);
   const cap = m && (m.fdvUsd !== null ? `$${fmtCompact(m.fdvUsd)}` : `${fmtCompact(m.price * 1e9)} ${quoteSymbol}`);
@@ -18,7 +20,11 @@ export function MarketStats({ quoteSymbol }: { quoteSymbol: string }) {
       <div className="flex flex-col gap-1.5">
         <span className="text-[13px] text-muted">Market cap</span>
         <span className="font-display font-bold text-2xl md:text-[30px]">{m ? cap : dash}</span>
-        <span className="font-mono text-sm text-muted">1B supply</span>
+        <span className="flex flex-wrap gap-x-2.5 gap-y-0.5 font-mono text-[12px]">
+          {changes.length ? changes.map((a) => (
+            <span key={a.window} className="text-muted">{a.window} <span className={a.change! >= 0 ? "text-accent" : "text-burn"}>{a.change! >= 0 ? "+" : ""}{a.change!.toFixed(1)}%</span></span>
+          )) : <span className="text-muted">1B supply</span>}
+        </span>
       </div>
       <div className="flex flex-col gap-1.5">
         <span className="text-[13px] text-muted">Volume today</span>

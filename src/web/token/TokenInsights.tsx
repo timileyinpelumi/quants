@@ -119,8 +119,8 @@ export function TokenInsights({ mint, symbol, quoteSymbol }: { mint: string; sym
       </div>
 
       {tab === "Trades" && (
-        <div className="flex flex-col">
-          <div className="hidden md:grid grid-cols-[64px_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.4fr)_90px] gap-6 pb-2 text-[12px] text-faint">
+        <div className="flex flex-col max-h-[520px] overflow-y-auto overscroll-contain pr-1">
+          <div className="hidden md:grid sticky top-0 z-10 bg-ground/95 backdrop-blur grid-cols-[64px_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.4fr)_90px] gap-6 py-2 text-[12px] text-faint">
             <span>Side</span><span className="text-right">{symbol}</span><span className="text-right">Value</span><span>Wallet</span><span className="text-right">When</span>
           </div>
           {!live || trades.length === 0 ? <p className="m-0 py-6 border-t line text-muted text-sm">No trades yet.</p> : trades.map((t) => (

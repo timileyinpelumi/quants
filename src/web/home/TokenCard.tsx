@@ -27,7 +27,7 @@ export function TokenCard({ t }: { t: TokenRow }) {
     <Link href={`/t/${t.mint}`} className="flex flex-col gap-4 p-4 rounded-3xl bg-surface border border-white/[0.07] hover:border-white/15 hover:bg-raised transition-colors min-w-0">
       <div className="flex items-center gap-3 min-w-0">
         <Avatar seed={t.mint} label={t.symbol} image={t.image} size={52} />
-        <span className="flex flex-col min-w-0 gap-0.5">
+        <span className="flex flex-1 flex-col min-w-0 gap-0.5">
           <span className="flex items-baseline gap-2 min-w-0">
             <span className="font-display font-bold text-lg truncate">{t.symbol}</span>
             <span className="font-mono text-[11px] text-faint shrink-0">{fmtAgo(t.createdAt)}</span>
