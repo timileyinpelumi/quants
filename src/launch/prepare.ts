@@ -43,7 +43,8 @@ export async function prepareLaunch(
   if (!parsed.success) throw new LaunchError("invalid_input", parsed.error.issues.map((i) => i.message).join("; "));
   const input = parsed.data;
   for (const b of input.basket) {
-    if (!(await deps.isVerified(b.mint))) throw new LaunchError("basket_not_verified", `${b.symbol ?? b.mint} is not on the Jupiter verified list. Pick another reward token.`);
+    // The pair token is already vetted as a pair; paying it out needs no swap.
+    if (b.mint !== input.quoteMint && !(await deps.isVerified(b.mint))) throw new LaunchError("basket_not_verified", `${b.symbol ?? b.mint} is not on the Jupiter verified list. Pick another reward token.`);
     if ((await deps.tokenProgramOf(b.mint)) !== CLASSIC_TOKEN_PROGRAM) {
       throw new LaunchError("basket_unsupported", `${b.symbol ?? b.mint} is not a classic SPL token, which Kamino farms require. Pick another reward token.`);
     }

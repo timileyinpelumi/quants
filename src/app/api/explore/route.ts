@@ -12,6 +12,7 @@ const Query = z.object({
   sort: z.enum(EXPLORE_SORTS).default("trending"),
   filter: z.enum(EXPLORE_FILTERS).default("all"),
   q: z.string().max(100).default(""),
+  quote: z.string().max(64).optional(),
   ...pageParams(30),
 });
 

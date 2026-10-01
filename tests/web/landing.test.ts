@@ -1,7 +1,7 @@
 import { test, expect } from "bun:test";
 import type { SQL } from "bun";
 import { freshDb } from "../helpers/db";
-import { landing, exploreTokens } from "../../src/web/server/landing";
+import { landing, exploreTokens, featured, recentBuys, HOME_TABS, HOME_PAGE } from "../../src/web/server/landing";
 import { defaultSettings, saveSettings } from "../../src/domain/settings";
 
 const NOW = Date.parse("2026-10-01T12:00:00Z");
@@ -37,7 +37,7 @@ test("stats count launches, graduations, volume, traders and what stakers earned
   expect({ ...stats, stakersUsd: Math.round(stats.stakersUsd * 1e6) / 1e6 }).toEqual({ launches: 3, graduated: 1, volume24hUsd: 800, volumeAllUsd: 1800, traders24h: 1, stakersUsd: 30 });
 });
 
-test("home lists trending, new, about to graduate, graduated and recent trades", async () => {
+test("home serves the first tab, and each tab is an explore query", async () => {
   const sql = await freshDb();
   const a = await launch(sql, "AAA", 48);
   const b = await launch(sql, "BBB", 30);
@@ -49,16 +49,73 @@ test("home lists trending, new, about to graduate, graduated and recent trades",
   await trade(sql, b, 30, 0.01, { reserve: 4, value: 1 });
   await trade(sql, g, 10, 0.1, { value: 2 });
   const d = await landing(sql, NOW);
-  expect(d.trending.map((t) => t.symbol)).toEqual(["AAA", "GGG", "BBB"]);
-  expect(d.trending[0]!.basket).toEqual([{ mint: "zec", symbol: "ZEC", icon: null }, { mint: "jup", symbol: "JUP", icon: null }]);
-  expect(d.trending[0]!.quote).toMatchObject({ symbol: "SOL" });
+  expect(HOME_TABS.map((t) => t.label)).toEqual(["Trending", "Bonding", "New", "Graduating", "Graduated"]);
+  expect(d.tokens.map((t) => t.symbol)).toEqual(["AAA", "GGG", "BBB", "CCC"]);
+  expect(d.nextOffset).toBeNull();
+  expect(d.tokens[0]!.basket).toEqual([{ mint: "zec", symbol: "ZEC", icon: null }, { mint: "jup", symbol: "JUP", icon: null }]);
+  expect(d.tokens[0]!.quote).toMatchObject({ symbol: "SOL" });
   const withIcons = await landing(sql, NOW, async (mints) => Object.fromEntries(mints.map((m) => [m, `https://icons/${m}`])));
-  expect(withIcons.trending[0]!.basket[0]!.icon).toBe("https://icons/zec");
-  expect(withIcons.trending[0]!.quote.icon).toBe("https://icons/So11111111111111111111111111111111111111112");
-  expect(d.newest.map((t) => t.symbol)).toEqual(["CCC", "GGG", "BBB", "AAA"]);
-  expect(d.soon.map((t) => [t.symbol, t.progress])).toEqual([["AAA", 90], ["BBB", 40]]);
-  expect(d.graduated.map((t) => t.symbol)).toEqual(["GGG"]);
-  expect(d.recent.map((t) => t.symbol)).toEqual(["GGG", "BBB", "AAA", "AAA", "BBB"]);
+  expect(withIcons.tokens[0]!.basket[0]!.icon).toBe("https://icons/zec");
+  expect(withIcons.tokens[0]!.quote.icon).toBe("https://icons/So11111111111111111111111111111111111111112");
+  const tab = async (key: string) => {
+    const t = HOME_TABS.find((x) => x.key === key)!;
+    return (await exploreTokens(sql, { sort: t.sort, filter: t.filter }, NOW)).map((r) => r.symbol);
+  };
+  // Bonding: live tokens, most recently traded first, untraded last
+  expect(await tab("bonding")).toEqual(["BBB", "AAA", "CCC"]);
+  expect(await tab("new")).toEqual(["CCC", "GGG", "BBB", "AAA"]);
+  expect(await tab("graduating")).toEqual(["AAA", "BBB"]);
+  expect(await tab("graduated")).toEqual(["GGG"]);
+});
+
+test("home pages the first tab", async () => {
+  const sql = await freshDb();
+  for (let i = 0; i < HOME_PAGE + 2; i++) await launch(sql, `T${i}`, i + 1);
+  const d = await landing(sql, NOW);
+  expect(d.tokens).toHaveLength(HOME_PAGE);
+  expect(d.nextOffset).toBe(HOME_PAGE);
+});
+
+test("recent buys are the newest buys across every launch", async () => {
+  const sql = await freshDb();
+  const a = await launch(sql, "AAA", 4);
+  const b = await launch(sql, "BBB", 3);
+  await trade(sql, a, 30, 0.001, { trader: "w1" });
+  await trade(sql, b, 20, 0.001, { trader: "w2", side: "sell" });
+  await trade(sql, b, 10, 0.001, { trader: "w3" });
+  const r = await recentBuys(sql, 10);
+  expect(r.map((x) => [x.symbol, x.trader])).toEqual([["BBB", "w3"], ["AAA", "w1"]]);
+  expect(r[0]!.amount).toBeCloseTo(0.000001, 12);
+  const { GET } = await import("../../src/app/api/trades/recent/route");
+  const { makeWebContext } = await import("../helpers/web-context");
+  const c = await makeWebContext();
+  const id = await launch(c.sql, "CCC", 1);
+  await trade(c.sql, id, 5, 0.001, { trader: "w9" });
+  const j = await (await GET(new Request("http://x/api/trades/recent"))).json();
+  expect(j.buys.map((x: any) => x.trader)).toEqual(["w9"]);
+  expect((await GET(new Request("http://x/api/trades/recent?limit=500"))).status).toBe(400);
+});
+
+test("the featured platform token shows its market when it launched here, else its pairs", async () => {
+  const sql = await freshDb();
+  const coins = [{ mint: "mint-QNT", symbol: "QNT", name: "quants", decimals: 6, graduation: 1, iconMint: null, platform: true, payoutMin: 0n }];
+  await launch(sql, "AAA", 2);
+  await sql`update launches set quote_mint = 'mint-QNT' where symbol = 'AAA'`;
+  expect(await featured(sql, NOW, undefined, coins)).toEqual({ mint: "mint-QNT", symbol: "QNT", name: "quants", pairs: 1, token: null });
+  const q = await launch(sql, "QNT", 1);
+  await trade(sql, q, 5, 0.002);
+  const f = (await featured(sql, NOW, undefined, coins))!;
+  expect(f.token).toMatchObject({ mint: "mint-QNT", symbol: "QNT" });
+  expect(f.token!.priceUsd).toBeCloseTo(0.2, 9);
+  expect(await featured(sql, NOW, undefined, [])).toBeNull();
+});
+
+test("explore filters by pair token", async () => {
+  const sql = await freshDb();
+  await launch(sql, "AAA", 2);
+  await launch(sql, "BBB", 1);
+  await sql`update launches set quote_mint = 'mint-QNT' where symbol = 'BBB'`;
+  expect((await exploreTokens(sql, { sort: "new", quote: "mint-QNT" }, NOW)).map((t) => t.symbol)).toEqual(["BBB"]);
 });
 
 test("token rows show staking progress until staking opens", async () => {
@@ -70,7 +127,7 @@ test("token rows show staking progress until staking opens", async () => {
     values (${a}, 'kamino', 3000, 's', 'pending', 1000, 420), (${b}, 'kamino', 3000, 's', 'ready', 1000, 1000)`;
   const rows = await exploreTokens(sql, { sort: "new" }, NOW);
   expect(rows.map((t) => [t.symbol, t.stakingPct])).toEqual([["CCC", null], ["BBB", null], ["AAA", 42]]);
-  expect((await landing(sql, NOW)).newest.find((t) => t.symbol === "AAA")!.stakingPct).toBe(42);
+  expect((await landing(sql, NOW)).tokens.find((t) => t.symbol === "AAA")!.stakingPct).toBe(42);
 });
 
 test("explore sorts, filters and searches", async () => {

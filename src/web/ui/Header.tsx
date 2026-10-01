@@ -2,13 +2,14 @@ import Link from "next/link";
 import { WalletButton } from "@/web/wallet/WalletButton";
 
 const links = [
+  { href: "/", label: "Home", key: "home" },
   { href: "/explore", label: "Explore", key: "explore" },
   { href: "/rewards", label: "Rewards", key: "rewards" },
   { href: "/portfolio", label: "Portfolio", key: "portfolio" },
   { href: "/docs", label: "Docs", key: "docs" },
 ] as const;
 
-export type HeaderKey = (typeof links)[number]["key"] | "launch" | "home" | "token" | "admin" | "other";
+export type HeaderKey = (typeof links)[number]["key"] | "launch" | "token" | "admin" | "other";
 
 function Search({ className }: { className: string }) {
   return (

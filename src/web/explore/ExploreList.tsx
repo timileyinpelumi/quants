@@ -12,7 +12,7 @@ const PAGE = 30;
 
 const usd = (n: number | null) => (n === null ? "No trades" : `$${fmtCompact(n)}`);
 
-export function ExploreList({ initial, nextOffset, query }: { initial: TokenRow[]; nextOffset: number | null; query: { sort: string; filter: string; q: string } }) {
+export function ExploreList({ initial, nextOffset, query }: { initial: TokenRow[]; nextOffset: number | null; query: { sort: string; filter: string; q: string; quote?: string } }) {
   const paged = usePaged(initial, nextOffset, async (offset) => {
     const sp = new URLSearchParams({ ...query, offset: String(offset), limit: String(PAGE) });
     const r = await getJson<{ tokens: TokenRow[]; nextOffset: number | null }>(`/api/explore?${sp}`);

@@ -15,7 +15,7 @@ import { FEE_TIERS_BPS } from "@/domain/fees";
 import { useUsd, usdText } from "@/web/ui/usd";
 
 const SOL = "So11111111111111111111111111111111111111112";
-export type QuoteOption = { mint: string; symbol: string; name: string; graduation: number; icon: string | null };
+export type QuoteOption = { mint: string; symbol: string; name: string; decimals: number; graduation: number; icon: string | null };
 const FEES: readonly number[] = FEE_TIERS_BPS;
 
 type Tier = { id: string; lockSeconds: number; multiplierBps: number };
@@ -61,7 +61,8 @@ export function LaunchForm({ split, tiers, maxPenaltyBps, quotes }: {
   const [symbol, setSymbol] = useState("");
   const [pair, setPair] = useState<string>(quotes[0]?.mint ?? SOL);
   const [fee, setFee] = useState(200);
-  const [basket, setBasket] = useState<BasketItem[]>([]);
+  const [mode, setMode] = useState<"pair" | "basket">("basket");
+  const [picked, setBasket] = useState<BasketItem[]>([]);
   const [devBuy, setDevBuy] = useState("");
   const [description, setDescription] = useState("");
   const [website, setWebsite] = useState("");
@@ -87,6 +88,12 @@ export function LaunchForm({ split, tiers, maxPenaltyBps, quotes }: {
     return devBuy.trim() === "" ? 0n : Number.isFinite(v) && v >= 0 ? BigInt(Math.round(v * 1e9)) : null;
   }, [devBuy]);
 
+  const pairQuote = quotes.find((q) => q.mint === pair);
+  const pairLabel = pairQuote?.symbol ?? "SOL";
+  const basket: BasketItem[] = mode === "pair"
+    ? [{ mint: pair, symbol: pairLabel, name: pairQuote?.name ?? pairLabel, icon: pairQuote?.icon ?? null, decimals: pairQuote?.decimals ?? 9, weight: 100 }]
+    : picked;
+
   const problems = [
     !image && "Add an image",
     !name.trim() && "Add a name",
@@ -101,8 +108,6 @@ export function LaunchForm({ split, tiers, maxPenaltyBps, quotes }: {
   const { rent } = launchCost({ tiers }, Math.max(1, basket.length));
   const solText = (lamports: bigint) => `${fmtAmount(lamports, 9, 3)} SOL`;
   const usdOf = (lamports: bigint) => usdText(Number(lamports) / 1e9, solUsd);
-  const pairQuote = quotes.find((q) => q.mint === pair);
-  const pairLabel = pairQuote?.symbol ?? "SOL";
 
   async function settle(p: { mint: string; sig: string }) {
     setStatus("confirming");
@@ -229,7 +234,24 @@ export function LaunchForm({ split, tiers, maxPenaltyBps, quotes }: {
 
           <div className={section}>
             <span className={num}>03</span>
-            <BasketPicker value={basket} onChange={setBasket} />
+            <div className="flex flex-col gap-5">
+              <div className="flex flex-col gap-3">
+                <span className="text-[13px] text-muted">Stakers earn</span>
+                <Segmented label="Stakers earn" value={mode} onChange={setMode}
+                  options={[{ value: "pair", label: "The pair" }, { value: "basket", label: "A basket" }]} />
+              </div>
+              {mode === "pair" ? (
+                <div className="flex items-center gap-4 px-5 py-4 rounded-2xl bg-surface border line">
+                  <Avatar seed={pair} label={pairLabel} image={pairQuote?.icon} size={40} />
+                  <span className="flex flex-col gap-0.5 min-w-0">
+                    <span className="font-display font-bold">{pairLabel}, 100%</span>
+                    <span className="text-[13px] text-muted">The stakers&apos; share of fees is paid to them in {pairLabel} directly, without buying other tokens.</span>
+                  </span>
+                </div>
+              ) : (
+                <BasketPicker value={picked} onChange={setBasket} />
+              )}
+            </div>
           </div>
 
           <div className={section}>

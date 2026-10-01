@@ -13,7 +13,7 @@ export default async function LaunchPage() {
   // only pairs whose curve configs exist on this network can be launched
   const coins = quoteCoins().filter((c) => Object.keys(ctx.configKeys).some((k) => k.startsWith(`${c.mint}:`)));
   const icons = await iconsFor(ctx.icons, coins.map((c) => c.mint), coins);
-  const quotes = coins.map((c) => ({ mint: c.mint, symbol: c.symbol, name: c.name, graduation: c.graduation, icon: icons[c.mint] ?? null }));
+  const quotes = coins.map((c) => ({ mint: c.mint, symbol: c.symbol, name: c.name, decimals: c.decimals, graduation: c.graduation, icon: icons[c.mint] ?? null }));
   return (
     <div className="flex-1 bg-launch">
       <Header active="launch" />

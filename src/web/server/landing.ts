@@ -1,5 +1,5 @@
 import type { SQL } from "bun";
-import { quoteCoin } from "@/domain/quotes";
+import { quoteCoin, quoteCoins, type QuoteCoin } from "@/domain/quotes";
 import { stakingOpens } from "./reads";
 
 export type Icons = (mints: string[]) => Promise<Record<string, string | null>>;
@@ -7,7 +7,8 @@ export type CoinRef = { mint: string; symbol: string; icon: string | null };
 
 const SUPPLY = 1_000_000_000;
 const DAY = 86_400_000;
-const LIST = 6;
+export const HOME_PAGE = 24;
+const BASE_UNIT = 1e-6; // launched tokens have 6 decimals
 
 export type TokenRow = {
   mint: string; symbol: string; name: string | null; image: string | null; status: string; createdAt: string;
@@ -22,15 +23,25 @@ export type TradeRow = {
   signature: string; eventIndex: number; mint: string; symbol: string; side: "buy" | "sell"; valueUsd: number | null; quoteValue: number; quoteMint: string;
   amount: number; trader: string; at: string; slot: number; seq: number;
 };
+export type Featured = { mint: string; symbol: string; name: string; pairs: number; token: TokenRow | null };
 export type Landing = {
   stats: { launches: number; graduated: number; volume24hUsd: number; volumeAllUsd: number; traders24h: number; stakersUsd: number };
-  trending: TokenRow[]; newest: TokenRow[]; soon: TokenRow[]; graduated: TokenRow[]; recent: TradeRow[];
+  tokens: TokenRow[]; nextOffset: number | null; featured: Featured | null;
 };
-export type ExploreSort = "trending" | "mcap" | "new" | "gainers" | "graduating";
+export type ExploreSort = "trending" | "mcap" | "new" | "gainers" | "graduating" | "active";
 export type ExploreFilter = "all" | "live" | "graduated";
-export type TokenQuery = { sort: ExploreSort; filter?: ExploreFilter; q?: string; traded?: boolean; limit?: number; offset?: number };
+export type TokenQuery = { sort: ExploreSort; filter?: ExploreFilter; q?: string; quote?: string; traded?: boolean; limit?: number; offset?: number };
 
-export const EXPLORE_SORTS = ["trending", "mcap", "new", "gainers", "graduating"] as const satisfies readonly ExploreSort[];
+export const EXPLORE_SORTS = ["trending", "mcap", "new", "gainers", "graduating", "active"] as const satisfies readonly ExploreSort[];
+
+export type HomeTab = "trending" | "bonding" | "new" | "graduating" | "graduated";
+export const HOME_TABS: { key: HomeTab; label: string; sort: ExploreSort; filter: ExploreFilter }[] = [
+  { key: "trending", label: "Trending", sort: "trending", filter: "all" },
+  { key: "bonding", label: "Bonding", sort: "active", filter: "live" },
+  { key: "new", label: "New", sort: "new", filter: "all" },
+  { key: "graduating", label: "Graduating", sort: "graduating", filter: "live" },
+  { key: "graduated", label: "Graduated", sort: "trending", filter: "graduated" },
+];
 export const EXPLORE_FILTERS = ["all", "live", "graduated"] as const satisfies readonly ExploreFilter[];
 
 // Fixed strings only: these are spliced into the query text.
@@ -40,6 +51,7 @@ const ORDER: Record<ExploreSort, string> = {
   new: "",
   gainers: "change desc, vol desc,",
   graduating: "progress desc,",
+  active: "last_at desc nulls last,",
 };
 
 type RawToken = {
@@ -52,10 +64,11 @@ async function tokenQuery(sql: SQL, o: TokenQuery, now: number): Promise<RawToke
   const since = new Date(now - DAY);
   const q = o.q?.trim().toLowerCase() ?? "";
   const status = o.filter === "live" ? "live" : o.filter === "graduated" ? "graduated" : null;
+  const quote = o.quote ?? null;
   return sql`
     select * from (
       select l.id, l.mint, coalesce(l.symbol, left(l.mint, 4)) as symbol, l.name, l.image, l.status, l.created_at, l.quote_mint,
-        last.price, last.quote_usd, d.vol, d.n, sp.status as pool_status, sp.rent_lamports, sp.basket_value_lamports,
+        last.price, last.quote_usd, last.block_time as last_at, d.vol, d.n, sp.status as pool_status, sp.rent_lamports, sp.basket_value_lamports,
         case when last.price is not null and coalesce(ref.price, first.price) <> 0 then (last.price / coalesce(ref.price, first.price) - 1) * 100 else 0 end as change,
         last.price * last.quote_usd * ${SUPPLY} as mcap,
         case when l.status = 'live' and curve.threshold <> 0 then least(100, round((curve.reserve / curve.threshold * 100)::numeric))::int end as progress,
@@ -63,13 +76,14 @@ async function tokenQuery(sql: SQL, o: TokenQuery, now: number): Promise<RawToke
                   from baskets b where b.launch_id = l.id), '[]') as basket
       from launches l
       left join stake_pools sp on sp.launch_id = l.id
-      left join lateral (select price, quote_usd from trades where launch_id = l.id order by slot desc, seq desc limit 1) last on true
+      left join lateral (select price, quote_usd, block_time from trades where launch_id = l.id order by slot desc, seq desc limit 1) last on true
       left join lateral (select price from trades where launch_id = l.id and block_time <= ${since} order by slot desc, seq desc limit 1) ref on true
       left join lateral (select price from trades where launch_id = l.id order by slot, seq limit 1) first on true
       cross join lateral (select coalesce(sum(quote_value * quote_usd), 0)::float8 as vol, count(*)::int as n from trades where launch_id = l.id and block_time > ${since}) d
       left join lateral (select curve_reserve::float8 as reserve, curve_threshold::float8 as threshold from trades
                          where launch_id = l.id and curve_reserve is not null order by slot desc, seq desc limit 1) curve on true
       where (${status}::text is null or l.status = ${status}::text)
+        and (${quote}::text is null or l.quote_mint = ${quote}::text)
         and (${q} = '' or lower(l.mint) = ${q} or strpos(lower(coalesce(l.symbol, left(l.mint, 4))), ${q}) > 0 or strpos(lower(coalesce(l.name, '')), ${q}) > 0)
     ) t
     where (${o.sort !== "graduating"} or progress is not null) and (${!o.traded} or vol > 0)
@@ -110,30 +124,44 @@ export async function landing(sql: SQL, now = Date.now(), icons?: Icons): Promis
       (select coalesce(sum((d.detail->>'amount')::float8 * (s.data->'split'->>'basketBps')::float8 / 10000 * px.unit * px.quote_usd), 0)
          from distributions d join settings s on s.version = d.settings_version join px on px.launch_id = d.launch_id
          where d.kind = 'split' and d.status = 'confirmed') as stakers`;
-  const lists = await Promise.all([
-    tokenQuery(sql, { sort: "trending", traded: true, limit: LIST }, now),
-    tokenQuery(sql, { sort: "new", limit: LIST }, now),
-    tokenQuery(sql, { sort: "graduating", limit: LIST }, now),
-    tokenQuery(sql, { sort: "trending", filter: "graduated", limit: LIST }, now),
-  ]);
-  const all = await toTokenRows(lists.flat(), icons);
-  let at = 0;
-  const [trending, newest, soon, graduated] = lists.map((l) => all.slice(at, (at += l.length)));
-  const recent = await recentTrades(sql, null, 8);
+  const first = HOME_TABS[0]!;
+  const rows = await toTokenRows(await tokenQuery(sql, { sort: first.sort, filter: first.filter, limit: HOME_PAGE + 1 }, now), icons);
   return {
     stats: {
       launches: stats.launches, graduated: stats.graduated, volume24hUsd: Number(stats.v24), volumeAllUsd: Number(stats.vall),
       traders24h: stats.traders, stakersUsd: Number(stats.stakers),
     },
-    trending: trending!, newest: newest!, soon: soon!, graduated: graduated!, recent,
+    tokens: rows.slice(0, HOME_PAGE), nextOffset: rows.length > HOME_PAGE ? HOME_PAGE : null,
+    featured: await featured(sql, now, icons),
   };
+}
+
+/** The platform's own token: its market row when it launched here, else how many launches pair with it. */
+export async function featured(sql: SQL, now = Date.now(), icons?: Icons, coins: QuoteCoin[] = quoteCoins()): Promise<Featured | null> {
+  const coin = coins.find((c) => c.platform);
+  if (!coin) return null;
+  const [token] = await toTokenRows(await tokenQuery(sql, { sort: "new", q: coin.mint.toLowerCase(), limit: 1 }, now), icons);
+  const [p] = await sql`select count(*)::int as n from launches where quote_mint = ${coin.mint}`;
+  return { mint: coin.mint, symbol: coin.symbol, name: coin.name, pairs: p.n, token: token?.mint === coin.mint ? token : null };
+}
+
+export type BuyRow = { id: string; mint: string; symbol: string; trader: string; amount: number; at: string };
+
+/** Newest buys across every launch, for the home page ticker. */
+export async function recentBuys(sql: SQL, limit: number): Promise<BuyRow[]> {
+  const rows = await sql`
+    select t.signature, t.event_index, l.mint, coalesce(l.symbol, left(l.mint, 4)) as symbol, t.trader, t.base_amount::float8 as base, t.block_time
+    from trades t join launches l on l.id = t.launch_id
+    where t.side = 'buy'
+    order by t.slot desc, t.seq desc limit ${limit}`;
+  return rows.map((r: any) => ({
+    id: `${r.signature}:${r.event_index}`, mint: r.mint, symbol: r.symbol, trader: r.trader, amount: r.base * BASE_UNIT, at: new Date(r.block_time).toISOString(),
+  }));
 }
 
 export async function exploreTokens(sql: SQL, o: TokenQuery, now = Date.now(), icons?: Icons): Promise<TokenRow[]> {
   return toTokenRows(await tokenQuery(sql, o, now), icons);
 }
-
-const BASE_UNIT = 1e-6; // launched tokens have 6 decimals
 
 export type TradeCursor = { slot: number; seq: number };
 export const tradeCursor = (t: TradeCursor) => `${t.slot}:${t.seq}`;

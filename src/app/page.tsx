@@ -1,51 +1,48 @@
 import Link from "next/link";
-import type { ReactNode } from "react";
 import { Header } from "@/web/ui/Header";
-import { Avatar } from "@/web/ui/Avatar";
-import { fmtAgo, fmtCompact, fmtPrice, shortAddr } from "@/web/ui/format";
+import { fmtCompact, fmtPrice } from "@/web/ui/format";
 import { getContext } from "@/web/server/context";
 import { iconsFor } from "@/web/server/icons";
 import { quoteCoins } from "@/domain/quotes";
-import { CoinStack, CoinTag } from "@/web/ui/CoinStack";
-import { landing, type TokenRow } from "@/web/server/landing";
-import { StakingAt } from "@/web/ui/StakingAt";
+import { HOME_TABS, landing, type Featured } from "@/web/server/landing";
+import { HomeGrid } from "@/web/home/HomeGrid";
+import { BuyTicker } from "@/web/home/BuyTicker";
+import { Change, CURVE, Meter } from "@/web/home/TokenCard";
 
 export const dynamic = "force-dynamic";
 
-const SOL = "So11111111111111111111111111111111111111112";
-
 const usd = (n: number | null) => (n === null ? "No price" : `$${fmtCompact(n)}`);
-const change = (c: number) => <span className={c >= 0 ? "text-accent" : "text-burn"}>{c >= 0 ? "+" : ""}{c.toFixed(1)}%</span>;
 
-function Progress({ value }: { value: number }) {
+function FeaturedToken({ f }: { f: Featured }) {
+  const t = f.token;
   return (
-    <span className="inline-flex h-1.5 w-full rounded-full bg-white/[0.07] overflow-hidden">
-      <span className="rounded-full" style={{ width: `${value}%`, background: "linear-gradient(90deg, #9D8CFF, #4C9DFF)" }} />
-    </span>
-  );
-}
-
-function Column({ title, href, empty, rows, right }: { title: string; href: string; empty: string; rows: TokenRow[]; right: (t: TokenRow) => ReactNode }) {
-  return (
-    <section className="flex flex-col min-w-0">
-      <div className="flex items-baseline justify-between pb-3">
-        <h2 className="m-0 font-display font-bold text-lg">{title}</h2>
-        <Link href={href} className="text-sm text-muted hover:text-ink">See all</Link>
-      </div>
-      {rows.length === 0 ? <p className="m-0 py-6 border-t line text-muted text-sm">{empty}</p> : rows.map((t) => (
-        <Link key={t.mint} href={`/t/${t.mint}`} className="grid grid-cols-[40px_minmax(0,1fr)_auto] gap-3 items-center py-3 border-t line hover:bg-white/[0.02]">
-          <Avatar seed={t.mint} label={t.symbol} image={t.image} size={40} />
-          <span className="flex flex-col min-w-0 gap-0.5">
-            <span className="flex items-baseline gap-2 min-w-0">
-              <span className="font-display font-bold truncate">{t.symbol}</span>
-              <span className="font-mono text-[12px] text-faint shrink-0">{fmtAgo(t.createdAt)}</span>
-              <StakingAt pct={t.stakingPct} />
+    <section aria-label="Featured" className="relative overflow-hidden rounded-[28px] p-[1px]" style={{ background: "linear-gradient(120deg, rgba(76,157,255,0.7), rgba(76,157,255,0.08) 45%, rgba(140,207,223,0.4))" }}>
+      <div className="flex flex-col md:flex-row md:items-center gap-5 md:gap-8 rounded-[27px] px-5 py-5 md:px-7 md:py-6" style={{ background: "radial-gradient(600px 220px at 0% 0%, rgba(76,157,255,0.16), transparent 70%), #111018" }}>
+        <div className="flex items-center gap-4 min-w-0 md:flex-1">
+          <img src="/brand/quants-mark.svg" alt="" width={64} height={64} className="w-16 h-16 shrink-0" style={{ filter: "drop-shadow(0 8px 24px rgba(76,157,255,0.3))" }} />
+          <span className="flex flex-col gap-1 min-w-0">
+            <span className="flex items-center gap-2.5">
+              <span className="font-display font-black text-2xl tracking-tight">{f.symbol}</span>
+              <span className="text-[11px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full bg-accent text-ground">Featured</span>
             </span>
-            <span className="text-[12px] text-muted truncate flex items-center gap-1.5">Earns <CoinStack coins={t.basket} size={14} max={3} /></span>
+            <span className="text-sm text-muted">The quants platform token. Pair a launch with it, or trade the tokens paired with it.</span>
           </span>
-          <span className="flex flex-col items-end gap-1 font-mono text-sm min-w-[84px]">{right(t)}</span>
-        </Link>
-      ))}
+        </div>
+        {t && (
+          <div className="grid grid-cols-3 gap-5 md:gap-8 font-mono md:w-[380px] shrink-0">
+            <span className="flex flex-col gap-0.5"><span className="font-sans text-[12px] text-faint">Price</span><span>{t.priceUsd === null ? "No trades" : `$${fmtPrice(t.priceUsd)}`}</span></span>
+            <span className="flex flex-col gap-0.5"><span className="font-sans text-[12px] text-faint">Market cap</span><span>{usd(t.mcapUsd)}</span></span>
+            <span className="flex flex-col gap-0.5"><span className="font-sans text-[12px] text-faint">24h</span><Change value={t.change24h} traded={t.price !== null} /></span>
+            {t.status !== "graduated" && <span className="col-span-3"><Meter value={t.progress ?? 0} color={CURVE} /></span>}
+          </div>
+        )}
+        <div className="flex flex-wrap gap-2.5 shrink-0">
+          {t && <Link href={`/t/${t.mint}`} className="font-display font-bold text-ground bg-accent glow-accent rounded-full px-5 min-h-11 flex items-center">Trade {f.symbol}</Link>}
+          <Link href={`/explore?quote=${f.mint}`} className="font-display font-bold rounded-full px-5 min-h-11 flex items-center bg-raised-2 border border-white/10">
+            {f.pairs === 0 ? `${f.symbol} pairs` : `${f.pairs} ${f.pairs === 1 ? "pair" : "pairs"}`}
+          </Link>
+        </div>
+      </div>
     </section>
   );
 }
@@ -56,7 +53,7 @@ export default async function HomePage() {
   return (
     <div className="flex-1 bg-launch">
       <Header active="home" />
-      <main className="wrap flex flex-col gap-12 md:gap-16 pt-8 md:pt-12 pb-20">
+      <main className="wrap flex flex-col gap-10 md:gap-12 pt-8 md:pt-12 pb-20">
         <section className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,520px)] gap-8 lg:gap-12 items-center">
           <div className="flex flex-col gap-5">
             <h1 className="m-0 font-display font-black text-[38px] md:text-[56px] leading-[1.02] tracking-[-0.03em]">
@@ -70,6 +67,7 @@ export default async function HomePage() {
               <Link href="/launch" className="font-display font-bold text-ground bg-accent glow-accent rounded-full px-6 min-h-12 flex items-center">Launch a token</Link>
               <Link href="/docs" className="font-display font-bold rounded-full px-6 min-h-12 flex items-center bg-raised-2 border border-white/10">How it works</Link>
             </div>
+            <BuyTicker />
           </div>
           <div className="flex flex-col gap-6 bg-surface border line rounded-[28px] p-6 md:p-7">
             <div className="flex flex-col gap-1.5">
@@ -87,59 +85,9 @@ export default async function HomePage() {
           </div>
         </section>
 
-        <section className="flex flex-col">
-          <div className="flex items-baseline justify-between pb-3">
-            <h2 className="m-0 font-display font-bold text-xl">Trending today</h2>
-            <Link href="/explore" className="text-sm text-muted hover:text-ink">Explore all</Link>
-          </div>
-          <div className="hidden md:grid grid-cols-[28px_minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,0.8fr)_minmax(0,1fr)_minmax(0,1.2fr)] gap-6 pb-2 text-[12px] text-faint">
-            <span>#</span><span>Token</span><span className="text-right">Market cap</span><span className="text-right">24h</span><span className="text-right">Volume 24h</span><span>Stakers earn</span>
-          </div>
-          {d.trending.length === 0 ? <p className="m-0 py-6 border-t line text-muted text-sm">No trades today.</p> : d.trending.map((t, i) => (
-            <Link key={t.mint} href={`/t/${t.mint}`} className="grid grid-cols-[28px_minmax(0,1fr)_auto] md:grid-cols-[28px_minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,0.8fr)_minmax(0,1fr)_minmax(0,1.2fr)] gap-3 md:gap-6 items-center py-3 border-t line hover:bg-white/[0.02]">
-              <span className="font-mono text-sm text-faint">{i + 1}</span>
-              <span className="flex items-center gap-3 min-w-0">
-                <Avatar seed={t.mint} label={t.symbol} image={t.image} size={40} />
-                <span className="flex flex-col min-w-0">
-                  <span className="flex items-baseline gap-2 min-w-0"><span className="font-display font-bold truncate">{t.symbol}</span><StakingAt pct={t.stakingPct} /></span>
-                  <span className="text-[12px] text-muted truncate flex items-center gap-1.5">{t.name ?? shortAddr(t.mint)} · <CoinTag coin={t.quote} size={12} /></span>
-                </span>
-              </span>
-              <span className="flex flex-col items-end font-mono text-sm md:hidden">
-                <span>{usd(t.mcapUsd)}</span>
-                <span className="text-[12px]">{change(t.change24h)}</span>
-              </span>
-              <span className="hidden md:block text-right font-mono text-sm">{usd(t.mcapUsd)}</span>
-              <span className="hidden md:block text-right font-mono text-sm">{change(t.change24h)}</span>
-              <span className="hidden md:block text-right font-mono text-sm">{usd(t.volume24hUsd)}</span>
-              <span className="hidden md:flex text-sm min-w-0"><CoinStack coins={t.basket} /></span>
-            </Link>
-          ))}
-        </section>
+        {d.featured && <FeaturedToken f={d.featured} />}
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-x-10 gap-y-12">
-          <Column title="New" href="/explore?sort=new" empty="Nothing launched yet." rows={d.newest}
-            right={(t) => <><span>{t.mcapUsd === null ? "No trades" : usd(t.mcapUsd)}</span><span className="text-[12px] text-muted">market cap</span></>} />
-          <Column title="About to graduate" href="/explore?sort=graduating" empty="Nothing on the curve has traded yet." rows={d.soon}
-            right={(t) => <><span>{t.progress}%</span><span className="w-20"><Progress value={t.progress ?? 0} /></span></>} />
-          <Column title="Graduated" href="/explore?filter=graduated" empty="Nothing has graduated yet." rows={d.graduated}
-            right={(t) => <><span>{usd(t.mcapUsd)}</span><span className="text-[12px]">{change(t.change24h)}</span></>} />
-        </div>
-
-        <section className="flex flex-col">
-          <h2 className="m-0 pb-3 font-display font-bold text-xl">Latest trades</h2>
-          {d.recent.length === 0 ? <p className="m-0 py-6 border-t line text-muted text-sm">No trades yet.</p> : d.recent.map((t) => (
-            <Link key={`${t.signature}:${t.eventIndex}`} href={`/t/${t.mint}`} className="grid grid-cols-[56px_minmax(0,1fr)_auto] md:grid-cols-[72px_minmax(0,1fr)_minmax(0,1fr)_120px] gap-3 md:gap-6 items-center py-3 border-t line hover:bg-white/[0.02] text-sm">
-              <span className={`font-semibold ${t.side === "buy" ? "text-accent" : "text-burn"}`}>{t.side === "buy" ? "Buy" : "Sell"}</span>
-              <span className="font-display font-bold truncate">{t.symbol}</span>
-              <span className="hidden md:block font-mono text-muted truncate">{shortAddr(t.trader)}</span>
-              <span className="flex flex-col items-end font-mono">
-                <span>{t.valueUsd === null ? `${fmtPrice(t.quoteValue)} ${t.quoteMint === SOL ? "SOL" : process.env.NEXT_PUBLIC_OURTOKEN_SYMBOL ?? "OURTOKEN"}` : `$${fmtPrice(t.valueUsd)}`}</span>
-                <span className="text-[12px] text-muted">{fmtAgo(t.at)}</span>
-              </span>
-            </Link>
-          ))}
-        </section>
+        <HomeGrid tabs={HOME_TABS} initial={d.tokens} nextOffset={d.nextOffset} />
       </main>
     </div>
   );

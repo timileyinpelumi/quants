@@ -46,6 +46,14 @@ test("rejects bad input", async () => {
   for (const b of bad) await expect(prepareLaunch(deps, b)).rejects.toBeInstanceOf(LaunchError);
 });
 
+test("the pair token can be the whole reward basket without a verified listing", async () => {
+  const { deps, sql } = await setup(false);
+  const r = await prepareLaunch(deps, { ...valid, basket: [{ mint: NATIVE_MINT, weightBps: 10_000 }] });
+  const [row] = await sql`select basket from prepared_launches where mint = ${r.mint}`;
+  expect((typeof row.basket === "string" ? JSON.parse(row.basket) : row.basket).map((b: any) => b.mint)).toEqual([NATIVE_MINT]);
+  await expect(prepareLaunch(deps, { ...valid, basket: [{ mint: valid.basket[0]!.mint, weightBps: 10_000 }] })).rejects.toMatchObject({ code: "basket_not_verified" });
+});
+
 test("rejects unverified basket tokens", async () => {
   const { deps } = await setup(false);
   await expect(prepareLaunch(deps, valid)).rejects.toMatchObject({ code: "basket_not_verified" });

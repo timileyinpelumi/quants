@@ -32,9 +32,12 @@ test("indexed trades fill the home page and the token chart", async ({ page }) =
   await expect(page.getByRole("heading", { name: /Launch a token/, level: 1 })).toBeVisible();
   await expect(page.getByText("Tokens launched")).toBeVisible();
   await expect(page.getByText("Fees set aside for stakers")).toBeVisible();
-  const trending = page.locator("section", { has: page.getByRole("heading", { name: "Trending today" }) });
-  await expect(trending.getByRole("link", { name: /CAT/ }).first()).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Latest trades" })).toBeVisible();
+  const tokens = page.getByRole("region", { name: "Tokens" });
+  await expect(page.getByRole("tab", { name: "Trending" })).toHaveAttribute("aria-selected", "true");
+  await expect(tokens.getByRole("link", { name: /CAT/ }).first()).toBeVisible();
+  await page.getByRole("tab", { name: "New" }).click();
+  await expect(tokens.getByRole("link", { name: /CAT/ }).first()).toBeVisible();
+  await expect(page.getByText(/ bought /).first()).toBeVisible();
   await page.getByRole("searchbox", { name: "Search tokens" }).first().fill("cat");
   await page.getByRole("searchbox", { name: "Search tokens" }).first().press("Enter");
   await expect(page).toHaveURL(/\/explore\?q=cat/);

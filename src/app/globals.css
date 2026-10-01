@@ -30,6 +30,9 @@ input::placeholder, textarea::placeholder { color: var(--color-faint); }
 .bg-launch { background: radial-gradient(900px 500px at 78% -10%, rgba(76,157,255,0.10), transparent 60%), radial-gradient(700px 500px at 0% 100%, rgba(157,140,255,0.10), transparent 60%), #0A0A0F; }
 .bg-token { background: radial-gradient(900px 500px at 20% -10%, rgba(255,122,89,0.10), transparent 60%), radial-gradient(800px 600px at 100% 40%, rgba(76,157,255,0.07), transparent 60%), #0A0A0F; }
 .bg-stake-page { background: radial-gradient(900px 600px at 50% -20%, rgba(91,180,204,0.12), transparent 60%), #0A0A0F; }
+@keyframes ticker-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+.ticker-in { animation: ticker-in 400ms ease-out; }
+@media (prefers-reduced-motion: reduce) { .ticker-in { animation: none; } }
 
 .wallet-adapter-button { font-family: var(--font-geist-mono) !important; font-weight: 500 !important; border-radius: 999px !important; background: #1B1A24 !important; border: 1px solid rgba(255,255,255,0.10) !important; height: 44px !important; font-size: 14px !important; padding: 0 20px !important; }
 .wallet-adapter-button:not([disabled]):hover { background: #232230 !important; }
