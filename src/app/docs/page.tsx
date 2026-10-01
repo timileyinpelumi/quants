@@ -86,7 +86,7 @@ export default async function DocsPage() {
 
           <H2 id="launch">Launching a token</H2>
           <P>Pick a name, a symbol and a square image, then choose what your token trades against: {quoteCoins().map((c) => c.symbol).join(", ")}. Choose a trading fee of 1%, 2%, 3% or 5% and pick your reward basket. You can buy some of your own token in the same approval, paid in SOL and swapped to the pair token if needed.</P>
-          <P>Every token has a supply of 1,000,000,000. Launching costs a platform fee of {sol(s.launchFeeLamports)} plus the rent for the staking farms: one Kamino farm per lock tier, with an account for each reward token. That comes to {sol(three.total)} in all for a three token basket, plus network fees. A first buy is capped at {pct(s.devBuyCapBps)} of supply.</P>
+          <P>Every token has a supply of 1,000,000,000. Launching costs a platform fee of {sol(s.launchFeeLamports)} plus the cost of setting up the staking farms: rent for one Kamino farm per lock tier with accounts for each reward token, and the transaction fees to create them. That comes to {sol(three.total)} in all for a three token basket, plus the network fee for your own transaction. A first buy is capped at {pct(s.devBuyCapBps)} of supply.</P>
 
           <H2 id="fees">Where fees go</H2>
           <P>Meteora keeps 20% of each trading fee. Of what is left:</P>

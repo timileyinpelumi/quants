@@ -10,9 +10,17 @@ export class FakeStaking implements StakingAdapter {
   async vaultAuthority(farm: string) { return `vault-auth-${farm}`; }
   funded: { farm: string; rewardMint: string; amount: bigint; rawRps: bigint }[] = [];
   constructor(private chain: FakeChain) {}
-  capabilities() { return { earlyExit: true, tiersOnChain: false }; }
+  rewards = new Map<string, string[]>();
+  rewardBatches: string[][] = [];
+  capabilities() { return { earlyExit: true, tiersOnChain: false, rewardsPerTx: 4 }; }
   async buildCreateFarm() { return this.chain.tx("create_farm"); }
   async buildConfigureFarm(i: { farm: string }) { this.farms.add(i.farm); return this.chain.tx("configure_farm"); }
+  async buildAddRewards(farm: string, mints: string[]) {
+    this.rewardBatches.push(mints);
+    this.rewards.set(farm, [...(this.rewards.get(farm) ?? []), ...mints]);
+    return this.chain.tx("add_rewards");
+  }
+  async farmRewardMints(farm: string) { return this.rewards.get(farm) ?? []; }
   async farmExists(farm: string) { return this.farms.has(farm); }
   async totalStaked(farm: string) { return this.staked.get(farm) ?? 0n; }
   async rewardState(farm: string, mint: string) { return { available: this.available.get(`${farm}:${mint}`) ?? 0n, rpsDecimals: 0, decimals: 6 }; }

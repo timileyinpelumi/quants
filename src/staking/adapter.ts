@@ -2,9 +2,12 @@ import type { SignedTx } from "../chain/port";
 
 export interface StakingAdapter {
   readonly backend: "kamino";
-  capabilities(): { earlyExit: boolean; tiersOnChain: boolean };
+  /** rewardsPerTx is how many reward mints buildAddRewards can register in one transaction. */
+  capabilities(): { earlyExit: boolean; tiersOnChain: boolean; rewardsPerTx: number };
   buildCreateFarm(stakeMint: string, farmSecret: Uint8Array): Promise<SignedTx>;
-  buildConfigureFarm(i: { farm: string; stakeMint: string; lockSeconds: number; maxPenaltyBps: number; spillAccount: string; rewardMints: string[] }): Promise<SignedTx>;
+  buildAddRewards(farm: string, rewardMints: string[]): Promise<SignedTx>;
+  farmRewardMints(farm: string): Promise<string[]>;
+  buildConfigureFarm(i: { farm: string; stakeMint: string; lockSeconds: number; maxPenaltyBps: number; spillAccount: string }): Promise<SignedTx>;
   farmExists(farm: string): Promise<boolean>;
   totalStaked(farm: string): Promise<bigint>;
   /** Owner of the farm's stake vault token account, used to label staked balances among holders. */
