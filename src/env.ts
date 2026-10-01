@@ -11,6 +11,7 @@ const Env = z.object({
   DAMM_V2_MIGRATION_CONFIG: z.string().min(32),
   JUPITER_BASE_URL: z.string().url().default("https://api.jup.ag/swap/v1"),
   JUPITER_API_KEY: z.string().optional(),
+  ALERT_WEBHOOK_URL: z.preprocess((v) => v || undefined, z.string().url().optional()),
 });
 export type Env = z.infer<typeof Env>;
 export const loadEnv = (): Env => Env.parse(process.env);

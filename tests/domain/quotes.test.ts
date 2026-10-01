@@ -17,6 +17,17 @@ test("a local validator swaps in its own mints but keeps mainnet icons", () => {
   expect(quoteCoin("nope", q)).toBeUndefined();
 });
 
+test("QUOTE_GRADUATIONS overrides graduation targets by symbol", () => {
+  const q = quoteCoins({ ...env, QUOTE_GRADUATIONS: JSON.stringify({ SOL: 120, QNT: 250000 }) });
+  expect(q.map((c) => [c.symbol, c.graduation])).toEqual([["SOL", 120], ["USDC", 12_000], ["USDT", 12_000], ["JUP", 30_000], ["QNT", 250_000]]);
+});
+
+test("QUOTE_GRADUATIONS rejects unknown symbols and targets that are not positive", () => {
+  expect(() => quoteCoins({ ...env, QUOTE_GRADUATIONS: JSON.stringify({ BONK: 5 }) })).toThrow("BONK");
+  expect(() => quoteCoins({ ...env, QUOTE_GRADUATIONS: JSON.stringify({ SOL: 0 }) })).toThrow("SOL");
+  expect(() => quoteCoins({ ...env, QUOTE_GRADUATIONS: JSON.stringify({ SOL: "lots" }) })).toThrow("SOL");
+});
+
 test("the platform token is left out when it is not configured", () => {
   expect(quoteCoins({}).map((c) => c.symbol)).toEqual(["SOL", "USDC", "USDT", "JUP"]);
 });

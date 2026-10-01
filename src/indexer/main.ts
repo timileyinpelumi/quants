@@ -4,6 +4,7 @@ import { db } from "../db/client";
 import { RpcHistory } from "./history";
 import { JupiterPrices } from "./prices";
 import { indexOnce } from "./run";
+import { makeAlerter, sqlThrottle, Streaks, indexerPassAlerts } from "../ops/alerts";
 
 const e = process.env;
 if (!e.DATABASE_URL || !e.RPC_URL) throw new Error("DATABASE_URL and RPC_URL are required");
@@ -36,13 +37,18 @@ const deps = {
   },
 };
 
+const alert = makeAlerter({ url: e.ALERT_WEBHOOK_URL || undefined, source: "indexer", store: sqlThrottle(sql) });
+const addressStreaks = new Streaks(5);
+
 while (true) {
   const started = Date.now();
   try {
-    const r = await indexOnce(deps);
+    const { checked, ...r } = await indexOnce(deps);
     if (r.trades || r.skipped || r.errors.length) console.log(JSON.stringify({ at: new Date().toISOString(), ...r }));
+    indexerPassAlerts(alert, addressStreaks, { ...r, checked });
   } catch (err) {
     console.error(JSON.stringify({ at: new Date().toISOString(), error: String(err) }));
+    void alert("indexer-pass", `pass failed: ${String(err)}`);
   }
   await Bun.sleep(Math.max(0, intervalMs - (Date.now() - started)));
 }

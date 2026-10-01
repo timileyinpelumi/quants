@@ -40,11 +40,13 @@ function Num({ label, value, onChange, suffix }: { label: string; value: number 
   );
 }
 
-export function AdminApp() {
+export type Pair = { mint: string; symbol: string; name: string; graduation: number };
+
+export function AdminApp({ pairs }: { pairs: Pair[] }) {
   const wallet = useWallet();
   const modal = useWalletModal();
   const [signedIn, setSignedIn] = useState(false);
-  const [tab, setTab] = useState<"settings" | "keeper" | "baskets">("settings");
+  const [tab, setTab] = useState<"settings" | "keeper" | "baskets" | "pairs">("settings");
   const [settings, setSettings] = useState<Settings | null>(null);
   const [version, setVersion] = useState<number | null>(null);
   const [status, setStatus] = useState<Status | null>(null);
@@ -123,7 +125,7 @@ export function AdminApp() {
     <main className="flex flex-col gap-8 wrap pt-10 md:pt-14 pb-16">
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
         <h1 className="m-0 font-display font-black text-[40px] md:text-[56px] tracking-[-0.03em] leading-none">Admin</h1>
-        <Segmented label="Section" value={tab} onChange={setTab} options={[{ value: "settings", label: "Settings" }, { value: "keeper", label: "Keeper" }, { value: "baskets", label: "Baskets" }]} />
+        <Segmented label="Section" value={tab} onChange={setTab} options={[{ value: "settings", label: "Settings" }, { value: "keeper", label: "Keeper" }, { value: "baskets", label: "Baskets" }, { value: "pairs", label: "Pairs" }]} />
       </div>
       {msg && <p role="status" className={`m-0 text-sm ${msg.ok ? "text-lime" : "text-burn"}`}>{msg.text}</p>}
 
@@ -201,6 +203,20 @@ export function AdminApp() {
           <label className="flex flex-col gap-2 text-[13px] text-muted"><span>Token mint</span><input value={basketMint} onChange={(e) => setBasketMint(e.target.value)} className={small} /></label>
           <label className="flex flex-col gap-2 text-[13px] text-muted"><span>Basket (weights in basis points, adding to 10000)</span><textarea value={basketJson} onChange={(e) => setBasketJson(e.target.value)} className={`${small} min-h-40`} /></label>
           <Button className="self-start" onClick={saveBasket}>Replace basket</Button>
+        </section>
+      )}
+
+      {tab === "pairs" && (
+        <section className="flex flex-col gap-5 max-w-3xl">
+          <p className="m-0 text-sm text-muted">Each pair graduates once this much has been raised on its curve. The target is fixed into the config keys when they are created, so changing QUOTE_GRADUATIONS only applies to config keys created after the change. These are the targets the server is set to now.</p>
+          <div className="flex flex-col">
+            {pairs.map((p) => (
+              <div key={p.mint} className="grid grid-cols-[minmax(0,1fr)_auto] gap-4 py-3 border-t line text-sm">
+                <span><span className="font-mono font-semibold">{p.symbol}</span> <span className="text-muted">{p.name}</span></span>
+                <span className="font-mono text-right">{p.graduation > 0 ? `${p.graduation.toLocaleString("en-US")} ${p.symbol}` : "Not set"}</span>
+              </div>
+            ))}
+          </div>
         </section>
       )}
     </main>

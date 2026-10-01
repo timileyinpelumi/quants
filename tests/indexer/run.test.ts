@@ -87,7 +87,8 @@ test("indexes the graduated pool as well and keeps going when one address fails"
   const r = await indexOnce(deps(sql, h));
   expect(r.trades).toBe(2);
   expect(r.errors).toEqual([{ address: "P1", error: "Error: rpc 429" }]);
-  const d = (await sql`select venue, curve_reserve from trades where signature = 'd1'`)[0];
+  expect(r.checked.sort()).toEqual(["D1", "P1", "P2"]);
+  const d =(await sql`select venue, curve_reserve from trades where signature = 'd1'`)[0];
   expect([d.venue, d.curve_reserve]).toEqual(["damm", null]);
 });
 

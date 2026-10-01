@@ -1,5 +1,5 @@
 import { PublicKey } from "@solana/web3.js";
-import { TOKEN_PROGRAM_ID } from "@solana/spl-token";
+import { TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID } from "@solana/spl-token";
 import { z } from "zod";
 import type { WebContext } from "./context";
 import { iconsFor } from "./icons";
@@ -11,12 +11,13 @@ const RANK = { launch: 0, platform: 1, reward: 2, other: 3 } as const;
 
 export async function walletOverview(ctx: WebContext, ownerRaw: string) {
   const owner = new PublicKey(z.string().regex(/^[1-9A-HJ-NP-Za-km-z]{32,44}$/, "Wallet address is not valid").parse(ownerRaw));
-  const [sol, accounts] = await Promise.all([
+  const [sol, classic, t22] = await Promise.all([
     ctx.conn.getBalance(owner, "confirmed"),
     ctx.conn.getParsedTokenAccountsByOwner(owner, { programId: TOKEN_PROGRAM_ID }, "confirmed"),
+    ctx.conn.getParsedTokenAccountsByOwner(owner, { programId: TOKEN_2022_PROGRAM_ID }, "confirmed"),
   ]);
   const held = new Map<string, { amount: bigint; decimals: number }>();
-  for (const a of accounts.value) {
+  for (const a of [...classic.value, ...t22.value]) {
     const info = (a.account.data as any).parsed.info;
     const prev = held.get(info.mint);
     const amount = BigInt(info.tokenAmount.amount) + (prev?.amount ?? 0n);

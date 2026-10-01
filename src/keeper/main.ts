@@ -7,6 +7,7 @@ import { JupiterLive } from "../jupiter/port";
 import { KaminoBackend } from "../staking/kamino";
 import { loadLatestSettings } from "../domain/settings";
 import { runKeeper, ReconcileError } from "./run";
+import { makeAlerter, sqlThrottle, Streaks, keeperRunAlerts } from "../ops/alerts";
 
 const env = loadEnv();
 const sql = db(env.DATABASE_URL);
@@ -22,15 +23,23 @@ const deps = {
   ourtokenMint: env.OURTOKEN_MINT,
 };
 
+const alert = makeAlerter({ url: env.ALERT_WEBHOOK_URL, source: "keeper", store: sqlThrottle(sql) });
+const launchStreaks = new Streaks(3);
+
 // A ReconcileError exits so a supervisor restart loop is visible and no funds move while the ledger is wrong.
 while (true) {
   const started = Date.now();
   try {
     const r = await runKeeper(deps);
     console.log(JSON.stringify({ at: new Date().toISOString(), ...r }));
+    keeperRunAlerts(alert, launchStreaks, r);
   } catch (e) {
     console.error(JSON.stringify({ at: new Date().toISOString(), fatal: String(e) }));
-    if (e instanceof ReconcileError) process.exit(1);
+    if (e instanceof ReconcileError) {
+      await alert("keeper-reconcile", `stopped, nothing is sent until the ledger and wallets agree. ${e.message}`);
+      process.exit(1);
+    }
+    void alert("keeper-fatal", `run failed: ${String(e)}`);
   }
   const { keeperIntervalSeconds } = await loadLatestSettings(sql);
   await Bun.sleep(Math.max(0, keeperIntervalSeconds * 1000 - (Date.now() - started)));

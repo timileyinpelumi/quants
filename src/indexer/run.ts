@@ -49,7 +49,7 @@ export const spotPrice = (sqrtPrice: bigint, baseDecimals: number, quoteDecimals
 //   fan-out:     at most MAX_ADDRESSES_PER_PASS addresses (least recently checked first) and MAX_TX_PER_PASS transactions each;
 //                the cursor carries the rest. A graduated token's curve pool is dropped once it has no new signatures.
 //   backoff:     the RPC connection has its own 429 retry turned off and a request timeout; the next pass is the retry.
-export async function indexOnce(d: IndexerDeps): Promise<{ trades: number; skipped: number; errors: { address: string; error: string }[] }> {
+export async function indexOnce(d: IndexerDeps): Promise<{ trades: number; skipped: number; checked: string[]; errors: { address: string; error: string }[] }> {
   const now = d.now?.() ?? Date.now();
   const launches = await d.sql`select id, pool, damm_pool, quote_mint, status from launches`;
   const cursors = new Map<string, { last: string | null; checked: number; finished: boolean }>(
@@ -107,5 +107,5 @@ export async function indexOnce(d: IndexerDeps): Promise<{ trades: number; skipp
       errors.push({ address, error: String(e) });
     }
   }
-  return { trades, skipped, errors };
+  return { trades, skipped, checked: targets.map((t: any) => t.address as string), errors };
 }

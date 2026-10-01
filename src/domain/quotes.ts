@@ -34,6 +34,13 @@ export function quoteCoins(env: Env = process.env): QuoteCoin[] {
       iconMint: null, platform: true, payoutMin: 0n,
     });
   }
+  const targets = env.QUOTE_GRADUATIONS ? (JSON.parse(env.QUOTE_GRADUATIONS) as Record<string, unknown>) : {};
+  for (const [symbol, target] of Object.entries(targets)) {
+    const coin = list.find((c) => c.symbol === symbol);
+    if (!coin) throw new Error(`QUOTE_GRADUATIONS names ${symbol}, which is not a pair token`);
+    if (typeof target !== "number" || !Number.isFinite(target) || target <= 0) throw new Error(`QUOTE_GRADUATIONS target for ${symbol} must be a positive number`);
+    coin.graduation = target;
+  }
   return list;
 }
 

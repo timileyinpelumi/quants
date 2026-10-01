@@ -16,6 +16,8 @@ Copy `.env.example` to `.env` and fill in:
 | `DAMM_V2_MIGRATION_CONFIG` | `A8gMrEPJkacWkcb3DGwtJwTe16HktSEfvwtuDh2MCtck` (DAMM v2 Customizable) |
 | `JUPITER_BASE_URL` | `https://api.jup.ag/swap/v1` |
 | `JUPITER_API_KEY` | Free key from the Jupiter portal; without it requests are limited to 30 a minute |
+| `ALERT_WEBHOOK_URL` | Optional. Incoming webhook the keeper and indexer post alerts to (see Alerts) |
+| `QUOTE_GRADUATIONS` | Optional. JSON of graduation targets by pair symbol, for example `{"SOL":100,"USDC":15000}` (see Graduation targets) |
 
 ## Wallets
 
@@ -29,8 +31,14 @@ Copy `.env.example` to `.env` and fill in:
 docker compose up -d
 bun run migrate
 bun scripts/create-kamino-global-config.ts         # prints KAMINO_GLOBAL_CONFIG
-SOL_GRADUATION=85 OURTOKEN_GRADUATION=<amount> bun scripts/create-configs.ts > config-keys.json
+OURTOKEN_GRADUATION=<amount> bun scripts/create-configs.ts > config-keys.json
 ```
+
+### Graduation targets
+
+Each pair graduates once a set amount of the pair token has been raised on the curve: 85 SOL, 12,000 USDC, 12,000 USDT, 30,000 JUP, and `OURTOKEN_GRADUATION` for the platform token. To change any of them, set `QUOTE_GRADUATIONS` to JSON keyed by symbol, for example `QUOTE_GRADUATIONS='{"SOL":100,"JUP":40000}'`. Pairs you leave out keep their default. An unknown symbol or a target that is not a positive number is an error naming the pair, in the script and in the web app.
+
+The target is written into each config key when `scripts/create-configs.ts` runs, and every pool keeps the target of the config key it was launched from. Set `QUOTE_GRADUATIONS` before creating config keys. Changing it afterwards does nothing for existing keys or pools; create a new set of config keys for a new target to apply. The admin page lists the targets the server is set to under Pairs, and `NEXT_PUBLIC_SOL_GRADUATION` and `NEXT_PUBLIC_OURTOKEN_GRADUATION` must match what the keys were created with.
 
 Keep `config-keys.json` next to `.env` on the server (it is gitignored because the dev seed regenerates it); the web app reads it from `CONFIG_KEYS_PATH`. Save the initial settings from a script or the admin page (plan 2) with `saveSettings(sql, defaultSettings(OURTOKEN_MINT), "<admin>")`.
 
@@ -51,6 +59,21 @@ bun run indexer
 It reads every swap on every quants pool (the curve, then DAMM v2 after graduation) into `trades`. Charts, market stats, volume and the home page come from that table, so they lag the chain by one pass (`INDEXER_INTERVAL_SECONDS`, default 5). It logs a JSON line only when it wrote trades, skipped any, or an address failed. A transaction the RPC lists but will not return is waited on for 10 minutes, then skipped and counted in `skipped` (pruned RPC history causes this). If the RPC has pruned the transaction a cursor points at, the indexer reads that pool again from its recent history. A failing address is skipped for that pass and retried on the next one; one that fails every pass shows in every line. Only one indexer runs at a time (Postgres advisory lock); a second one exits.
 
 Each trade stores the quote token's USD price from Jupiter (`JUPITER_API_KEY`) at the time it was indexed. With no price the trade is stored without one and pages show values in the quote token.
+
+## Alerts
+
+Set `ALERT_WEBHOOK_URL` and the keeper and indexer post `{"text": "..."}` to it. That works as is with Slack incoming webhooks and anything that accepts the same body. For Discord, add `/slack` to the end of the channel's webhook URL. Without the variable nothing is sent.
+
+They alert when:
+
+- The keeper stops on a `ReconcileError`.
+- A keeper run fails outright.
+- The same launch errors on 3 keeper runs in a row (and on every run after that until it clears).
+- An indexer pass fails outright.
+- The indexer fails to read the same pool address on 5 passes in a row.
+- The indexer skips transactions the RPC would not return.
+
+The same alert is sent at most once an hour. The last send time per alert is kept in the `alerts_sent` table, so a keeper that exits and restarts does not repeat it every 30 seconds; to get an alert again sooner, delete its row. A webhook that is down or slow (5 second timeout) is logged as `alertFailed` and never holds up the keeper or indexer.
 
 ## When something goes wrong
 
@@ -93,7 +116,7 @@ Never set these in production: `NEXT_PUBLIC_TEST_WALLET_SECRET`, `PINATA_JWT=stu
 
 ## Deploying to a VPS
 
-1. Install Bun, Node 22 or newer (for the build), Postgres 16 and Caddy. Create a `quants` user.
+1. Install Bun, Node 22 or newer (for the build), Postgres 16 and Caddy. Create a `quants` user. The service files run `/usr/local/bin/bun`, and the Bun installer puts it in your home directory, so copy it there: `sudo install -m 755 ~/.bun/bin/bun /usr/local/bin/bun`. Check the units with `systemd-analyze verify deploy/*.service`.
 2. Clone the repo to `/opt/quants`, write `/opt/quants/.env` with every variable from `.env.example` and put `config-keys.json` next to it.
 3. `bun install`, `bun run migrate`, `bun run build`.
 4. Copy `deploy/quants-web.service`, `deploy/quants-keeper.service` and `deploy/quants-indexer.service` to `/etc/systemd/system/`, then `systemctl enable --now quants-web quants-keeper quants-indexer`.
