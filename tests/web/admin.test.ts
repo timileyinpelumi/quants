@@ -82,6 +82,23 @@ test("status lists failed steps and launches with steps in flight", async () => 
   expect(s.inFlight).toEqual([]);
 });
 
+test("status pages failed steps from a cursor", async () => {
+  const c = await makeWebContext();
+  const cookie = cookieOf(await signIn(ADMIN));
+  const [l] = await c.sql`insert into launches (mint, pool, quote_mint, fee_tier_bps, config_key, creator, status, settings_version) values ('M1', 'P1', 'q', 200, 'c', 'cr', 'live', 1) returning id`;
+  for (let i = 0; i < 5; i++) {
+    const row = await beginStep(c.sql, { launchId: Number(l.id), idemKey: `k${i}`, kind: "payout", settingsVersion: 1, detail: {} });
+    await failStep(c.sql, row.id, `fail ${i}`);
+  }
+  const get = async (qs: string) => (await statusRoute(new Request(`http://x?${qs}`, { headers: { cookie } }))).json();
+  const p1 = await get("limit=2");
+  const p2 = await get(`limit=2&before=${p1.failedNext}`);
+  const p3 = await get(`limit=2&before=${p2.failedNext}`);
+  expect([...p1.failed, ...p2.failed, ...p3.failed].map((f: any) => f.error)).toEqual(["fail 4", "fail 3", "fail 2", "fail 1", "fail 0"]);
+  expect(p3.failedNext).toBeNull();
+  expect((await statusRoute(new Request("http://x?limit=0", { headers: { cookie } }))).status).toBe(400);
+});
+
 test("basket override replaces a pending launch's basket and is refused once farms exist", async () => {
   const c = await makeWebContext();
   const cookie = cookieOf(await signIn(ADMIN));

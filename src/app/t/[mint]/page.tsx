@@ -75,7 +75,7 @@ export default async function TokenPage({ params }: { params: Promise<{ mint: st
             stake={{ tiers: d.tiers.map((t) => ({ id: t.tierId, lockSeconds: t.lockSeconds, multiplierBps: t.multiplierBps })), maxPenaltyBps: d.maxPenaltyBps, ready: d.stakeReady, earns }} />
         </section>
 
-        <TokenInsights symbol={symbol} quoteSymbol={pairSymbol} />
+        <TokenInsights mint={mint} symbol={symbol} quoteSymbol={pairSymbol} />
 
         <section className="grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-8">
           <div className="flex flex-col gap-2">

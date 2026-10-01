@@ -40,6 +40,20 @@ test("listLaunches returns newest first with metadata and burned totals", async 
   void b;
 });
 
+test("launches route pages by offset", async () => {
+  const c = await makeWebContext();
+  const { GET } = await import("../../src/app/api/launches/route");
+  for (const s of ["AAA", "BBB", "CCC"]) await launch(c, s);
+  const get = async (qs: string) => (await GET(new Request(`http://x/api/launches?${qs}`))).json();
+  const p1 = await get("limit=2");
+  expect(p1.launches.map((l: any) => l.symbol)).toEqual(["CCC", "BBB"]);
+  expect(p1.nextOffset).toBe(2);
+  const p2 = await get("limit=2&offset=2");
+  expect(p2.launches.map((l: any) => l.symbol)).toEqual(["AAA"]);
+  expect(p2.nextOffset).toBeNull();
+  expect((await GET(new Request("http://x/api/launches?limit=51"))).status).toBe(400);
+});
+
 test("launchDetail sums paid out and burned, and weights tier shares by multiplier", async () => {
   const c = await makeWebContext();
   const a = await launch(c, "CAT");

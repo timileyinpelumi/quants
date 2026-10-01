@@ -1,11 +1,25 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import type { TradeRow } from "@/web/server/landing";
+import type { Trader } from "@/web/server/live";
+import { LoadMore, getJson } from "@/web/ui/LoadMore";
 import { fmtAgo, fmtCompact, fmtPrice, shortAddr } from "@/web/ui/format";
 import { Jazzicon } from "@/web/ui/Jazzicon";
 import { useTokenLive } from "./TokenLive";
 
 const TABS = ["Trades", "Activity", "Top traders", "Holders"] as const;
 type Tab = (typeof TABS)[number];
+
+// the live endpoint carries this many of each
+const LIVE_TRADES = 25;
+const LIVE_TRADERS = 10;
+type LoadState = "idle" | "loading" | "error";
+
+function mergeTrades(...lists: TradeRow[][]): TradeRow[] {
+  const m = new Map<string, TradeRow>();
+  for (const l of lists) for (const t of l) m.set(`${t.signature}:${t.eventIndex}`, t);
+  return [...m.values()].sort((a, b) => b.slot - a.slot || b.seq - a.seq);
+}
 
 const solscan = (path: string) => `https://solscan.io/${path}`;
 
@@ -29,10 +43,54 @@ function Bar({ buy, sell }: { buy: number; sell: number }) {
   );
 }
 
-export function TokenInsights({ symbol, quoteSymbol }: { symbol: string; quoteSymbol: string }) {
+export function TokenInsights({ mint, symbol, quoteSymbol }: { mint: string; symbol: string; quoteSymbol: string }) {
   const live = useTokenLive();
   const [tab, setTab] = useState<Tab>("Trades");
   const [win, setWin] = useState("24h");
+  const [older, setOlder] = useState<TradeRow[]>([]);
+  const [olderDone, setOlderDone] = useState(false);
+  const [olderState, setOlderState] = useState<LoadState>("idle");
+  const [moreTraders, setMoreTraders] = useState<Trader[]>([]);
+  const [tradersNext, setTradersNext] = useState<number | null>(LIVE_TRADERS);
+  const [tradersState, setTradersState] = useState<LoadState>("idle");
+
+  // once paging back, keep every live snapshot so trades that scroll out of the newest 25 stay listed
+  useEffect(() => {
+    const t = live?.trades;
+    if (t) setOlder((o) => (o.length ? mergeTrades(o, t) : o));
+  }, [live]);
+
+  const liveTrades = live?.trades ?? [];
+  const trades = older.length ? mergeTrades(liveTrades, older) : liveTrades;
+  const liveWallets = new Set((live?.traders ?? []).map((t) => t.wallet));
+  const traders = [...(live?.traders ?? []), ...moreTraders.filter((t) => !liveWallets.has(t.wallet))];
+
+  async function loadOlder() {
+    const last = trades.at(-1);
+    if (!last || olderState === "loading") return;
+    setOlderState("loading");
+    try {
+      const r = await getJson<{ trades: TradeRow[]; next: string | null }>(`/api/trades/${mint}?before=${last.slot}:${last.seq}&limit=${LIVE_TRADES}`);
+      setOlder((o) => mergeTrades(o, liveTrades, r.trades));
+      if (!r.next) setOlderDone(true);
+      setOlderState("idle");
+    } catch {
+      setOlderState("error");
+    }
+  }
+
+  async function loadTraders() {
+    if (tradersNext === null || tradersState === "loading") return;
+    setTradersState("loading");
+    try {
+      const r = await getJson<{ traders: Trader[]; nextOffset: number | null }>(`/api/token/${mint}/traders?offset=${tradersNext}&limit=${LIVE_TRADERS}`);
+      setMoreTraders((m) => [...m, ...r.traders.filter((t) => !m.some((x) => x.wallet === t.wallet))]);
+      setTradersNext(r.nextOffset);
+      setTradersState("idle");
+    } catch {
+      setTradersState("error");
+    }
+  }
   const usd = live?.quoteUsd ?? null;
   const value = (q: number) => (usd !== null ? `$${fmtPrice(q * usd)}` : `${fmtPrice(q)} ${quoteSymbol}`);
   const compact = (q: number) => (usd !== null ? `$${fmtCompact(q * usd)}` : `${fmtCompact(q)} ${quoteSymbol}`);
@@ -65,7 +123,7 @@ export function TokenInsights({ symbol, quoteSymbol }: { symbol: string; quoteSy
           <div className="hidden md:grid grid-cols-[64px_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.4fr)_90px] gap-6 pb-2 text-[12px] text-faint">
             <span>Side</span><span className="text-right">{symbol}</span><span className="text-right">Value</span><span>Wallet</span><span className="text-right">When</span>
           </div>
-          {!live || live.trades.length === 0 ? <p className="m-0 py-6 border-t line text-muted text-sm">No trades yet.</p> : live.trades.map((t) => (
+          {!live || trades.length === 0 ? <p className="m-0 py-6 border-t line text-muted text-sm">No trades yet.</p> : trades.map((t) => (
             <div key={`${t.signature}:${t.eventIndex}`} className="grid grid-cols-[52px_minmax(0,1fr)_auto] md:grid-cols-[64px_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.4fr)_90px] gap-3 md:gap-6 items-center py-2.5 border-t line text-sm font-mono">
               <span className={`font-sans font-semibold ${t.side === "buy" ? "text-lime" : "text-burn"}`}>{t.side === "buy" ? "Buy" : "Sell"}</span>
               <span className="md:text-right truncate">{fmtCompact(t.amount)}</span>
@@ -74,6 +132,9 @@ export function TokenInsights({ symbol, quoteSymbol }: { symbol: string; quoteSy
               <a href={solscan(`tx/${t.signature}`)} target="_blank" rel="noreferrer" className="hidden md:block text-right text-muted hover:text-ink">{fmtAgo(t.at)}</a>
             </div>
           ))}
+          {liveTrades.length >= LIVE_TRADES && (
+            <LoadMore done={olderDone} state={olderState} onMore={loadOlder} label="Load older trades" doneText="No older trades" />
+          )}
         </div>
       )}
 
@@ -103,7 +164,7 @@ export function TokenInsights({ symbol, quoteSymbol }: { symbol: string; quoteSy
           <div className="hidden md:grid grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)] gap-6 pb-2 text-[12px] text-faint">
             <span>Wallet</span><span className="text-right">Bought</span><span className="text-right">Sold</span><span className="text-right">Holding</span><span className="text-right">Profit</span>
           </div>
-          {!live || live.traders.length === 0 ? <p className="m-0 py-6 border-t line text-muted text-sm">No trades yet.</p> : live.traders.map((t) => (
+          {!live || traders.length === 0 ? <p className="m-0 py-6 border-t line text-muted text-sm">No trades yet.</p> : traders.map((t) => (
             <div key={t.wallet} className="grid grid-cols-[minmax(0,1fr)_auto] md:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)] gap-3 md:gap-6 items-center py-2.5 border-t line text-sm font-mono">
               <span className="min-w-0 flex flex-col gap-0.5"><Wallet address={t.wallet} tag={tagFor(t.wallet)} /><span className="text-[12px] text-faint font-sans">{t.trades} {t.trades === 1 ? "trade" : "trades"}, first {fmtAgo(t.firstAt)}</span></span>
               <span className="hidden md:flex flex-col items-end"><span>{value(t.spent)}</span><span className="text-[12px] text-muted">{fmtCompact(t.bought)} {symbol}</span></span>
@@ -112,6 +173,9 @@ export function TokenInsights({ symbol, quoteSymbol }: { symbol: string; quoteSy
               <span className={`text-right ${t.pnl >= 0 ? "text-lime" : "text-burn"}`}>{t.pnl >= 0 ? "+" : "-"}{value(Math.abs(t.pnl))}</span>
             </div>
           ))}
+          {(live?.traders.length ?? 0) >= LIVE_TRADERS && (
+            <LoadMore done={tradersNext === null} state={tradersState} onMore={loadTraders} doneText="No more traders" />
+          )}
           <p className="m-0 pt-3 text-[12px] text-faint">Profit uses each wallet&apos;s average buy price and today&apos;s price for what it still holds. Tokens moved in from elsewhere are not counted.</p>
         </div>
       )}
