@@ -39,8 +39,9 @@ test.skipIf(!up)("user stake, pending rewards, claim, early exit and claim after
   await run(kamino.buildCreateFarm(stakeMint.toBase58(), farm.secretKey));
   await run(kamino.buildConfigureFarm({
     farm: f, stakeMint: stakeMint.toBase58(), lockSeconds: 120, maxPenaltyBps: 3000,
-    spillAccount: getAssociatedTokenAddressSync(stakeMint, spill.publicKey).toBase58(), rewardMints: rewards.map((m) => m.toBase58()),
+    spillAccount: getAssociatedTokenAddressSync(stakeMint, spill.publicKey).toBase58(),
   }));
+  await run(kamino.buildAddRewards(f, rewards.map((m) => m.toBase58())));
   const kr = await getOrCreateAssociatedTokenAccount(conn, keeper, rewards[0]!, keeper.publicKey);
   await mintTo(conn, keeper, rewards[0]!, kr.address, keeper, 10_000_000n);
   const rs = await kamino.rewardState(f, rewards[0]!.toBase58());

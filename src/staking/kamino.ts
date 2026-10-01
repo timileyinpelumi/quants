@@ -5,6 +5,7 @@ import { address, createNoopSigner, createSolanaRpc, none } from "@solana/kit";
 import Decimal from "decimal.js";
 import type { StakePosition, StakingAdapter } from "./adapter";
 import { fromKitInstruction, kitSigner, type SolanaChain } from "../chain/solana";
+import { REWARDS_PER_TX } from "../domain/launch-cost";
 
 const TOKEN_PROGRAM = address(TOKEN_PROGRAM_ID.toBase58());
 const WAD = 10n ** 18n;
@@ -18,7 +19,7 @@ export class KaminoBackend implements StakingAdapter {
     this.farms = new Farms(createSolanaRpc(rpcUrl));
   }
 
-  capabilities() { return { earlyExit: true, tiersOnChain: false }; }
+  capabilities() { return { earlyExit: true, tiersOnChain: false, rewardsPerTx: REWARDS_PER_TX }; }
 
   private async state(farm: string) {
     const [f] = await this.farms.getAllFarmStatesByPubkeys([address(farm)]);
@@ -32,17 +33,25 @@ export class KaminoBackend implements StakingAdapter {
     return this.chain.signLegacy(new Transaction().add(...ixs.map(fromKitInstruction)), [farm]);
   }
 
-  async buildConfigureFarm(i: { farm: string; stakeMint: string; lockSeconds: number; maxPenaltyBps: number; spillAccount: string; rewardMints: string[] }) {
+  async buildAddRewards(farm: string, rewardMints: string[]) {
+    const admin = kitSigner(this.chain.keeper);
+    const tx = new Transaction();
+    for (const m of rewardMints) tx.add(fromKitInstruction(await this.farms.addRewardToFarmIx(admin, address(this.globalConfig), address(farm), address(m), TOKEN_PROGRAM)));
+    return this.chain.signLegacy(tx, []);
+  }
+
+  async farmRewardMints(farm: string) {
+    return (await this.state(farm)).rewardInfos.map((r) => r.token.mint as string).filter((m) => m !== EMPTY_MINT);
+  }
+
+  async buildConfigureFarm(i: { farm: string; stakeMint: string; lockSeconds: number; maxPenaltyBps: number; spillAccount: string }) {
     const admin = kitSigner(this.chain.keeper);
     const farm = address(i.farm);
-    const first = address(i.rewardMints[0]!);
+    // Farm-level options ignore the mint; newFarm=true skips the reward index lookup.
+    const cfg = async (mode: FarmConfigOption, value: number | bigint | ReturnType<typeof address>) =>
+      fromKitInstruction(await this.farms.updateFarmConfigIx(admin, farm, address(EMPTY_MINT), mode, value, -1, undefined, true));
     const tx = new Transaction().add(
       createAssociatedTokenAccountIdempotentInstruction(this.chain.keeper.publicKey, new PublicKey(i.spillAccount), this.chain.spill.publicKey, new PublicKey(i.stakeMint)),
-    );
-    for (const m of i.rewardMints) tx.add(fromKitInstruction(await this.farms.addRewardToFarmIx(admin, address(this.globalConfig), farm, address(m), TOKEN_PROGRAM)));
-    const cfg = async (mode: FarmConfigOption, value: number | bigint | ReturnType<typeof address>) =>
-      fromKitInstruction(await this.farms.updateFarmConfigIx(admin, farm, first, mode, value, -1, undefined, true));
-    tx.add(
       await cfg(FarmConfigOption.LockingMode, 1),
       await cfg(FarmConfigOption.LockingDuration, i.lockSeconds),
       await cfg(FarmConfigOption.LockingEarlyWithdrawalPenaltyBps, i.maxPenaltyBps),

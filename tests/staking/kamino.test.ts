@@ -35,8 +35,9 @@ test.skipIf(!up)("create, configure, fund, early exit, collect penalty", async (
   expect(await kamino.farmExists(farm.publicKey.toBase58())).toBe(true);
   await run(kamino.buildConfigureFarm({
     farm: farm.publicKey.toBase58(), stakeMint: stakeMint.toBase58(), lockSeconds: 60, maxPenaltyBps: 3000,
-    spillAccount, rewardMints: rewards.map((m) => m.toBase58()),
+    spillAccount,
   }));
+  await run(kamino.buildAddRewards(farm.publicKey.toBase58(), rewards.map((m) => m.toBase58())));
 
   const ata = await getOrCreateAssociatedTokenAccount(conn, keeper, stakeMint, user.publicKey);
   await mintTo(conn, keeper, stakeMint, ata.address, keeper, 100_000_000n);
@@ -80,8 +81,9 @@ test.skipIf(!up)("funds a SOL reward from the keeper's native balance", async ()
   await run(kamino.buildCreateFarm(stakeMint.toBase58(), farm.secretKey));
   await run(kamino.buildConfigureFarm({
     farm: farm.publicKey.toBase58(), stakeMint: stakeMint.toBase58(), lockSeconds: 60, maxPenaltyBps: 3000,
-    spillAccount: getAssociatedTokenAddressSync(stakeMint, spill.publicKey).toBase58(), rewardMints: [SOL],
+    spillAccount: getAssociatedTokenAddressSync(stakeMint, spill.publicKey).toBase58(),
   }));
+  await run(kamino.buildAddRewards(farm.publicKey.toBase58(), [SOL]));
   const rs = await kamino.rewardState(farm.publicKey.toBase58(), SOL);
   await run(kamino.buildFund({ farm: farm.publicKey.toBase58(), rewardMint: SOL, amount: 500_000_000n, rawRps: kaminoRawRps(500_000_000n, 3_600, rs.rpsDecimals), decimals: rs.decimals }));
   expect((await kamino.rewardState(farm.publicKey.toBase58(), SOL)).available).toBe(500_000_000n);

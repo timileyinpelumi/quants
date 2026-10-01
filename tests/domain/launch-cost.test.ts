@@ -1,14 +1,21 @@
 import { test, expect } from "bun:test";
-import { launchCost, FARM_RENT, TOKEN_ACCOUNT_RENT } from "../../src/domain/launch-cost";
+import { launchCost, FARM_RENT, TOKEN_ACCOUNT_RENT, TX_FEE } from "../../src/domain/launch-cost";
 import { defaultSettings } from "../../src/domain/settings";
 
-test("the launch fee is the platform fee plus rent for one farm per lock tier and its reward vaults", () => {
+test("the launch fee is the platform fee plus farm setup for every lock tier", () => {
   const s = defaultSettings("OURS");
   const c = launchCost(s, 3);
-  const perFarm = FARM_RENT + TOKEN_ACCOUNT_RENT * 7n; // stake vault plus a reward vault and a treasury vault per reward
-  expect(c.rent).toBe(BigInt(s.tiers.length) * perFarm);
+  // Farm account, stake vault and a reward vault per reward; create (two signers), one reward batch, configure.
+  const perFarm = FARM_RENT + TOKEN_ACCOUNT_RENT * 4n + 2n * TX_FEE * 4n;
+  // One treasury vault per reward mint and the spill account, shared by every farm of the launch.
+  const perLaunch = TOKEN_ACCOUNT_RENT * 4n;
+  expect(c.rent).toBe(BigInt(s.tiers.length) * perFarm + perLaunch);
   expect(c.total).toBe(s.launchFeeLamports + c.rent);
-  expect(launchCost(s, 10).rent).toBeGreaterThan(c.rent);
+});
+
+test("ten rewards take two reward batches per farm", () => {
+  const s = { launchFeeLamports: 0n, tiers: [{ id: "7d", lockSeconds: 604_800, multiplierBps: 10_000 }] };
+  expect(launchCost(s, 10).rent).toBe(FARM_RENT + TOKEN_ACCOUNT_RENT * 11n + 2n * TX_FEE * 5n + TOKEN_ACCOUNT_RENT * 11n);
 });
 
 test("default lock tiers start at 12 hours", () => {

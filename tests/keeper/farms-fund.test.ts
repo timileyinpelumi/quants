@@ -47,6 +47,30 @@ test("a retried farm creation reuses the stored farm keypair", async () => {
   expect(b.farm).toBe(a.farm);
 });
 
+test("adds rewards in batches sized for one transaction and skips rewards already on the farm", async () => {
+  const f = await keeperFixture();
+  const staking = new FakeStaking(f.chain);
+  const deps = { ...f.deps, staking };
+  const id = await insertLaunch(f.sql);
+  await pendingPool(f.sql, id);
+  const mints = Array.from({ length: 9 }, (_, i) => `R${i}`);
+  for (const m of mints) await f.sql`insert into baskets values (${id}, ${m}, 1000)`;
+  const [launch] = await loadLaunches(f.sql, deps.ourtokenMint);
+  f.chain.nextOutcome = "unknown";
+  await createFarmsStep(deps, launch!, f.settings, "r1");
+  const [first] = await f.sql`select detail->>'farm' as farm from distributions where kind = 'create_farm' order by id limit 1`;
+  staking.farms.add(first.farm);
+  staking.rewards.set(first.farm, ["R0", "R1", "R2", "R3"]);
+  f.chain.height += 1_000n;
+  f.chain.nextOutcome = "confirmed";
+  expect(await createFarmsStep(deps, launch!, f.settings, "r2")).toBe("ready");
+  const farms = await f.sql`select farm from stake_tiers where launch_id = ${id} order by lock_seconds`;
+  for (const t of farms) expect([...staking.rewards.get(t.farm)!].sort()).toEqual(["R0", "R1", "R2", "R3", "R4", "R5", "R6", "R7", "R8", "ZEC"]);
+  for (const b of staking.rewardBatches) expect(b.length).toBeLessThanOrEqual(staking.capabilities().rewardsPerTx);
+  expect(staking.rewardBatches.flat().filter((m) => m === "R0").length).toBe(1);
+  expect(f.chain.sent.filter((s) => s.startsWith("configure_farm")).length).toBe(2);
+});
+
 test("fund allocates by stake times multiplier and sets rate over the period", async () => {
   const f = await keeperFixture();
   const staking = new FakeStaking(f.chain);

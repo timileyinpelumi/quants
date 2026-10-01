@@ -30,12 +30,13 @@ export async function createFarmsStep(deps: KeeperDeps, launch: LaunchRow, s: Ve
           build: () => deps.staking.buildCreateFarm(launch.mint, secret), resolve: async () => [],
         });
     if (created !== "confirmed") { allDone = false; continue; }
+    if (!(await addRewards(deps, launch, s, t.tier_id, farm, rewardMints))) { allDone = false; continue; }
     const configured = await runTxStep(deps.sql, deps.chain, {
       launchId: launch.id, idemKey: `configure_farm:${launch.id}:${t.tier_id}`, kind: "configure_farm", settingsVersion: s.version,
       detail: { farm },
       build: () => deps.staking.buildConfigureFarm({
         farm, stakeMint: launch.mint, lockSeconds: t.lock_seconds, maxPenaltyBps: pool.max_penalty_bps,
-        spillAccount: pool.spill_account, rewardMints,
+        spillAccount: pool.spill_account,
       }),
       resolve: async () => [],
     });
@@ -45,4 +46,27 @@ export async function createFarmsStep(deps: KeeperDeps, launch: LaunchRow, s: Ve
   if (!allDone) return "pending";
   await deps.sql`update stake_pools set status = 'ready' where launch_id = ${launch.id}`;
   return "ready";
+}
+
+// Batches are keyed by position in the sorted basket and each build leaves out mints already on the farm,
+// so a retry never registers a reward twice.
+async function addRewards(deps: KeeperDeps, launch: LaunchRow, s: VersionedSettings, tierId: string, farm: string, rewardMints: string[]) {
+  const size = deps.staking.capabilities().rewardsPerTx;
+  let onChain = new Set(await deps.staking.farmRewardMints(farm));
+  let done = true;
+  for (let i = 0; i < rewardMints.length; i += size) {
+    const batch = rewardMints.slice(i, i + size);
+    if (batch.every((m) => onChain.has(m))) continue;
+    const r = await runTxStep(deps.sql, deps.chain, {
+      launchId: launch.id, idemKey: `add_rewards:${launch.id}:${tierId}:${i / size}`, kind: "configure_farm", settingsVersion: s.version,
+      detail: { farm, rewardMints: batch },
+      build: async () => {
+        onChain = new Set(await deps.staking.farmRewardMints(farm));
+        return deps.staking.buildAddRewards(farm, batch.filter((m) => !onChain.has(m)));
+      },
+      resolve: async () => [],
+    });
+    if (r !== "confirmed") done = false;
+  }
+  return done;
 }
