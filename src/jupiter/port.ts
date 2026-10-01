@@ -1,4 +1,5 @@
-import { VersionedTransaction } from "@solana/web3.js";
+import { ComputeBudgetProgram, PublicKey, SystemProgram, VersionedTransaction } from "@solana/web3.js";
+import { ASSOCIATED_TOKEN_PROGRAM_ID, NATIVE_MINT, TOKEN_2022_PROGRAM_ID, getAssociatedTokenAddressSync } from "@solana/spl-token";
 import type { SignedTx } from "../chain/port";
 import type { SolanaChain } from "../chain/solana";
 
@@ -19,6 +20,50 @@ const keepClassicVerified = (rows: TokenRow[]): VerifiedToken[] => rows
   .filter((t) => t.isVerified === true && t.tokenProgram === CLASSIC_TOKEN_PROGRAM)
   .map((t) => ({ mint: t.id, symbol: t.symbol, name: t.name, icon: t.icon ?? null, decimals: t.decimals, tokenProgram: t.tokenProgram! }));
 type TokenRow = { id: string; symbol: string; name: string; icon?: string | null; decimals: number; tags?: string[]; isVerified?: boolean; tokenProgram?: string };
+
+const JUPITER_V6 = "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4";
+const COMPUTE_BUDGET = ComputeBudgetProgram.programId.toBase58();
+const TOKEN_2022 = TOKEN_2022_PROGRAM_ID.toBase58();
+const ASSOCIATED_TOKEN = ASSOCIATED_TOKEN_PROGRAM_ID.toBase58();
+const SYSTEM = SystemProgram.programId.toBase58();
+const SYNC_NATIVE = 17, CLOSE_ACCOUNT = 9, SYSTEM_TRANSFER = 2;
+
+/** Throws unless the swap only touches Jupiter, compute budget, token account plumbing and the keeper's own SOL wrapping. */
+export function assertSafeSwap(tx: VersionedTransaction, keeper: PublicKey) {
+  const msg = tx.message;
+  const keys = msg.staticAccountKeys.map((k) => k.toBase58());
+  const me = keeper.toBase58();
+  const wsol = getAssociatedTokenAddressSync(NATIVE_MINT, keeper).toBase58();
+  if (keys[0] !== me) throw new Error(`swap refused: fee payer ${keys[0]} is not the keeper`);
+  // Accounts that come from lookup tables cannot be checked here, so checked instructions must use static keys.
+  const acct = (ix: { accountKeyIndexes: number[] }, i: number, what: string) => {
+    const k = keys[ix.accountKeyIndexes[i]!];
+    if (!k) throw new Error(`swap refused: ${what} instruction uses an account outside the static keys`);
+    return k;
+  };
+  for (const ix of msg.compiledInstructions) {
+    const program = keys[ix.programIdIndex];
+    const data = Buffer.from(ix.data);
+    if (program === JUPITER_V6 || program === COMPUTE_BUDGET) continue;
+    if (program === SYSTEM) {
+      const ok = data.length === 12 && data.readUInt32LE(0) === SYSTEM_TRANSFER && acct(ix, 0, "System") === me && acct(ix, 1, "System") === wsol;
+      if (!ok) throw new Error("swap refused: System instruction other than wrapping SOL into the keeper's wSOL account");
+      continue;
+    }
+    if (program === CLASSIC_TOKEN_PROGRAM || program === TOKEN_2022) {
+      const ok = (data.length === 1 && data[0] === SYNC_NATIVE)
+        || (data.length === 1 && data[0] === CLOSE_ACCOUNT && acct(ix, 1, "Token") === me && acct(ix, 2, "Token") === me);
+      if (!ok) throw new Error("swap refused: Token instruction other than sync or closing to the keeper");
+      continue;
+    }
+    if (program === ASSOCIATED_TOKEN) {
+      const ok = (data.length === 0 || (data.length === 1 && data[0]! <= 1)) && acct(ix, 0, "Associated Token") === me && acct(ix, 2, "Associated Token") === me;
+      if (!ok) throw new Error("swap refused: Associated Token instruction not creating a keeper account");
+      continue;
+    }
+    throw new Error(`swap refused: program ${program} is not allowed`);
+  }
+}
 
 export class JupiterLive implements JupiterPort {
   private tokensBase: string;
@@ -51,6 +96,7 @@ export class JupiterLive implements JupiterPort {
   async buildSwap(q: SwapQuote): Promise<SignedTx> {
     const { swapTransaction, lastValidBlockHeight } = await this.swapTx(q, this.chain.keeper.publicKey.toBase58());
     const tx = VersionedTransaction.deserialize(Buffer.from(swapTransaction, "base64"));
+    assertSafeSwap(tx, this.chain.keeper.publicKey);
     return this.chain.signVersioned(tx, [], BigInt(lastValidBlockHeight));
   }
 
