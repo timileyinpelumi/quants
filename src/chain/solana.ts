@@ -2,12 +2,13 @@ import {
   Connection, Keypair, PublicKey, SystemProgram, Transaction, TransactionInstruction, VersionedTransaction,
 } from "@solana/web3.js";
 import {
-  createAssociatedTokenAccountIdempotentInstruction, createBurnInstruction, createTransferInstruction, getAssociatedTokenAddressSync,
+  createAssociatedTokenAccountIdempotentInstruction, createBurnInstruction, createTransferCheckedInstruction, getAssociatedTokenAddressSync,
 } from "@solana/spl-token";
 import { createNoopSigner, address, type Instruction, type TransactionSigner } from "@solana/kit";
 import bs58 from "bs58";
 import type { ChainPort, SignedTx, SigState } from "./port";
 import { NATIVE_MINT } from "../domain/types";
+import { mintPaused, readMint, TOKEN_2022_PROGRAM } from "./mints";
 
 export const loadKeypair = (json: string) => Keypair.fromSecretKey(Uint8Array.from(JSON.parse(json)));
 export const kitSigner = (kp: Keypair): TransactionSigner => createNoopSigner(address(kp.publicKey.toBase58()));
@@ -21,7 +22,26 @@ export function fromKitInstruction(ix: Instruction): TransactionInstruction {
 }
 
 export class SolanaChain implements ChainPort {
+  // A mint's token program and decimals never change, so they are read once per process.
+  private mints = new Map<string, { program: PublicKey; decimals: number }>();
   constructor(readonly conn: Connection, readonly keeper: Keypair, readonly spill: Keypair) {}
+
+  async mintInfo(mint: string): Promise<{ program: PublicKey; decimals: number } | null> {
+    const hit = this.mints.get(mint);
+    if (hit) return hit;
+    const key = new PublicKey(mint);
+    const info = await this.conn.getAccountInfo(key, "confirmed");
+    if (!info) return null;
+    const { program, decimals } = readMint(key, info);
+    this.mints.set(mint, { program, decimals });
+    return { program, decimals };
+  }
+
+  private async requireMint(mint: string) {
+    const m = await this.mintInfo(mint);
+    if (!m) throw new Error(`mint ${mint} not found`);
+    return m;
+  }
 
   async signLegacy(tx: Transaction, signers: Keypair[]): Promise<SignedTx> {
     const { blockhash, lastValidBlockHeight } = await this.conn.getLatestBlockhash("confirmed");
@@ -91,28 +111,41 @@ export class SolanaChain implements ChainPort {
       tx.add(SystemProgram.transfer({ fromPubkey: this.keeper.publicKey, toPubkey: dest, lamports: amount }));
     } else {
       const m = new PublicKey(mint);
-      const from = getAssociatedTokenAddressSync(m, this.keeper.publicKey);
-      const toAta = getAssociatedTokenAddressSync(m, dest, true);
-      tx.add(createAssociatedTokenAccountIdempotentInstruction(this.keeper.publicKey, toAta, dest, m));
-      tx.add(createTransferInstruction(from, toAta, this.keeper.publicKey, amount));
+      const { program, decimals } = await this.requireMint(mint);
+      const from = getAssociatedTokenAddressSync(m, this.keeper.publicKey, false, program);
+      const toAta = getAssociatedTokenAddressSync(m, dest, true, program);
+      tx.add(createAssociatedTokenAccountIdempotentInstruction(this.keeper.publicKey, toAta, dest, m, program));
+      tx.add(createTransferCheckedInstruction(from, m, toAta, this.keeper.publicKey, amount, decimals, [], program));
     }
     return this.signLegacy(tx, []);
   }
 
   async buildBurn(mint: string, amount: bigint): Promise<SignedTx> {
     const m = new PublicKey(mint);
-    const ata = getAssociatedTokenAddressSync(m, this.spill.publicKey);
-    return this.signLegacy(new Transaction().add(createBurnInstruction(ata, m, this.spill.publicKey, amount)), [this.spill]);
+    const { program } = await this.requireMint(mint);
+    const ata = getAssociatedTokenAddressSync(m, this.spill.publicKey, false, program);
+    return this.signLegacy(new Transaction().add(createBurnInstruction(ata, m, this.spill.publicKey, amount, [], program)), [this.spill]);
   }
 
   async balance(owner: string, mint: string): Promise<bigint> {
     const o = new PublicKey(owner);
     if (mint === NATIVE_MINT) return BigInt(await this.conn.getBalance(o, "confirmed"));
+    const m = await this.mintInfo(mint);
+    if (!m) return 0n;
     try {
-      const r = await this.conn.getTokenAccountBalance(getAssociatedTokenAddressSync(new PublicKey(mint), o, true), "confirmed");
+      const r = await this.conn.getTokenAccountBalance(getAssociatedTokenAddressSync(new PublicKey(mint), o, true, m.program), "confirmed");
       return BigInt(r.value.amount);
     } catch {
       return 0n;
     }
+  }
+
+  async isPaused(mint: string): Promise<boolean> {
+    if (mint === NATIVE_MINT) return false;
+    const m = await this.mintInfo(mint);
+    if (!m || m.program.toBase58() !== TOKEN_2022_PROGRAM) return false;
+    const key = new PublicKey(mint);
+    const info = await this.conn.getAccountInfo(key, "confirmed");
+    return !!info && mintPaused(readMint(key, info).mint);
   }
 }

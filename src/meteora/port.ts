@@ -1,6 +1,9 @@
-import { Keypair, PublicKey, Transaction } from "@solana/web3.js";
+import { Keypair, PublicKey, Transaction, type Connection } from "@solana/web3.js";
 import BN from "bn.js";
-import { DynamicBondingCurveClient, calculateQuoteToBaseFromAmountIn, deriveDbcPoolAddress, deriveDammV2PoolAddress } from "@meteora-ag/dynamic-bonding-curve-sdk";
+import { TOKEN_2022_PROGRAM_ID } from "@solana/spl-token";
+import {
+  DynamicBondingCurveClient, calculateQuoteToBaseFromAmountIn, deriveDbcPoolAddress, deriveDammV2PoolAddress, deriveTokenBadgeAddress,
+} from "@meteora-ag/dynamic-bonding-curve-sdk";
 import { CpAmm, getTokenProgram } from "@meteora-ag/cp-amm-sdk";
 import type { SignedTx } from "../chain/port";
 import type { SolanaChain } from "../chain/solana";
@@ -22,9 +25,22 @@ export interface MeteoraPort {
   buildLaunchTx(input: LaunchTxInput): Promise<{ tx: Transaction; baseMint: Keypair; pool: string }>;
   /** Base units a first buy of `quoteAmount` takes from a fresh curve, before fees (an upper bound on what it receives). */
   firstBuyMaxOut(configKey: string, quoteAmount: bigint): Promise<bigint>;
+  /** Quote base units the curve of this config raises before it graduates. */
+  configThreshold(configKey: string): Promise<bigint>;
 }
 
 const pk = (s: string) => new PublicKey(s);
+
+/**
+ * DBC rejects Token-2022 quote mints with extensions unless the config and each pool pass the mint's token badge,
+ * which Meteora creates per mint. A Token-2022 mint without a badge (a plain local mint) is passed without one.
+ */
+export async function quoteTokenBadge(conn: Pick<Connection, "getAccountInfo">, quoteMint: PublicKey): Promise<PublicKey | undefined> {
+  const info = await conn.getAccountInfo(quoteMint, "confirmed");
+  if (!info?.owner.equals(TOKEN_2022_PROGRAM_ID)) return undefined;
+  const badge = deriveTokenBadgeAddress(quoteMint);
+  return (await conn.getAccountInfo(badge, "confirmed")) ? badge : undefined;
+}
 
 export class MeteoraLive implements MeteoraPort {
   private dbc: DynamicBondingCurveClient;
@@ -102,13 +118,19 @@ export class MeteoraLive implements MeteoraPort {
     return BigInt(r.outputAmount.toString());
   }
 
+  async configThreshold(configKey: string) {
+    const cfg = await this.dbc.state.getPoolConfig(configKey);
+    if (!cfg) throw new Error(`config ${configKey} not found`);
+    return BigInt(cfg.migrationQuoteThreshold.toString());
+  }
+
   async buildLaunchTx(input: LaunchTxInput) {
     const baseMint = Keypair.generate();
     const creator = pk(input.creator);
     const create = await this.dbc.creator.createPoolWithFirstBuy({
       createPoolParam: {
         name: input.name, symbol: input.symbol, uri: input.uri, payer: creator, poolCreator: creator,
-        config: pk(input.configKey), baseMint: baseMint.publicKey,
+        config: pk(input.configKey), baseMint: baseMint.publicKey, tokenBadge: await quoteTokenBadge(this.chain.conn, pk(input.quoteMint)),
       },
       firstBuyParam: input.devBuyQuoteAmount > 0n
         ? { buyer: creator, buyAmount: new BN(input.devBuyQuoteAmount.toString()), minimumAmountOut: new BN(input.devBuyMinOut.toString()), referralTokenAccount: null }

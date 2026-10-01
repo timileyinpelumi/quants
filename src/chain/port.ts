@@ -8,4 +8,6 @@ export interface ChainPort {
   buildTransfer(mint: string, to: string, amount: bigint): Promise<SignedTx>;
   buildBurn(mint: string, amount: bigint): Promise<SignedTx>;
   balance(owner: string, mint: string): Promise<bigint>;
+  /** True while a Token-2022 mint with the pausable extension is paused; transfers of it fail until resumed. */
+  isPaused(mint: string): Promise<boolean>;
 }

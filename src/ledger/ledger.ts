@@ -70,10 +70,25 @@ export async function retryFailed(sql: SQL, id: number) {
     where id = ${id} and status = 'failed'`;
 }
 
-// Abandoned rows never reached the chain, so they do not count toward the retry cap.
+export const MINT_PAUSED = "mint paused";
+
+/**
+ * A send the RPC refused in preflight because the mint is paused never reached the chain: it gives back its attempt
+ * and its signature is kept but marked expired, so a later survey still sees it if it ever lands.
+ */
+export async function releasePaused(sql: SQL, id: number, signature: string) {
+  await sql`update distributions set status = 'failed', error = ${MINT_PAUSED}, signature = null, last_valid_block_height = null,
+    attempts = greatest(attempts - 1, 0), updated_at = now(),
+    detail = jsonb_set(detail, '{signatures}', (
+      select coalesce(jsonb_agg(case when e->>'signature' = ${signature} then jsonb_set(e, '{lastValidBlockHeight}', '"0"') else e end), '[]'::jsonb)
+      from jsonb_array_elements(coalesce(detail->'signatures', '[]'::jsonb)) e))
+    where id = ${id} and status = 'sent'`;
+}
+
+// Abandoned rows and paused mints never reached the chain, so they do not count toward the retry cap.
 export async function failuresSinceConfirmed(sql: SQL, stepKey: string): Promise<number> {
   const [r] = await sql`select count(*)::int as n from distributions
-    where step_key = ${stepKey} and status = 'failed' and coalesce(error, '') <> 'abandoned before send'
+    where step_key = ${stepKey} and status = 'failed' and coalesce(error, '') not in ('abandoned before send', ${MINT_PAUSED})
       and id > coalesce((select max(id) from distributions where step_key = ${stepKey} and status = 'confirmed'), 0)`;
   return r.n;
 }

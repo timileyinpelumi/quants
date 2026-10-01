@@ -67,6 +67,21 @@ test("the first buy cap is checked against the curve quote, not the client's min
   expect(meteora.firstBuyQuotes.at(-1)).toEqual({ configKey: "CfgSol200", amount: cap / 1_000n });
 });
 
+test("a stock pair is trading only: no basket, and a basket is refused", async () => {
+  const { sql, meteora } = await setup();
+  const STOCK = "Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh";
+  const deps = { sql, meteora, configKeys: { ...configKeys, [`${STOCK}:200`]: "CfgStock200" }, quoteMints: [NATIVE_MINT, STOCK], tradingOnlyMints: [STOCK],
+    isVerified: async () => { throw new Error("no basket check for a trading only pair"); }, tokenProgramOf: async () => "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb" };
+  const r = await prepareLaunch(deps, { ...valid, quoteMint: STOCK, basket: [] });
+  expect(meteora.launches.at(-1)!.configKey).toBe("CfgStock200");
+  const [row] = await sql`select trading_only, basket from prepared_launches where mint = ${r.mint}`;
+  expect(row.trading_only).toBe(true);
+  expect(row.basket).toEqual([]);
+  const noBasket = await prepareLaunch(deps, { ...valid, quoteMint: STOCK, basket: undefined });
+  expect(noBasket.mint).toBeDefined();
+  await expect(prepareLaunch(deps, { ...valid, quoteMint: STOCK })).rejects.toMatchObject({ code: "invalid_input", message: expect.stringContaining("no reward basket") });
+});
+
 test("rejects basket tokens that are not classic SPL tokens", async () => {
   const { deps } = await setup(true, "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb");
   await expect(prepareLaunch(deps, valid)).rejects.toMatchObject({ code: "basket_unsupported" });
