@@ -28,8 +28,8 @@ export function ExploreList({ initial, nextOffset, query }: { initial: TokenRow[
         <Link key={t.mint} href={`/t/${t.mint}`} className={`grid grid-cols-[minmax(0,1fr)_auto] ${COLS} gap-3 md:gap-6 items-center py-3.5 border-t line hover:bg-white/[0.02]`}>
           <span className="flex items-center gap-3 min-w-0">
             <Avatar seed={t.mint} label={t.symbol} image={t.image} size={44} />
-            <span className="flex flex-col min-w-0">
-              <span className="flex items-baseline gap-2 min-w-0">
+            <span className="flex flex-1 flex-col min-w-0">
+              <span className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 min-w-0">
                 <span className="font-display font-bold text-lg truncate">{t.symbol}</span>
                 <span className="font-mono text-[12px] text-faint shrink-0">{fmtAgo(t.createdAt)}</span>
                 <StakingAt pct={t.stakingPct} tradingOnly={t.tradingOnly} />

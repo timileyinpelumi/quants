@@ -94,7 +94,7 @@ export function TokenPicker({ open, onClose, onPick, taken, max }: {
                 className={`w-full grid grid-cols-[40px_minmax(0,1fr)_auto] gap-3 items-center px-3 py-3 rounded-2xl text-left cursor-pointer disabled:opacity-40 disabled:cursor-default min-h-14 ${on ? "bg-accent/[0.08]" : "hover:bg-white/[0.04]"}`}
               >
                 <Avatar seed={t.mint} label={t.symbol} image={t.icon} size={40} />
-                <span className="flex flex-col min-w-0">
+                <span className="flex flex-1 flex-col min-w-0">
                   <span className="font-semibold truncate">{t.symbol}</span>
                   <span className="text-[13px] text-muted truncate">{t.name} · <span className="font-mono">{shortAddr(t.mint)}</span></span>
                 </span>

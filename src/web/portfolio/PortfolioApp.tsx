@@ -116,7 +116,7 @@ export function PortfolioApp() {
               const inner = (
                 <>
                   <Avatar seed={t.mint} label={t.symbol ?? "?"} image={t.image} />
-                  <span className="flex flex-col min-w-0">
+                  <span className="flex flex-1 flex-col min-w-0">
                     <span className="font-semibold truncate">{t.symbol ?? shortAddr(t.mint)}</span>
                     <span className="text-[13px] text-muted truncate">{t.name ?? shortAddr(t.mint)}</span>
                   </span>

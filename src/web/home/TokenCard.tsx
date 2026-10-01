@@ -28,7 +28,7 @@ export function TokenCard({ t }: { t: TokenRow }) {
       <div className="flex items-center gap-3 min-w-0">
         <Avatar seed={t.mint} label={t.symbol} image={t.image} size={52} />
         <span className="flex flex-1 flex-col min-w-0 gap-0.5">
-          <span className="flex items-baseline gap-2 min-w-0">
+          <span className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 min-w-0">
             <span className="font-display font-bold text-lg truncate">{t.symbol}</span>
             <span className="font-mono text-[11px] text-faint shrink-0">{fmtAgo(t.createdAt)}</span>
             {t.tradingOnly && <TradingOnly />}

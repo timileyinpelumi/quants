@@ -35,7 +35,7 @@ export function Header({ active }: { active: HeaderKey }) {
         <nav aria-label="Main" className="hidden lg:flex gap-7 text-[15px] font-medium shrink-0">
           {links.map((l) => <Link key={l.href} href={l.href} className={cls(l.key)}>{l.label}</Link>)}
         </nav>
-        <Search className="hidden md:block flex-1 max-w-md" />
+        <Search className="hidden md:block flex-1 min-w-44 max-w-md" />
         <div className="ml-auto flex items-center gap-2.5 shrink-0">
           <Link href="/launch" className={`hidden sm:flex items-center gap-1.5 font-display font-bold rounded-full px-5 min-h-11 ${active === "launch" ? "bg-raised-2 border border-white/10" : "text-ground bg-accent"}`}>
             <span aria-hidden className="text-lg leading-none">+</span> Launch

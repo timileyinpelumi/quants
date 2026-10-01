@@ -20,7 +20,7 @@ export function StakerTokensList({ initial, nextOffset }: { initial: StakerToken
         <Link key={t.mint} href={`/t/${t.mint}`} className="grid grid-cols-[28px_40px_minmax(0,1fr)_auto] gap-3 items-center py-3 border-t line hover:bg-white/[0.02]">
           <span className="font-mono text-sm text-faint">{i + 1}</span>
           <Avatar seed={t.mint} label={t.symbol} image={t.image} size={40} />
-          <span className="flex flex-col min-w-0">
+          <span className="flex flex-1 flex-col min-w-0">
             <span className="font-display font-bold truncate">{t.symbol}</span>
             <span className="text-[12px] text-muted truncate">Pays {t.basket.join(", ")}</span>
           </span>
@@ -45,7 +45,7 @@ export function PaymentsList({ initial, next }: { initial: PricedPayment[]; next
     <>
       {paged.items.map((p) => (
         <div key={p.id} className="grid grid-cols-[minmax(0,1fr)_auto] gap-3 items-center py-3 border-t line text-sm">
-          <span className="flex flex-col min-w-0">
+          <span className="flex flex-1 flex-col min-w-0">
             <Link href={`/t/${p.mint}`} className="font-display font-bold hover:text-accent truncate">{p.symbol} stakers</Link>
             <span className="font-mono text-[12px] text-muted">{fmtCompact(p.amount)} {p.reward}{p.priceUsd != null ? ` ($${fmtPrice(p.amount * p.priceUsd)})` : ""} added to the farm</span>
           </span>
