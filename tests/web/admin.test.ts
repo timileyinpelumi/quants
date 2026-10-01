@@ -148,6 +148,15 @@ test("basket override replaces a pending launch's basket and is refused once far
   expect((await late.json()).error.message).toBe("Farms already exist for this launch");
 });
 
+test("basket override is refused for a trading only launch", async () => {
+  const c = await makeWebContext();
+  const cookie = cookieOf(await signIn(ADMIN));
+  await c.sql`insert into launches (mint, pool, quote_mint, fee_tier_bps, config_key, creator, status, settings_version, trading_only) values ('MS', 'PS', 'q', 200, 'c', 'cr', 'live', 1, true)`;
+  const r = await basketRoute(withCookie(cookie, { method: "POST", body: JSON.stringify({ mint: "MS", basket: [{ mint: "Zec1111111111111111111111111111111111111111", weightBps: 10000 }] }) }));
+  expect(r.status).toBe(400);
+  expect((await c.sql`select count(*)::int n from baskets`)[0].n).toBe(0);
+});
+
 test("basket override can keep a token that was already in the basket", async () => {
   const c = await makeWebContext();
   const cookie = cookieOf(await signIn(ADMIN));

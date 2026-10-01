@@ -6,6 +6,7 @@ import { fetchBackpack, fetchXStocks, type Fetch, type StockIssuer, type StockLi
 
 const DAY_MS = 86_400_000;
 const MEMORY_MS = 5 * 60_000;
+const RETRY_MS = 3_600_000;
 
 export interface StockRegistryDeps {
   sql: SQL;
@@ -24,6 +25,7 @@ export interface StockRegistryDeps {
 export class StockRegistry {
   private memory: { at: number; list: QuoteCoin[] } | null = null;
   private refreshing: Promise<void> | null = null;
+  private lastTry = -Infinity;
   private now: () => number;
   private log: (msg: string) => void;
   constructor(private d: StockRegistryDeps) {
@@ -43,8 +45,13 @@ export class StockRegistry {
   async list(): Promise<QuoteCoin[]> {
     if (this.memory && this.now() - this.memory.at < MEMORY_MS) return this.memory.list;
     const [r] = await this.d.sql`select max(listed_at) as at from stock_quotes`;
-    if (!r?.at) await this.refresh();
-    else if (this.now() - new Date(r.at).getTime() > DAY_MS) void this.refresh().catch((e) => this.log(`refresh failed: ${e}`));
+    const stale = !r?.at || this.now() - new Date(r.at).getTime() > DAY_MS;
+    // At most one refresh an hour while stale, so an issuer API that is down does not slow every page.
+    if (stale && this.now() - this.lastTry > RETRY_MS) {
+      this.lastTry = this.now();
+      const p = this.refresh().catch((e) => this.log(`refresh failed: ${e}`));
+      if (!r?.at) await p;
+    }
     await this.check();
     const keyed = this.configMints();
     const rows = keyed.size ? await this.d.sql`select * from stock_quotes where ok and mint in ${this.d.sql([...keyed.keys()])} order by symbol` : [];

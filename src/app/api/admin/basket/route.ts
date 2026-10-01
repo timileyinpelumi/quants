@@ -20,8 +20,9 @@ export async function POST(req: Request) {
     const c = getContext();
     await requireAdmin(c, req);
     const b = Body.parse(await readJson(req));
-    const [l] = await c.sql`select l.id from launches l where l.mint = ${b.mint}`;
+    const [l] = await c.sql`select l.id, l.trading_only from launches l where l.mint = ${b.mint}`;
     if (!l) throw new LaunchError("invalid_input", "Token not found");
+    if (l.trading_only) throw new LaunchError("invalid_input", "This token is paired with a stock and has no basket");
     for (const t of b.basket) {
       if ((await c.tokenProgramOf(t.mint)) !== CLASSIC) throw new LaunchError("basket_unsupported", `${t.mint} is not a classic SPL token`);
     }

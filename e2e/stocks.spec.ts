@@ -1,4 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
+import { execSync } from "node:child_process";
 
 const symbol = `S${Math.random().toString(36).slice(2, 8).toUpperCase().replace(/[^A-Z0-9]/g, "X")}`;
 
@@ -17,7 +18,7 @@ test("a token paired with a stock launches trading only", async ({ page }) => {
   await expect(page.getByRole("tab", { name: /xStocks\s*1/ })).toBeVisible();
   await page.getByRole("tab", { name: /xStocks/ }).click();
   await page.getByRole("radio", { name: /NVDAx/ }).click();
-  await expect(page.getByText("No reward basket")).toBeVisible();
+  await expect(page.getByText("No reward basket", { exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: /Add reward tokens/ })).toHaveCount(0);
   await expect(page.getByText("Lock tiers for stakers")).toHaveCount(0);
 
@@ -33,6 +34,15 @@ test("a token paired with a stock launches trading only", async ({ page }) => {
   await expect(page.getByRole("button", { name: "Stake", exact: true })).toHaveCount(0);
   await expect(page.getByText(`Stake ${symbol}, earn`)).toHaveCount(0);
   await expect(page.getByText(/Balance [\d,.]+ NVDAx/)).toBeVisible();
+
+  await page.getByLabel("Amount of NVDAx").fill("5");
+  await expect(page.getByText(/You get about\s*[\d,.]+ /)).toBeVisible();
+  await page.getByRole("button", { name: `Buy ${symbol}` }).click();
+  await expect(page.getByText("Bought. Balances updated.")).toBeVisible();
+
+  // The keeper claims the fee in the stock token, splits it with no basket and pays the treasury, all with Token-2022 transfers.
+  const run = JSON.parse(execSync("bun --env-file=.env.local scripts/keeper-once.ts", { stdio: "pipe", timeout: 180_000 }).toString().trim().split("\n").at(-1)!);
+  expect(run.errors).toEqual([]);
 
   await page.goto("/explore?sort=new");
   await expect(page.getByText("Trading only").first()).toBeVisible();

@@ -98,6 +98,21 @@ test("mints are checked once and lists refresh after a day, keeping the old list
   expect((await down.list()).map((c) => c.symbol)).toEqual(["NVDAx", "SPCX.US"]);
 });
 
+test("with no listing and the issuers down, a refresh is tried at most once an hour", async () => {
+  const sql = await freshDb();
+  let now = Date.parse("2026-10-01T00:00:00Z");
+  const down = setup({ fail: true });
+  const reg = new StockRegistry({ sql, conn: down.conn as any, fetch: down.fetchFn, configKeys: down.configKeys, threshold: async () => 0n, now: () => now, log: () => {} });
+  expect(await reg.list()).toEqual([]);
+  const tries = down.fetches();
+  now += 6 * 60_000;
+  await reg.list();
+  expect(down.fetches()).toBe(tries);
+  now += 3_600_000;
+  await reg.list();
+  expect(down.fetches()).toBe(tries * 2);
+});
+
 test("local listings stand in for the issuers", async () => {
   const sql = await freshDb();
   const s = setup();
