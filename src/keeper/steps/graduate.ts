@@ -3,12 +3,12 @@ import type { LaunchRow } from "../launch-row";
 import type { VersionedSettings } from "../../domain/settings";
 import { runTxStep } from "../../ledger/run-step";
 
-// Meteora's keepers only migrate SOL-quoted curves; OURTOKEN curves are migrated here.
+// Meteora's keepers migrate SOL curves and leave other quotes to us; migrating every full curve covers both and any delay on theirs.
 export async function graduateStep(deps: KeeperDeps, launch: LaunchRow, s: VersionedSettings, _runId: string): Promise<LaunchRow> {
   if (launch.status === "graduated") return launch;
   const curve = await deps.meteora.curveState(launch.pool);
   if (!curve.migrated) {
-    if (curve.complete && launch.ourtoken) {
+    if (curve.complete) {
       await runTxStep(deps.sql, deps.chain, {
         launchId: launch.id, idemKey: `migrate:${launch.id}`, kind: "migrate", settingsVersion: s.version, detail: { pool: launch.pool },
         build: () => deps.meteora.buildMigrate(launch.pool), resolve: async () => [],

@@ -1,16 +1,9 @@
 "use client";
-import { useEffect, useState } from "react";
 import { fmtCompact, fmtPrice } from "@/web/ui/format";
-import type { Market } from "@/web/server/chart";
+import { useTokenLive } from "./TokenLive";
 
-export function MarketStats({ mint, quoteSymbol }: { mint: string; quoteSymbol: string }) {
-  const [m, setM] = useState<Market | null | undefined>(undefined);
-  useEffect(() => {
-    const load = () => fetch(`/api/chart/${mint}?tf=1H`).then((r) => r.json()).then((j) => setM(j.market ?? null)).catch(() => setM((x) => x ?? null));
-    load();
-    const t = setInterval(load, 15_000);
-    return () => clearInterval(t);
-  }, [mint]);
+export function MarketStats({ quoteSymbol }: { quoteSymbol: string }) {
+  const m = useTokenLive()?.market ?? null;
   const dash = <span className="font-sans font-normal text-base text-faint">No trades yet</span>;
   const price = m && (m.priceUsd !== null ? `$${fmtPrice(m.priceUsd)}` : `${fmtPrice(m.price)} ${quoteSymbol}`);
   const cap = m && (m.fdvUsd !== null ? `$${fmtCompact(m.fdvUsd)}` : `${fmtCompact(m.price * 1e9)} ${quoteSymbol}`);
@@ -32,6 +25,28 @@ export function MarketStats({ mint, quoteSymbol }: { mint: string; quoteSymbol: 
         <span className="font-display font-bold text-2xl md:text-[30px]">{m ? vol : dash}</span>
         {m && <span className="font-mono text-sm text-muted">{m.trades24h} {m.trades24h === 1 ? "trade" : "trades"}</span>}
       </div>
+    </>
+  );
+}
+
+export function GraduationBar({ initial, quoteSymbol, quoteDecimals }: { initial: { reserve: string; threshold: string; progress: number; migrated: boolean }; quoteSymbol: string; quoteDecimals: number }) {
+  const live = useTokenLive();
+  const graduated = live?.status === "graduated" || initial.migrated;
+  const c = live?.curve ?? initial;
+  const whole = (v: string) => (Number(BigInt(v)) / 10 ** quoteDecimals).toLocaleString("en-US", { maximumFractionDigits: 1 });
+  if (graduated) {
+    return (
+      <>
+        <span className="text-[13px] text-muted">Graduated</span>
+        <span className="font-mono text-sm text-lime">Trading on Meteora DAMM v2</span>
+      </>
+    );
+  }
+  return (
+    <>
+      <span className="flex justify-between text-[13px] text-muted"><span>To graduation</span><span className="font-mono text-ink">{c.progress}%</span></span>
+      <span className="h-3 rounded-full bg-white/[0.07] overflow-hidden flex"><span className="rounded-full transition-[width] duration-700" style={{ width: `${c.progress}%`, background: "linear-gradient(90deg, #9D8CFF, #C8FF3D)" }} /></span>
+      <span className="font-mono text-[13px] text-muted">{whole(c.reserve)} of {whole(c.threshold)} {quoteSymbol}{live?.quoteUsd ? ` · $${fmtCompact(Number(BigInt(c.threshold)) / 10 ** quoteDecimals * live.quoteUsd)} target` : ""}</span>
     </>
   );
 }

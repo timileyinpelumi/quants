@@ -7,6 +7,8 @@ export type BasketItem = { mint: string; symbol: string; name: string; icon: str
 
 export const basketTotal = (items: BasketItem[]) => items.reduce((a, b) => a + b.weight, 0);
 
+const MAX = 10;
+
 function evenly(items: BasketItem[]): BasketItem[] {
   if (!items.length) return items;
   const base = Math.floor(100 / items.length);
@@ -17,9 +19,9 @@ export function BasketPicker({ value, onChange }: { value: BasketItem[]; onChang
   const [picking, setPicking] = useState(false);
   const close = useCallback(() => setPicking(false), []);
 
-  const add = (t: PickedToken) => {
-    if (value.length >= 3 || value.some((v) => v.mint === t.mint)) return;
-    onChange(evenly([...value, { ...t, weight: 0 }]));
+  const add = (picked: PickedToken[]) => {
+    const fresh = picked.filter((t) => !value.some((v) => v.mint === t.mint)).slice(0, MAX - value.length);
+    if (fresh.length) onChange(evenly([...value, ...fresh.map((t) => ({ ...t, weight: 0 }))]));
   };
   const setWeight = (mint: string, w: number) => onChange(value.map((v) => (v.mint === mint ? { ...v, weight: Math.max(0, Math.min(100, Math.round(w) || 0)) } : v)));
   const remove = (mint: string) => onChange(evenly(value.filter((v) => v.mint !== mint)));
@@ -29,7 +31,7 @@ export function BasketPicker({ value, onChange }: { value: BasketItem[]; onChang
     <div className="flex flex-col gap-3.5">
       <div className="flex justify-between items-baseline gap-4">
         <span className="font-display font-bold text-xl">Reward basket</span>
-        <span className="text-[13px] text-muted text-right">Up to 3 tokens. Trading fees buy these for your stakers.</span>
+        <span className="text-[13px] text-muted text-right">Up to 10 tokens. Trading fees buy these for your stakers.</span>
       </div>
 
       <div className="flex flex-col">
@@ -72,7 +74,7 @@ export function BasketPicker({ value, onChange }: { value: BasketItem[]; onChang
         </div>
       )}
 
-      {value.length < 3 && (
+      {value.length < MAX && (
         <button
           type="button"
           onClick={() => setPicking(true)}
@@ -82,13 +84,13 @@ export function BasketPicker({ value, onChange }: { value: BasketItem[]; onChang
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round"><path d="M12 5v14" /><path d="M5 12h14" /></svg>
           </span>
           <span className="flex flex-col">
-            <span>{value.length === 0 ? "Add a reward token" : "Add another token"}</span>
-            <span className="text-[13px] font-normal text-muted">{3 - value.length} of 3 left</span>
+            <span>{value.length === 0 ? "Add reward tokens" : "Add more tokens"}</span>
+            <span className="text-[13px] font-normal text-muted">{MAX - value.length} of {MAX} left</span>
           </span>
         </button>
       )}
 
-      <TokenPicker open={picking} onClose={close} onPick={add} taken={value.map((v) => v.mint)} />
+      <TokenPicker open={picking} onClose={close} onPick={add} taken={value.map((v) => v.mint)} max={MAX - value.length} />
     </div>
   );
 }

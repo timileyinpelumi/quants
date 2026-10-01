@@ -7,17 +7,14 @@ import { Avatar } from "@/web/ui/Avatar";
 import { Button } from "@/web/ui/Button";
 import { Field, Suffixed, TextArea, TextInput, inputClass } from "@/web/ui/Field";
 import { Segmented } from "@/web/ui/Segmented";
-import { fmtAmount } from "@/web/ui/format";
+import { fmtAmount, lockLabel, lockShort } from "@/web/ui/format";
 import { signAndSendAll, SendError, type UnsignedTx } from "@/web/wallet/send";
 import { BasketPicker, basketTotal, type BasketItem } from "./BasketPicker";
+import { launchCost } from "@/domain/launch-cost";
+import { useUsd, usdText } from "@/web/ui/usd";
 
 const SOL = "So11111111111111111111111111111111111111112";
-const OURS = process.env.NEXT_PUBLIC_OURTOKEN_MINT ?? "";
-const OURS_SYMBOL = process.env.NEXT_PUBLIC_OURTOKEN_SYMBOL ?? "OURTOKEN";
-const GRADUATION: Record<string, string> = {
-  [SOL]: `${process.env.NEXT_PUBLIC_SOL_GRADUATION ?? "85"} SOL raised`,
-  [OURS]: `${process.env.NEXT_PUBLIC_OURTOKEN_GRADUATION ?? ""} ${OURS_SYMBOL} raised`,
-};
+export type QuoteOption = { mint: string; symbol: string; name: string; graduation: number; icon: string | null };
 const FEES = [100, 200, 300, 500];
 
 type Tier = { id: string; lockSeconds: number; multiplierBps: number };
@@ -45,7 +42,8 @@ async function postJson<T>(url: string, body: unknown): Promise<T> {
   return j as T;
 }
 
-export function LaunchForm({ split, tiers, launchFeeLamports, maxPenaltyBps }: {
+export function LaunchForm({ split, tiers, launchFeeLamports, maxPenaltyBps, quotes }: {
+  quotes: QuoteOption[];
   split: { basketBps: number; platformBps: number; creatorBps: number };
   tiers: Tier[];
   launchFeeLamports: string;
@@ -61,7 +59,7 @@ export function LaunchForm({ split, tiers, launchFeeLamports, maxPenaltyBps }: {
   const [imageError, setImageError] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [symbol, setSymbol] = useState("");
-  const [pair, setPair] = useState<string>(SOL);
+  const [pair, setPair] = useState<string>(quotes[0]?.mint ?? SOL);
   const [fee, setFee] = useState(200);
   const [basket, setBasket] = useState<BasketItem[]>([]);
   const [devBuy, setDevBuy] = useState("");
@@ -99,7 +97,12 @@ export function LaunchForm({ split, tiers, launchFeeLamports, maxPenaltyBps }: {
   ].filter(Boolean) as string[];
 
   const busy = status !== "idle";
-  const pairLabel = pair === SOL ? "SOL" : OURS_SYMBOL;
+  const solUsd = useUsd([SOL])[SOL];
+  const cost = launchCost({ launchFeeLamports: BigInt(launchFeeLamports), tiers }, Math.max(1, basket.length));
+  const solText = (lamports: bigint) => `${fmtAmount(lamports, 9, 3)} SOL`;
+  const usdOf = (lamports: bigint) => usdText(Number(lamports) / 1e9, solUsd);
+  const pairQuote = quotes.find((q) => q.mint === pair);
+  const pairLabel = pairQuote?.symbol ?? "SOL";
 
   async function settle(p: { mint: string; sig: string }) {
     setStatus("confirming");
@@ -158,7 +161,7 @@ export function LaunchForm({ split, tiers, launchFeeLamports, maxPenaltyBps }: {
         return;
       }
       if (e instanceof SendError && count === 2 && e.confirmed.length === 1) {
-        setError(`The swap to ${OURS_SYMBOL} went through but the launch did not. The ${OURS_SYMBOL} is in your wallet. Try again with no first buy, or a smaller one.`);
+        setError(`The swap to ${pairLabel} went through but the launch did not. The ${pairLabel} is in your wallet. Try again with no first buy, or a smaller one.`);
       } else {
         setError(e instanceof Error ? e.message : "Something went wrong");
       }
@@ -174,7 +177,7 @@ export function LaunchForm({ split, tiers, launchFeeLamports, maxPenaltyBps }: {
       <section className="flex flex-col gap-10 min-w-0">
         <div className="flex flex-col gap-3.5">
           <h1 className="m-0 font-display font-black text-[40px] md:text-[56px] leading-[1.02] tracking-[-0.03em]">Launch a token</h1>
-          <p className="m-0 text-lg text-muted max-w-[560px] leading-normal">Pick up to three reward tokens. Trading fees on your token buy them and pay them to the people who stake it. Longer locks earn a bigger share.</p>
+          <p className="m-0 text-lg text-muted max-w-[560px] leading-normal">Pick up to ten reward tokens. Trading fees on your token buy them and pay them to the people who stake it. Longer locks earn a bigger share.</p>
         </div>
 
         <div className="flex flex-col">
@@ -203,10 +206,19 @@ export function LaunchForm({ split, tiers, launchFeeLamports, maxPenaltyBps }: {
 
           <div className={section}>
             <span className={num}>02</span>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-7 md:gap-8">
+            <div className="grid grid-cols-1 gap-7">
               <div className="flex flex-col gap-3">
                 <span className="text-[13px] text-muted">Paired with</span>
-                <Segmented label="Paired with" value={pair} onChange={setPair} options={[{ value: SOL, label: "SOL" }, ...(OURS ? [{ value: OURS, label: OURS_SYMBOL }] : [])]} />
+                <div role="radiogroup" aria-label="Paired with" className="flex flex-wrap gap-2">
+                  {quotes.map((q) => (
+                    <button key={q.mint} type="button" role="radio" aria-checked={pair === q.mint} onClick={() => setPair(q.mint)}
+                      className={`flex items-center gap-2 pl-2 pr-4 min-h-11 rounded-full border text-sm font-semibold cursor-pointer ${pair === q.mint ? "bg-raised-2 border-lime/60 text-ink" : "border-white/10 text-muted hover:text-ink"}`}>
+                      <Avatar seed={q.mint} label={q.symbol} image={q.icon} size={24} />
+                      {q.symbol}
+                    </button>
+                  ))}
+                </div>
+                <span className="text-[13px] text-muted">Traders buy and sell your token with {pairLabel}. Fees are earned in {pairLabel}.</span>
               </div>
               <div className="flex flex-col gap-3">
                 <span className="text-[13px] text-muted">Trading fee</span>
@@ -229,7 +241,8 @@ export function LaunchForm({ split, tiers, launchFeeLamports, maxPenaltyBps }: {
                 </Suffixed>
               </Field>
               <p className="m-0 text-sm text-muted md:pb-[18px]">
-                {pair === SOL ? "Bought on the curve in the same approval as the launch." : `Swapped to ${OURS_SYMBOL} first, then bought on the curve. One approval.`}
+                {devBuyLamports && devBuyLamports > 0n && usdOf(devBuyLamports) ? `About ${usdOf(devBuyLamports)}. ` : ""}
+                {pair === SOL ? "Bought on the curve in the same approval as the launch." : `Swapped to ${pairLabel} first, then bought on the curve. One approval.`}
               </p>
             </div>
           </div>
@@ -284,7 +297,7 @@ export function LaunchForm({ split, tiers, launchFeeLamports, maxPenaltyBps }: {
             {tiers.map((t) => (
               <span key={t.id} className="flex flex-col items-center gap-1 py-3.5 rounded-[18px] bg-violet/[0.08] border border-violet/20">
                 <span className="font-display font-black text-xl text-violet-light">{t.multiplierBps / 10_000}x</span>
-                <span className="text-xs text-muted">{Math.round(t.lockSeconds / 86_400)} days</span>
+                <span className="text-xs text-muted">{lockLabel(t.lockSeconds)}</span>
               </span>
             ))}
           </div>
@@ -292,8 +305,10 @@ export function LaunchForm({ split, tiers, launchFeeLamports, maxPenaltyBps }: {
         </div>
 
         <div className="flex flex-col text-sm border-t line pt-3">
-          <span className="flex justify-between py-1.5"><span className="text-muted">Launch fee</span><span className="font-mono">{fmtAmount(launchFeeLamports, 9)} SOL</span></span>
-          <span className="flex justify-between py-1.5"><span className="text-muted">Graduates at</span><span className="font-mono">{GRADUATION[pair]}</span></span>
+          <span className="flex justify-between py-1.5"><span className="text-muted">Launch fee</span><span className="font-mono text-right">{solText(cost.total)}{usdOf(cost.total) && <span className="block text-[12px] text-faint">≈ {usdOf(cost.total)}</span>}</span></span>
+          <span className="flex justify-between pb-1.5 text-[13px] text-muted"><span>Staking farms, one per lock tier ({tiers.length})</span><span className="font-mono">{solText(cost.rent)}</span></span>
+          <span className="flex justify-between pb-1.5 text-[13px] text-muted"><span>Platform</span><span className="font-mono">{solText(cost.fee)}</span></span>
+          <span className="flex justify-between py-1.5"><span className="text-muted">Graduates at</span><span className="font-mono">{pairQuote ? `${pairQuote.graduation.toLocaleString("en-US")} ${pairQuote.symbol} raised` : ""}</span></span>
           <span className="flex justify-between py-1.5"><span className="text-muted">Supply</span><span className="font-mono">1,000,000,000</span></span>
         </div>
 

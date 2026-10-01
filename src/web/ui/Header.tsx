@@ -3,6 +3,7 @@ import { WalletButton } from "@/web/wallet/WalletButton";
 
 const links = [
   { href: "/explore", label: "Explore", key: "explore" },
+  { href: "/rewards", label: "Rewards", key: "rewards" },
   { href: "/portfolio", label: "Portfolio", key: "portfolio" },
   { href: "/docs", label: "Docs", key: "docs" },
 ] as const;
@@ -15,7 +16,7 @@ function Search({ className }: { className: string }) {
       <label className="flex items-center gap-2.5 h-11 px-4 rounded-full bg-raised-2 border border-white/[0.08] focus-within:border-white/20 w-full">
         <svg aria-hidden width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-muted shrink-0"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
         <span className="sr-only">Search tokens</span>
-        <input name="q" type="search" placeholder="Search by name, symbol or address" className="bg-transparent outline-none text-sm w-full placeholder:text-faint" />
+        <input name="q" type="search" placeholder="Search tokens" className="bg-transparent outline-none text-sm w-full placeholder:text-faint" />
       </label>
     </form>
   );
@@ -27,7 +28,7 @@ export function Header({ active }: { active: HeaderKey }) {
     <header className="border-b line">
       <div className="wrap flex items-center gap-4 md:gap-8 py-4 md:py-5">
         <Link href="/" className="flex items-center gap-2.5 shrink-0" aria-label="quants home">
-          <img src="/brand/quants-mark.svg" alt="" width={32} height={32} className="w-8 h-8" style={{ filter: "drop-shadow(0 0 16px rgba(200,255,61,0.35))" }} />
+          <img src="/brand/quants-mark.svg" alt="" width={32} height={32} className="w-8 h-8" style={{ filter: "drop-shadow(0 4px 14px rgba(200,255,61,0.18))" }} />
           <span className="font-display font-black text-xl md:text-2xl tracking-tight">quants</span>
         </Link>
         <nav aria-label="Main" className="hidden lg:flex gap-7 text-[15px] font-medium shrink-0">

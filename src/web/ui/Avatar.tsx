@@ -1,9 +1,9 @@
-import { avatarGradient } from "./format";
+import { avatarGradient, imgSrc } from "./format";
 
 export function Avatar({ seed, label, size = 44, image }: { seed: string; label: string; size?: number; image?: string | null }) {
   const radius = Math.round(size * 0.31);
   if (image) {
-    return <img src={image} alt="" width={size} height={size} style={{ width: size, height: size, borderRadius: radius }} className="object-cover puff shrink-0" />;
+    return <img src={imgSrc(image, size)} alt="" loading="lazy" decoding="async" width={size} height={size} style={{ width: size, height: size, borderRadius: radius }} className="object-cover puff shrink-0" />;
   }
   const [a, b] = avatarGradient(seed);
   return (

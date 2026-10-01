@@ -7,7 +7,7 @@
     "migrate": "bun src/db/migrate.ts",
     "keeper": "bun src/keeper/main.ts",
     "indexer": "bun src/indexer/main.ts",
-    "typecheck": "bunx tsc --noEmit",
+    "typecheck": "bunx tsc --noEmit --incremental false",
     "dev": "bun --bun next dev --webpack",
     "build": "node node_modules/next/dist/bin/next build",
     "start": "bun --bun next start",

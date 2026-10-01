@@ -20,3 +20,15 @@ test("returns null when Jupiter has no price or fails", async () => {
   expect(await new JupiterPrices("https://x", undefined, async () => new Response("no", { status: 401 })).usd("m")).toBeNull();
   expect(await new JupiterPrices("https://x", undefined, async () => { throw new Error("down"); }).usd("m")).toBeNull();
 });
+
+test("prices many mints in one request and serves repeats from the cache", async () => {
+  const urls: string[] = [];
+  const p = new JupiterPrices("https://api.jup.ag/price/v3", undefined, async (u) => {
+    urls.push(String(u));
+    return Response.json({ A: { usdPrice: 1 }, B: { usdPrice: 2 } });
+  });
+  expect(await p.usdMany(["A", "B", "C"])).toEqual({ A: 1, B: 2, C: null });
+  expect(await p.usdMany(["A", "C"])).toEqual({ A: 1, C: null });
+  expect(urls).toEqual(["https://api.jup.ag/price/v3?ids=A,B,C"]);
+  expect(await p.usd("B")).toBe(2);
+});

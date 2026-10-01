@@ -29,7 +29,7 @@ export function avatarGradient(seed: string): [string, string] {
 
 export function fmtPrice(n: number, sig = 3): string {
   if (n === 0) return "0";
-  if (Math.abs(n) >= 1) return n.toFixed(2);
+  if (Math.abs(n) >= 1) return n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const decimals = Math.min(12, -Math.floor(Math.log10(Math.abs(n))) + sig - 1);
   return n.toFixed(decimals).replace(/0+$/, "").replace(/\.$/, "");
 }
@@ -41,3 +41,19 @@ export function fmtAgo(iso: string, now = Date.now()): string {
   if (s < 86_400) return `${Math.floor(s / 3600)}h ago`;
   return `${Math.floor(s / 86_400)}d ago`;
 }
+
+/** Remote logos are served resized through wsrv.nl so pages never download full size token art. */
+export function imgSrc(url: string, px: number): string {
+  if (!/^https:\/\//.test(url) || /^https:\/\/(localhost|127\.0\.0\.1)/.test(url)) return url;
+  return `https://wsrv.nl/?url=${encodeURIComponent(url)}&w=${px * 2}&h=${px * 2}&fit=cover&output=webp`;
+}
+
+/** "12 hours", "1 day", "30 days" for a lock length. */
+export function lockLabel(seconds: number): string {
+  if (seconds < 86_400) { const h = Math.round(seconds / 3600); return `${h} ${h === 1 ? "hour" : "hours"}`; }
+  const d = Math.round(seconds / 86_400);
+  return `${d} ${d === 1 ? "day" : "days"}`;
+}
+
+/** "12h", "1d", "30d" for tight spaces. */
+export const lockShort = (seconds: number) => (seconds < 86_400 ? `${Math.round(seconds / 3600)}h` : `${Math.round(seconds / 86_400)}d`);

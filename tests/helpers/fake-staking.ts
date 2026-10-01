@@ -7,6 +7,7 @@ export class FakeStaking implements StakingAdapter {
   staked = new Map<string, bigint>();
   available = new Map<string, bigint>();
   slashed = new Map<string, bigint>();
+  async vaultAuthority(farm: string) { return `vault-auth-${farm}`; }
   funded: { farm: string; rewardMint: string; amount: bigint; rawRps: bigint }[] = [];
   constructor(private chain: FakeChain) {}
   capabilities() { return { earlyExit: true, tiersOnChain: false }; }

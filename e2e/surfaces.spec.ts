@@ -16,7 +16,7 @@ test("trade widget buys and sells", async ({ page }) => {
   await page.goto(`/t/${CAT}`);
   await connect(page);
   await page.getByRole("button", { name: "0.1", exact: true }).click();
-  await expect(page.getByText(/You get about/).locator("..").getByText(/CAT$/)).toBeVisible();
+  await expect(page.getByText(/You get about/).locator("..").getByText(/ CAT/)).toBeVisible();
   await page.getByRole("button", { name: "Buy CAT" }).click();
   await expect(page.getByText("Bought. Balances updated.")).toBeVisible();
 
@@ -44,7 +44,7 @@ test("indexed trades fill the home page and the token chart", async ({ page }) =
   await page.goto(`/t/${CAT}`);
   await expect(page.getByRole("img", { name: "Price chart" })).toBeVisible();
   await expect(page.getByText("Volume today")).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Trades" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Trades", exact: true })).toBeVisible();
 });
 
 test("wallet modal shows SOL and token balances and links to stakes", async ({ page }) => {

@@ -15,6 +15,7 @@ import { defaultSettings, saveSettings } from "../src/domain/settings";
 import { prepareLaunch } from "../src/launch/prepare";
 import { confirmLaunch } from "../src/launch/confirm";
 import { NATIVE_MINT } from "../src/domain/types";
+import { quoteCoins } from "../src/domain/quotes";
 
 const RPC = process.env.RPC_URL ?? "http://127.0.0.1:8899";
 const DB = process.env.SEED_DATABASE_URL ?? "postgres://quants:quants@localhost:5434/quants";
@@ -29,6 +30,16 @@ for (const k of [keeper, spill, treasury, creator, trader, tester, admin].map((x
   await conn.confirmTransaction(await conn.requestAirdrop(k, 200 * LAMPORTS_PER_SOL));
 }
 const ours = await createMint(conn, keeper, keeper.publicKey, null, 6);
+// Stand-ins for the mainnet quote coins, which do not exist on a local validator.
+const localQuotes: Record<string, PublicKey> = {
+  USDC: await createMint(conn, keeper, keeper.publicKey, null, 6),
+  USDT: await createMint(conn, keeper, keeper.publicKey, null, 6),
+  JUP: await createMint(conn, keeper, keeper.publicKey, null, 6),
+};
+const quoteEnv = {
+  OURTOKEN_MINT: ours.toBase58(), OURTOKEN_SYMBOL: "QNT", OURTOKEN_DECIMALS: "6", OURTOKEN_GRADUATION: "100000",
+  QUOTE_MINTS: JSON.stringify(Object.fromEntries(Object.entries(localQuotes).map(([k, v]) => [k, v.toBase58()]))),
+};
 const rewards = {
   ZEC: await createMint(conn, keeper, keeper.publicKey, null, 8),
   CATE: await createMint(conn, keeper, keeper.publicKey, null, 6),
@@ -38,7 +49,7 @@ log("wallets and mints ready");
 
 const client = DynamicBondingCurveClient.create(conn, "confirmed");
 const configKeys: Record<string, string> = {};
-for (const q of [{ mint: NATIVE_MINT, decimals: 9, migrationQuoteThreshold: 85 }, { mint: ours.toBase58(), decimals: 6, migrationQuoteThreshold: 100_000 }]) {
+for (const q of quoteCoins(quoteEnv).map((c) => ({ mint: c.mint, decimals: c.decimals, migrationQuoteThreshold: c.graduation }))) {
   for (const bps of FEE_TIERS_BPS) {
     const config = Keypair.generate();
     await sendAndConfirmTransaction(conn, await client.partner.createConfig({
@@ -53,7 +64,7 @@ const farms = new Farms(createSolanaRpc(RPC));
 const gc = Keypair.generate();
 await sendAndConfirmTransaction(conn, new Transaction().add(...(await farms.createGlobalConfigIxs(kitSigner(keeper), kitSigner(gc))).map(fromKitInstruction)), [keeper, gc]);
 await sendAndConfirmTransaction(conn, new Transaction().add(fromKitInstruction(await farms.updateGlobalConfigIx(kitSigner(keeper), address(gc.publicKey.toBase58()), GlobalConfigOption.SetTreasuryFeeBps, "0", "number"))), [keeper]);
-log("8 config keys and the Kamino global config created");
+log(`${Object.keys(configKeys).length} config keys and the Kamino global config created`);
 
 const sql = new SQL({ url: DB, max: 4 });
 await sql.unsafe("drop schema if exists public cascade; create schema public;");
@@ -62,7 +73,7 @@ await saveSettings(sql, defaultSettings(ours.toBase58()), "seed");
 
 const chain = new SolanaChain(conn, keeper, spill);
 const meteora = new MeteoraLive(chain, DAMM_CUSTOM);
-const deps = { sql, meteora, configKeys, ourtokenMint: ours.toBase58(), keeperAddress: keeper.publicKey.toBase58(), isVerified: async () => true,
+const deps = { sql, meteora, configKeys, quoteMints: [NATIVE_MINT, ours.toBase58()], keeperAddress: keeper.publicKey.toBase58(), isVerified: async () => true,
   tokenProgramOf: async (m: string) => (await conn.getAccountInfo(new PublicKey(m)))!.owner.toBase58() };
 
 async function launch(name: string, symbol: string, basket: { mint: PublicKey; symbol: string; decimals: number; weightBps: number }[]) {
@@ -91,9 +102,11 @@ for (const who of [tester, admin]) await buy(who, cat.pool, 3);
 for (let i = 0; i < 4; i++) await buy(trader, dog.pool, 1);
 log(`launched CAT ${cat.mint} and DOG ${dog.mint}, traded both`);
 
-// Test wallet also gets some OURTOKEN so OURTOKEN pairs can be tried by hand.
-const testerOurs = await getOrCreateAssociatedTokenAccount(conn, keeper, ours, tester.publicKey);
-await mintTo(conn, keeper, ours, testerOurs.address, keeper, 1_000_000_000_000n);
+// Test wallet also gets each non-SOL quote coin so those pairs can be tried by hand.
+for (const m of [ours, ...Object.values(localQuotes)]) {
+  const acct = await getOrCreateAssociatedTokenAccount(conn, keeper, m, tester.publicKey);
+  await mintTo(conn, keeper, m, acct.address, keeper, 1_000_000_000_000n);
+}
 
 const env = {
   DATABASE_URL: DB,
@@ -103,7 +116,7 @@ const env = {
   KEEPER_ADDRESS: keeper.publicKey.toBase58(),
   SPILL_ADDRESS: spill.publicKey.toBase58(),
   TREASURY_ADDRESS: treasury.publicKey.toBase58(),
-  OURTOKEN_MINT: ours.toBase58(),
+  ...quoteEnv,
   KAMINO_GLOBAL_CONFIG: gc.publicKey.toBase58(),
   DAMM_V2_MIGRATION_CONFIG: DAMM_CUSTOM,
   CONFIG_KEYS_PATH: "config-keys.json",

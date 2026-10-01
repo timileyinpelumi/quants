@@ -50,7 +50,11 @@ test("home lists trending, new, about to graduate, graduated and recent trades",
   await trade(sql, g, 10, 0.1, { value: 2 });
   const d = await landing(sql, NOW);
   expect(d.trending.map((t) => t.symbol)).toEqual(["AAA", "GGG", "BBB"]);
-  expect(d.trending[0]!.basket).toEqual(["ZEC", "JUP"]);
+  expect(d.trending[0]!.basket).toEqual([{ mint: "zec", symbol: "ZEC", icon: null }, { mint: "jup", symbol: "JUP", icon: null }]);
+  expect(d.trending[0]!.quote).toMatchObject({ symbol: "SOL" });
+  const withIcons = await landing(sql, NOW, async (mints) => Object.fromEntries(mints.map((m) => [m, `https://icons/${m}`])));
+  expect(withIcons.trending[0]!.basket[0]!.icon).toBe("https://icons/zec");
+  expect(withIcons.trending[0]!.quote.icon).toBe("https://icons/So11111111111111111111111111111111111111112");
   expect(d.newest.map((t) => t.symbol)).toEqual(["CCC", "GGG", "BBB", "AAA"]);
   expect(d.soon.map((t) => [t.symbol, t.progress])).toEqual([["AAA", 90], ["BBB", 40]]);
   expect(d.graduated.map((t) => t.symbol)).toEqual(["GGG"]);

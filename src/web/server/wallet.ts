@@ -2,6 +2,9 @@ import { PublicKey } from "@solana/web3.js";
 import { TOKEN_PROGRAM_ID } from "@solana/spl-token";
 import { z } from "zod";
 import type { WebContext } from "./context";
+import { iconsFor } from "./icons";
+import { quoteCoin, quoteCoins } from "@/domain/quotes";
+import { NATIVE_MINT } from "@/domain/types";
 
 export interface HeldToken { mint: string; amount: string; decimals: number; symbol: string | null; name: string | null; image: string | null; kind: "launch" | "platform" | "reward" | "other" }
 const RANK = { launch: 0, platform: 1, reward: 2, other: 3 } as const;
@@ -24,16 +27,18 @@ export async function walletOverview(ctx: WebContext, ownerRaw: string) {
   const rewards = mints.length ? await ctx.sql`select distinct on (reward_mint) reward_mint, symbol from baskets where reward_mint in ${ctx.sql(mints)} and symbol is not null` : [];
   const lmap = new Map(launches.map((l: any) => [l.mint, l]));
   const rmap = new Map(rewards.map((r: any) => [r.reward_mint, r.symbol as string]));
+  const quotes = quoteCoins();
+  const icons = await iconsFor(ctx.icons, [NATIVE_MINT, ...mints.filter((m) => !lmap.has(m))], quotes).catch(() => ({} as Record<string, string | null>));
   const tokens: HeldToken[] = [];
   for (const [mint, h] of held) {
     if (h.amount === 0n) continue;
     const l = lmap.get(mint) as any;
     const kind: HeldToken["kind"] = l ? "launch" : mint === ctx.ourtokenMint ? "platform" : rmap.has(mint) ? "reward" : "other";
     tokens.push({
-      mint, amount: h.amount.toString(), decimals: h.decimals, kind, image: l?.image ?? null, name: l?.name ?? null,
-      symbol: l?.symbol ?? (kind === "platform" ? process.env.NEXT_PUBLIC_OURTOKEN_SYMBOL ?? "OURTOKEN" : rmap.get(mint) ?? null),
+      mint, amount: h.amount.toString(), decimals: h.decimals, kind, image: l?.image ?? icons[mint] ?? null, name: l?.name ?? null,
+      symbol: l?.symbol ?? quoteCoin(mint, quotes)?.symbol ?? rmap.get(mint) ?? null,
     });
   }
   tokens.sort((a, b) => RANK[a.kind] - RANK[b.kind] || (a.symbol ?? "~").localeCompare(b.symbol ?? "~"));
-  return { sol: String(sol), tokens };
+  return { sol: String(sol), solIcon: icons[NATIVE_MINT] ?? null, tokens };
 }

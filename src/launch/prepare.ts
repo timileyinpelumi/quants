@@ -4,6 +4,7 @@ import type { MeteoraPort } from "../meteora/port";
 import { configKeyName, FEE_TIERS_BPS } from "../meteora/config";
 import { loadLatestSettings } from "../domain/settings";
 import { NATIVE_MINT } from "../domain/types";
+import { launchCost } from "../domain/launch-cost";
 
 export class LaunchError extends Error {
   constructor(public code: "invalid_input" | "basket_not_verified" | "basket_unsupported" | "dev_buy_too_large" | "not_found_on_chain" | "pool_mismatch", message: string) { super(message); }
@@ -14,15 +15,15 @@ const publicUri = (u: string) => u.startsWith("https://") || (process.env.ALLOW_
 const addr = z.string().regex(/^[1-9A-HJ-NP-Za-km-z]{32,44}$/);
 const uint = z.string().regex(/^\d+$/).default("0").transform((v) => BigInt(v));
 
-const launchInput = (ourtokenMint: string) => z.object({
+const launchInput = (quoteMints: string[]) => z.object({
   name: z.string().trim().min(1).max(32),
   symbol: z.string().regex(/^[A-Za-z0-9]{1,10}$/),
   uri: z.string().url().refine(publicUri, "Metadata link must be HTTPS"),
   image: z.string().url().refine(publicUri, "Image link must be HTTPS").optional(),
   creator: addr,
-  quoteMint: z.enum([NATIVE_MINT, ourtokenMint] as [string, string]),
+  quoteMint: z.string().refine((m) => quoteMints.includes(m), "That pair token is not supported"),
   feeTierBps: z.number().refine((v) => (FEE_TIERS_BPS as readonly number[]).includes(v)),
-  basket: z.array(z.object({ mint: addr, weightBps: z.number().int().positive(), symbol: z.string().max(20).optional(), decimals: z.number().int().min(0).max(18).optional() })).min(1).max(3)
+  basket: z.array(z.object({ mint: addr, weightBps: z.number().int().positive(), symbol: z.string().max(20).optional(), decimals: z.number().int().min(0).max(18).optional() })).min(1).max(10)
     .refine((b) => new Set(b.map((x) => x.mint)).size === b.length, "duplicate basket token")
     .refine((b) => b.reduce((a, x) => a + x.weightBps, 0) === 10_000, "weights must sum to 10000"),
   devBuyQuoteAmount: uint,
@@ -35,11 +36,11 @@ const CLASSIC_TOKEN_PROGRAM = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
 const SUPPLY_BASE_UNITS = 1_000_000_000n * 1_000_000n;
 
 export async function prepareLaunch(
-  deps: { sql: SQL; meteora: MeteoraPort; configKeys: Record<string, string>; ourtokenMint: string; keeperAddress: string;
+  deps: { sql: SQL; meteora: MeteoraPort; configKeys: Record<string, string>; quoteMints: string[]; keeperAddress: string;
     isVerified: (mint: string) => Promise<boolean>; tokenProgramOf: (mint: string) => Promise<string> },
   raw: unknown,
 ) {
-  const parsed = launchInput(deps.ourtokenMint).safeParse(raw);
+  const parsed = launchInput(deps.quoteMints).safeParse(raw);
   if (!parsed.success) throw new LaunchError("invalid_input", parsed.error.issues.map((i) => i.message).join("; "));
   const input = parsed.data;
   for (const b of input.basket) {
@@ -56,7 +57,7 @@ export async function prepareLaunch(
   if (!configKey) throw new LaunchError("invalid_input", "no config key for this quote and fee tier");
   const { tx, baseMint, pool } = await deps.meteora.buildLaunchTx({
     name: input.name, symbol: input.symbol, uri: input.uri, creator: input.creator, configKey, quoteMint: input.quoteMint,
-    launchFeeLamports: settings.launchFeeLamports, feeReceiver: deps.keeperAddress,
+    launchFeeLamports: launchCost(settings, input.basket.length).total, feeReceiver: deps.keeperAddress,
     devBuyQuoteAmount: input.devBuyQuoteAmount, devBuyMinOut: input.devBuyMinOut,
   });
   const mint = baseMint.publicKey.toBase58();

@@ -20,6 +20,7 @@ test("avatarGradient is stable per seed", () => {
 
 test("fmtPrice keeps three significant digits without exponents", () => {
   expect(fmtPrice(12.345)).toBe("12.35");
+  expect(fmtPrice(2828.716)).toBe("2,828.72");
   expect(fmtPrice(0.5)).toBe("0.5");
   expect(fmtPrice(0.000123456)).toBe("0.000123");
   expect(fmtPrice(0.00000008)).toBe("0.00000008");
@@ -33,4 +34,10 @@ test("fmtAgo", () => {
   expect(fmtAgo("2026-10-01T11:55:00Z", now)).toBe("5m ago");
   expect(fmtAgo("2026-10-01T09:00:00Z", now)).toBe("3h ago");
   expect(fmtAgo("2026-09-28T12:00:00Z", now)).toBe("3d ago");
+});
+
+test("lock labels read in hours under a day", async () => {
+  const { lockLabel, lockShort } = await import("../../src/web/ui/format");
+  expect([lockLabel(43_200), lockLabel(86_400), lockLabel(259_200), lockLabel(3600)]).toEqual(["12 hours", "1 day", "3 days", "1 hour"]);
+  expect([lockShort(43_200), lockShort(604_800)]).toEqual(["12h", "7d"]);
 });

@@ -3,6 +3,9 @@ import { Header } from "@/web/ui/Header";
 import { Avatar } from "@/web/ui/Avatar";
 import { fmtAgo, fmtCompact, shortAddr } from "@/web/ui/format";
 import { getContext } from "@/web/server/context";
+import { iconsFor } from "@/web/server/icons";
+import { quoteCoins } from "@/domain/quotes";
+import { CoinStack, CoinTag } from "@/web/ui/CoinStack";
 import { exploreTokens, type ExploreFilter, type ExploreSort } from "@/web/server/landing";
 
 export const dynamic = "force-dynamic";
@@ -18,7 +21,8 @@ export default async function ExplorePage({ searchParams }: { searchParams: Prom
   const sort = (SORTS.find(([k]) => k === p.sort)?.[0] ?? "trending") as ExploreSort;
   const filter = (p.graduated === "1" ? "graduated" : FILTERS.find(([k]) => k === p.filter)?.[0] ?? "all") as ExploreFilter;
   const q = p.q?.trim() ?? "";
-  const tokens = await exploreTokens(getContext().sql, { sort, filter, q });
+  const ctx = getContext();
+  const tokens = await exploreTokens(ctx.sql, { sort, filter, q }, Date.now(), (m) => iconsFor(ctx.icons, m, quoteCoins()));
   const href = (o: { sort?: string; filter?: string }) => {
     const sp = new URLSearchParams();
     if (q) sp.set("q", q);
@@ -70,7 +74,7 @@ export default async function ExplorePage({ searchParams }: { searchParams: Prom
                       <span className="font-display font-bold text-lg truncate">{t.symbol}</span>
                       <span className="font-mono text-[12px] text-faint shrink-0">{fmtAgo(t.createdAt)}</span>
                     </span>
-                    <span className="text-[13px] text-muted truncate">{t.name ?? shortAddr(t.mint)}</span>
+                    <span className="text-[13px] text-muted truncate flex items-center gap-1.5">{t.name ?? shortAddr(t.mint)} · <CoinTag coin={t.quote} size={14} /></span>
                   </span>
                 </span>
                 <span className="flex flex-col items-end font-mono text-sm md:hidden">
@@ -90,7 +94,7 @@ export default async function ExplorePage({ searchParams }: { searchParams: Prom
                     </>
                   )}
                 </span>
-                <span className="hidden md:block text-sm truncate">{t.basket.length ? t.basket.join(" + ") : "No basket"}</span>
+                <span className="hidden md:flex text-sm min-w-0"><CoinStack coins={t.basket} /></span>
               </Link>
             ))}
           </div>

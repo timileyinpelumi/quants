@@ -10,7 +10,7 @@ const CLASSIC = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
 const Body = z.object({
   mint: z.string().min(1),
   basket: z.array(z.object({ mint: z.string().regex(/^[1-9A-HJ-NP-Za-km-z]{32,44}$/), weightBps: z.number().int().positive(), symbol: z.string().max(20).optional(), decimals: z.number().int().min(0).max(18).optional() }))
-    .min(1).max(3)
+    .min(1).max(10)
     .refine((b) => new Set(b.map((x) => x.mint)).size === b.length, "Duplicate basket token")
     .refine((b) => b.reduce((a, x) => a + x.weightBps, 0) === 10_000, "Weights must add up to 100%"),
 });

@@ -1,21 +1,30 @@
 type Fetch = (url: string | URL, init?: RequestInit) => Promise<Response>;
 
-// One lookup per quote mint per minute; a failure returns null and the trade is stored without a USD value.
+const BATCH = 50;
+
+// One lookup per mint per minute; a failure returns null and callers show amounts without a USD value.
 export class JupiterPrices {
   private cache = new Map<string, { at: number; usd: number | null }>();
   constructor(private base: string, private apiKey: string | undefined, private fetchFn: Fetch = fetch, private ttlMs = 60_000) {}
 
   async usd(mint: string): Promise<number | null> {
-    const hit = this.cache.get(mint);
-    if (hit && Date.now() - hit.at < this.ttlMs) return hit.usd;
-    let usd: number | null = null;
-    try {
-      const res = await this.fetchFn(`${this.base}?ids=${mint}`, { headers: this.apiKey ? { "x-api-key": this.apiKey } : {}, signal: AbortSignal.timeout(10_000) });
-      if (res.ok) usd = ((await res.json()) as Record<string, { usdPrice?: number }>)[mint]?.usdPrice ?? null;
-    } catch {
-      usd = null;
+    return (await this.usdMany([mint]))[mint] ?? null;
+  }
+
+  async usdMany(mints: string[]): Promise<Record<string, number | null>> {
+    const now = Date.now();
+    const missing = [...new Set(mints)].filter((m) => { const c = this.cache.get(m); return !c || now - c.at > this.ttlMs; });
+    for (let i = 0; i < missing.length; i += BATCH) {
+      const batch = missing.slice(i, i + BATCH);
+      let found: Record<string, { usdPrice?: number }> = {};
+      try {
+        const res = await this.fetchFn(`${this.base}?ids=${batch.join(",")}`, { headers: this.apiKey ? { "x-api-key": this.apiKey } : {}, signal: AbortSignal.timeout(10_000) });
+        if (res.ok) found = (await res.json()) as typeof found;
+      } catch {
+        found = {};
+      }
+      for (const m of batch) this.cache.set(m, { at: now, usd: found[m]?.usdPrice ?? null });
     }
-    this.cache.set(mint, { at: Date.now(), usd });
-    return usd;
+    return Object.fromEntries(mints.map((m) => [m, this.cache.get(m)?.usd ?? null]));
   }
 }

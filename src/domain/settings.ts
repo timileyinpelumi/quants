@@ -11,7 +11,7 @@ const Schema = z.object({
     .refine((s) => s.basketBps + s.platformBps + s.creatorBps === 10_000, "split must sum to 10000 bps"),
   creatorPayoutMin: z.record(z.string(), big),
   tiers: z.array(z.object({ id: z.string().min(1).max(16), lockSeconds: z.number().int().positive(), multiplierBps: z.number().int().min(10_000).max(100_000) }))
-    .min(1).max(6)
+    .min(1).max(8)
     .refine((t) => new Set(t.map((x) => x.id)).size === t.length, "tier ids must be unique"),
   maxPenaltyBps: z.number().int().min(1).max(9_999),
   rewardPeriodSeconds: z.number().int().min(3_600),
@@ -36,15 +36,18 @@ export function defaultSettings(ourtokenMint: string): Settings {
     split: { basketBps: 6000, platformBps: 2500, creatorBps: 1500 },
     creatorPayoutMin: { [NATIVE_MINT]: 50_000_000n, [ourtokenMint]: 0n },
     tiers: [
-      { id: "7d", lockSeconds: 7 * DAY, multiplierBps: 10_000 },
-      { id: "30d", lockSeconds: 30 * DAY, multiplierBps: 15_000 },
-      { id: "90d", lockSeconds: 90 * DAY, multiplierBps: 20_000 },
+      { id: "12h", lockSeconds: DAY / 2, multiplierBps: 10_000 },
+      { id: "1d", lockSeconds: DAY, multiplierBps: 11_000 },
+      { id: "3d", lockSeconds: 3 * DAY, multiplierBps: 12_500 },
+      { id: "7d", lockSeconds: 7 * DAY, multiplierBps: 15_000 },
+      { id: "30d", lockSeconds: 30 * DAY, multiplierBps: 20_000 },
+      { id: "90d", lockSeconds: 90 * DAY, multiplierBps: 25_000 },
       { id: "180d", lockSeconds: 180 * DAY, multiplierBps: 30_000 },
     ],
     maxPenaltyBps: 3000,
     rewardPeriodSeconds: DAY,
     slippageBps: 100,
-    launchFeeLamports: 300_000_000n,
+    launchFeeLamports: 50_000_000n,
     devBuyCapBps: 5000,
     keeperIntervalSeconds: 600,
     defaultBackend: "kamino",

@@ -4,6 +4,9 @@ import { Header } from "@/web/ui/Header";
 import { Avatar } from "@/web/ui/Avatar";
 import { fmtAgo, fmtCompact, fmtPrice, shortAddr } from "@/web/ui/format";
 import { getContext } from "@/web/server/context";
+import { iconsFor } from "@/web/server/icons";
+import { quoteCoins } from "@/domain/quotes";
+import { CoinStack, CoinTag } from "@/web/ui/CoinStack";
 import { landing, type TokenRow } from "@/web/server/landing";
 
 export const dynamic = "force-dynamic";
@@ -12,7 +15,6 @@ const SOL = "So11111111111111111111111111111111111111112";
 
 const usd = (n: number | null) => (n === null ? "No price" : `$${fmtCompact(n)}`);
 const change = (c: number) => <span className={c >= 0 ? "text-lime" : "text-burn"}>{c >= 0 ? "+" : ""}{c.toFixed(1)}%</span>;
-const earns = (t: TokenRow) => (t.basket.length ? t.basket.join(" + ") : "No basket");
 
 function Progress({ value }: { value: number }) {
   return (
@@ -37,7 +39,7 @@ function Column({ title, href, empty, rows, right }: { title: string; href: stri
               <span className="font-display font-bold truncate">{t.symbol}</span>
               <span className="font-mono text-[12px] text-faint shrink-0">{fmtAgo(t.createdAt)}</span>
             </span>
-            <span className="text-[12px] text-muted truncate">Stakers earn {earns(t)}</span>
+            <span className="text-[12px] text-muted truncate flex items-center gap-1.5">Earns <CoinStack coins={t.basket} size={14} max={3} /></span>
           </span>
           <span className="flex flex-col items-end gap-1 font-mono text-sm min-w-[84px]">{right(t)}</span>
         </Link>
@@ -47,7 +49,8 @@ function Column({ title, href, empty, rows, right }: { title: string; href: stri
 }
 
 export default async function HomePage() {
-  const d = await landing(getContext().sql);
+  const ctx = getContext();
+  const d = await landing(ctx.sql, Date.now(), (m) => iconsFor(ctx.icons, m, quoteCoins()));
   return (
     <div className="flex-1 bg-launch">
       <Header active="home" />
@@ -58,7 +61,7 @@ export default async function HomePage() {
               Launch a token that <span className="text-lime">pays its stakers.</span>
             </h1>
             <p className="m-0 text-[17px] md:text-lg text-muted leading-relaxed max-w-xl">
-              Most of every trading fee buys up to three tokens the creator picks, and pays them to the people who stake the launched token.
+              Most of every trading fee buys up to ten tokens the creator picks, and pays them to the people who stake the launched token.
               Lock longer for a bigger share.
             </p>
             <div className="flex flex-wrap gap-3">
@@ -97,7 +100,7 @@ export default async function HomePage() {
                 <Avatar seed={t.mint} label={t.symbol} image={t.image} size={40} />
                 <span className="flex flex-col min-w-0">
                   <span className="font-display font-bold truncate">{t.symbol}</span>
-                  <span className="text-[12px] text-muted truncate">{t.name ?? shortAddr(t.mint)}</span>
+                  <span className="text-[12px] text-muted truncate flex items-center gap-1.5">{t.name ?? shortAddr(t.mint)} · <CoinTag coin={t.quote} size={12} /></span>
                 </span>
               </span>
               <span className="flex flex-col items-end font-mono text-sm md:hidden">
@@ -107,7 +110,7 @@ export default async function HomePage() {
               <span className="hidden md:block text-right font-mono text-sm">{usd(t.mcapUsd)}</span>
               <span className="hidden md:block text-right font-mono text-sm">{change(t.change24h)}</span>
               <span className="hidden md:block text-right font-mono text-sm">{usd(t.volume24hUsd)}</span>
-              <span className="hidden md:block text-sm truncate">{earns(t)}</span>
+              <span className="hidden md:flex text-sm min-w-0"><CoinStack coins={t.basket} /></span>
             </Link>
           ))}
         </section>

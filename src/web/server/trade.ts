@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type { WebContext } from "./context";
 import { LaunchError } from "@/launch/prepare";
-import { NATIVE_MINT } from "@/domain/types";
+import { quoteCoin } from "@/domain/quotes";
 import type { Side, TradeTarget } from "@/meteora/trade";
 
 const addr = z.string().regex(/^[1-9A-HJ-NP-Za-km-z]{32,44}$/, "Wallet address is not valid");
@@ -9,14 +9,12 @@ const amount = z.string().regex(/^\d+$/, "Amount must be a whole number of base 
 const side = z.enum(["buy", "sell"], { message: "Side must be buy or sell" });
 const slippage = z.coerce.number().int().min(1, "Slippage is at least 0.01%").max(1_000, "Slippage is at most 10%").default(100);
 
-const OURTOKEN_DECIMALS = Number(process.env.OURTOKEN_DECIMALS ?? 6);
-
 async function target(ctx: WebContext, mint: string): Promise<TradeTarget> {
   const [l] = await ctx.sql`select mint, pool, damm_pool, status, quote_mint from launches where mint = ${mint}`;
   if (!l) throw new LaunchError("invalid_input", "No token here");
   return {
     pool: l.pool, dammPool: l.status === "graduated" ? l.damm_pool : null, baseMint: l.mint, quoteMint: l.quote_mint,
-    baseDecimals: 6, quoteDecimals: l.quote_mint === NATIVE_MINT ? 9 : OURTOKEN_DECIMALS,
+    baseDecimals: 6, quoteDecimals: quoteCoin(l.quote_mint)?.decimals ?? 6,
   };
 }
 

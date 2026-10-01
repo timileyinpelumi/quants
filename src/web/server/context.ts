@@ -9,6 +9,8 @@ import type { StakingAdapter } from "@/staking/adapter";
 import { TradeLive, type TradePort } from "@/meteora/trade";
 import { JupiterLive, type JupiterPort } from "@/jupiter/port";
 import { DevPinata, PinataRest, type PinataPort } from "./pinata";
+import { TokenIcons } from "./icons";
+import { JupiterPrices } from "@/indexer/prices";
 
 export interface WebContext {
   sql: SQL;
@@ -18,6 +20,8 @@ export interface WebContext {
   jupiter: JupiterPort;
   pinata: PinataPort;
   trade: TradePort;
+  icons: TokenIcons;
+  prices: JupiterPrices;
   configKeys: Record<string, string>;
   keeperAddress: string;
   spillWallet: PublicKey;
@@ -56,6 +60,8 @@ export function getContext(): WebContext {
     jupiter: withLocalTokens(new JupiterLive(e.JUPITER_BASE_URL ?? "https://api.jup.ag/swap/v1", chain, fetch, e.JUPITER_API_KEY), e.LOCAL_TOKEN_LIST),
     pinata: e.PINATA_JWT === "stub" ? new DevPinata() : new PinataRest(e.PINATA_JWT!),
     trade: new TradeLive(conn),
+    prices: new JupiterPrices(e.JUPITER_API_KEY ? "https://api.jup.ag/price/v3" : "https://lite-api.jup.ag/price/v3", e.JUPITER_API_KEY),
+    icons: new TokenIcons(e.JUPITER_API_KEY ? "https://api.jup.ag/tokens/v2" : "https://lite-api.jup.ag/tokens/v2", e.JUPITER_API_KEY),
     configKeys: JSON.parse(readFileSync(e.CONFIG_KEYS_PATH ?? "config-keys.json", "utf8")),
     keeperAddress: e.KEEPER_ADDRESS!,
     spillWallet: new PublicKey(e.SPILL_ADDRESS!),

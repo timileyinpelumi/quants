@@ -5,12 +5,14 @@ import { shortAddr } from "@/web/ui/format";
 
 export type PickedToken = { mint: string; symbol: string; name: string; icon: string | null; decimals: number };
 
-export function TokenPicker({ open, onClose, onPick, taken }: {
+export function TokenPicker({ open, onClose, onPick, taken, max }: {
   open: boolean;
   onClose: () => void;
-  onPick: (t: PickedToken) => void;
+  onPick: (t: PickedToken[]) => void;
   taken: string[];
+  max: number;
 }) {
+  const [selected, setSelected] = useState<PickedToken[]>([]);
   const [q, setQ] = useState("");
   const [found, setFound] = useState<PickedToken[]>([]);
   const [state, setState] = useState<"idle" | "searching" | "done" | "error">("idle");
@@ -20,6 +22,7 @@ export function TokenPicker({ open, onClose, onPick, taken }: {
   useEffect(() => {
     if (!open) return;
     setQ("");
+    setSelected([]);
     setFound([]);
     setState("idle");
     const t = setTimeout(() => input.current?.focus(), 30);
@@ -59,7 +62,7 @@ export function TokenPicker({ open, onClose, onPick, taken }: {
       <button type="button" aria-label="Close" onClick={onClose} className="absolute inset-0 bg-black/70 backdrop-blur-sm cursor-default" />
       <div role="dialog" aria-modal="true" aria-labelledby="picker-title" className="panel relative w-full md:max-w-lg max-h-[85vh] flex flex-col rounded-b-none md:rounded-[32px]">
         <div className="flex items-center justify-between gap-4 px-6 pt-6 pb-4">
-          <h2 id="picker-title" className="m-0 font-display font-black text-2xl tracking-tight">Pick a reward token</h2>
+          <h2 id="picker-title" className="m-0 font-display font-black text-2xl tracking-tight">Pick reward tokens</h2>
           <button type="button" aria-label="Close" onClick={onClose} className="w-11 h-11 rounded-full border border-white/10 text-muted hover:text-ink flex items-center justify-center cursor-pointer">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M6 6l12 12" /><path d="M18 6L6 18" /></svg>
           </button>
@@ -78,23 +81,36 @@ export function TokenPicker({ open, onClose, onPick, taken }: {
           {!browsing && state === "done" && found.length === 0 && <p className="m-0 px-3 py-6 text-sm text-muted">No verified token matches that.</p>}
           {list.map((t) => {
             const added = taken.includes(t.mint);
+            const on = selected.some((x) => x.mint === t.mint);
+            const full = !on && selected.length >= max;
             return (
               <button
                 key={t.mint}
                 type="button"
-                disabled={added}
-                onClick={() => { onPick(t); onClose(); }}
-                className="w-full grid grid-cols-[40px_minmax(0,1fr)_auto] gap-3 items-center px-3 py-3 rounded-2xl text-left cursor-pointer hover:bg-white/[0.04] disabled:opacity-40 disabled:cursor-default min-h-14"
+                role="checkbox"
+                aria-checked={on || added}
+                disabled={added || full}
+                onClick={() => setSelected((cur) => (on ? cur.filter((x) => x.mint !== t.mint) : [...cur, t]))}
+                className={`w-full grid grid-cols-[40px_minmax(0,1fr)_auto] gap-3 items-center px-3 py-3 rounded-2xl text-left cursor-pointer disabled:opacity-40 disabled:cursor-default min-h-14 ${on ? "bg-lime/[0.08]" : "hover:bg-white/[0.04]"}`}
               >
                 <Avatar seed={t.mint} label={t.symbol} image={t.icon} size={40} />
                 <span className="flex flex-col min-w-0">
                   <span className="font-semibold truncate">{t.symbol}</span>
                   <span className="text-[13px] text-muted truncate">{t.name} · <span className="font-mono">{shortAddr(t.mint)}</span></span>
                 </span>
-                <span className={`text-sm font-semibold ${added ? "text-muted" : "text-lime"}`}>{added ? "Added" : "Add"}</span>
+                <span aria-hidden className={`w-6 h-6 rounded-full border flex items-center justify-center ${on || added ? "bg-lime border-lime text-ground" : "border-white/25"}`}>
+                  {(on || added) && <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12l5 5 9-10" /></svg>}
+                </span>
               </button>
             );
           })}
+        </div>
+        <div className="flex items-center justify-between gap-4 px-6 py-4 border-t line">
+          <span className="text-sm text-muted">{selected.length ? selected.map((x) => x.symbol).join(", ") : `Pick up to ${max}`}</span>
+          <button type="button" disabled={selected.length === 0} onClick={() => { onPick(selected); onClose(); }}
+            className="font-display font-bold text-ground bg-lime rounded-full px-6 min-h-11 cursor-pointer disabled:opacity-40 disabled:cursor-default shrink-0">
+            {selected.length > 1 ? `Add ${selected.length} tokens` : "Add token"}
+          </button>
         </div>
       </div>
     </div>

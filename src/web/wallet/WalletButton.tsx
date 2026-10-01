@@ -3,9 +3,10 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useWalletModal } from "@solana/wallet-adapter-react-ui";
+import { useUsd, usdText } from "@/web/ui/usd";
 import { Avatar } from "@/web/ui/Avatar";
 import { Jazzicon } from "@/web/ui/Jazzicon";
-import { fmtAmount, shortAddr } from "@/web/ui/format";
+import { fmtAmount, fmtCompact, shortAddr } from "@/web/ui/format";
 
 type Held = { mint: string; amount: string; decimals: number; symbol: string | null; name: string | null; image: string | null; kind: "launch" | "platform" | "reward" | "other" };
 const KIND: Record<Held["kind"], string> = { launch: "Launched here", platform: "Platform token", reward: "Reward token", other: "Other" };
@@ -43,9 +44,13 @@ export function WalletButton() {
 function AccountModal({ owner, onClose }: { owner: string; onClose: () => void }) {
   const wallet = useWallet();
   const modal = useWalletModal();
-  const [data, setData] = useState<{ sol: string; tokens: Held[] } | null>(null);
+  const [data, setData] = useState<{ sol: string; solIcon?: string | null; tokens: Held[] } | null>(null);
   const [error, setError] = useState(false);
   const [copied, setCopied] = useState(false);
+  const SOL_MINT = "So11111111111111111111111111111111111111112";
+  const px = useUsd([SOL_MINT, ...(data?.tokens.map((t) => t.mint) ?? [])]);
+  const values = data ? [Number(BigInt(data.sol)) / 1e9 * (px[SOL_MINT] ?? NaN), ...data.tokens.map((t) => Number(BigInt(t.amount)) / 10 ** t.decimals * (px[t.mint] ?? 0))] : [];
+  const total = values.length && Number.isFinite(values[0]) ? values.reduce((a, b) => a + b, 0) : null;
 
   const load = useCallback(async () => {
     setError(false);
@@ -84,9 +89,13 @@ function AccountModal({ owner, onClose }: { owner: string; onClose: () => void }
         </div>
 
         <div className="mx-6 px-5 py-4 rounded-[22px] bg-ground border border-white/[0.06] flex items-end justify-between">
+          <span className="flex items-center gap-3">
+            <Avatar seed="SOL" label="SOL" image={data?.solIcon ?? null} size={36} />
           <span className="flex flex-col gap-1">
             <span className="text-[13px] text-muted">SOL balance</span>
             <span className="font-display font-black text-3xl tracking-tight">{data ? fmtAmount(data.sol, 9, 4) : "…"}</span>
+            {data && total !== null && <span className="font-mono text-[13px] text-muted">Wallet worth about ${fmtCompact(total)}</span>}
+          </span>
           </span>
           <button type="button" onClick={load} className="text-[13px] text-muted hover:text-ink cursor-pointer min-h-11">Refresh</button>
         </div>
@@ -104,7 +113,10 @@ function AccountModal({ owner, onClose }: { owner: string; onClose: () => void }
                   <span className="font-semibold truncate">{t.symbol ?? shortAddr(t.mint)}</span>
                   <span className="text-[13px] text-muted truncate">{KIND[t.kind]}</span>
                 </span>
-                <span className="font-mono text-sm text-right">{fmtAmount(t.amount, t.decimals, 4)}</span>
+                <span className="flex flex-col items-end font-mono text-sm text-right">
+                  <span>{fmtAmount(t.amount, t.decimals, 4)}</span>
+                  {usdText(Number(BigInt(t.amount)) / 10 ** t.decimals, px[t.mint]) && <span className="text-[12px] text-faint">{usdText(Number(BigInt(t.amount)) / 10 ** t.decimals, px[t.mint])}</span>}
+                </span>
               </>
             );
             const cls = "grid grid-cols-[40px_minmax(0,1fr)_auto] gap-3 items-center px-3 py-2.5 rounded-2xl min-h-14";

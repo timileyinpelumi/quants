@@ -5,6 +5,8 @@ import { FakeMeteora } from "./fake-meteora";
 import { FakeStaking } from "./fake-staking";
 import { FakeJupiter } from "./fake-jupiter";
 import { setContextForTests, type WebContext } from "../../src/web/server/context";
+import { TokenIcons } from "../../src/web/server/icons";
+import { JupiterPrices } from "../../src/indexer/prices";
 import { resetRateLimits } from "../../src/web/server/http";
 import type { PinataPort } from "../../src/web/server/pinata";
 import { defaultSettings, saveSettings } from "../../src/domain/settings";
@@ -46,6 +48,8 @@ export async function makeWebContext(over: Partial<WebContext> = {}) {
     jupiter: new FakeJupiter(chain),
     pinata: new FakePinata(),
     trade: new FakeTrade(),
+    prices: new JupiterPrices("https://prices.test", undefined, async () => Response.json({})),
+    icons: new TokenIcons("https://jup.test/tokens/v2", undefined, async () => Response.json([])),
     configKeys: { [`${NATIVE_MINT}:200`]: "CfgSol200", [`${OURS}:200`]: "CfgOurs200" },
     keeperAddress: "Keeper1111111111111111111111111111111111111",
     spillWallet: Keypair.generate().publicKey,

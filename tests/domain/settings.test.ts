@@ -9,12 +9,13 @@ test("defaults match the spec", () => {
   const s = defaultSettings(OURS);
   expect(s.split).toEqual({ basketBps: 6000, platformBps: 2500, creatorBps: 1500 });
   expect(s.tiers.map((t) => [t.id, t.lockSeconds, t.multiplierBps])).toEqual([
-    ["7d", 604_800, 10_000], ["30d", 2_592_000, 15_000], ["90d", 7_776_000, 20_000], ["180d", 15_552_000, 30_000],
+    ["12h", 43_200, 10_000], ["1d", 86_400, 11_000], ["3d", 259_200, 12_500], ["7d", 604_800, 15_000],
+    ["30d", 2_592_000, 20_000], ["90d", 7_776_000, 25_000], ["180d", 15_552_000, 30_000],
   ]);
   expect(s.maxPenaltyBps).toBe(3000);
   expect(s.rewardPeriodSeconds).toBe(86_400);
   expect(s.slippageBps).toBe(100);
-  expect(s.launchFeeLamports).toBe(300_000_000n);
+  expect(s.launchFeeLamports).toBe(50_000_000n);
   expect(s.creatorPayoutMin[NATIVE_MINT]).toBe(50_000_000n);
   expect(s.devBuyCapBps).toBe(5000);
   expect(s.keeperIntervalSeconds).toBe(600);
@@ -48,5 +49,5 @@ test("save creates a new version and load returns the latest with bigints intact
   const latest = await loadLatestSettings(sql);
   expect(latest.version).toBe(v2);
   expect(latest.split.basketBps).toBe(7000);
-  expect(latest.launchFeeLamports).toBe(300_000_000n);
+  expect(latest.launchFeeLamports).toBe(50_000_000n);
 });

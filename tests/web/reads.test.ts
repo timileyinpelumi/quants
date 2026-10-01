@@ -12,7 +12,7 @@ const CREATOR = "Creator111111111111111111111111111111111111";
 
 async function launch(c: Awaited<ReturnType<typeof makeWebContext>>, symbol: string) {
   const p = await prepareLaunch(
-    { sql: c.sql, meteora: c.meteora, configKeys: c.configKeys, ourtokenMint: c.ourtokenMint, keeperAddress: c.keeperAddress, isVerified: async () => true, tokenProgramOf: c.tokenProgramOf },
+    { sql: c.sql, meteora: c.meteora, configKeys: c.configKeys, quoteMints: [NATIVE_MINT, c.ourtokenMint], keeperAddress: c.keeperAddress, isVerified: async () => true, tokenProgramOf: c.tokenProgramOf },
     { name: `${symbol} Coin`, symbol, uri: "https://ipfs.io/ipfs/m", image: "https://ipfs.io/ipfs/i", creator: CREATOR, quoteMint: NATIVE_MINT, feeTierBps: 200,
       basket: [{ mint: ZEC, weightBps: 10_000, symbol: "ZEC", decimals: 8 }] },
   );
@@ -55,8 +55,9 @@ test("launchDetail sums paid out and burned, and weights tier shares by multipli
   expect(d.launch.symbol).toBe("CAT");
   expect(d.basket).toEqual([{ mint: ZEC, symbol: "ZEC", decimals: 8, weightBps: 10_000, paidOut: "150" }]);
   expect(d.burned).toBe("300");
-  expect(d.tiers.map((t) => t.sharePct)).toEqual([25, 0, 0, 75]);
-  expect(d.tiers[0]!.staked).toBe("100");
+  // 7d is 1.5x and 180d is 3x, so equal stakes split one third to two thirds
+  expect(d.tiers.map((t) => t.sharePct)).toEqual([0, 0, 0, 33, 0, 0, 67]);
+  expect(d.tiers[3]!.staked).toBe("100");
   expect(d.curve).toEqual({ quoteReserve: "40", threshold: "80", migrated: false });
   expect(await launchDetail(c, "unknown")).toBeNull();
 });

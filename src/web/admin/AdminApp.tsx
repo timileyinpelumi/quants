@@ -146,19 +146,19 @@ export function AdminApp() {
             {settings.tiers.map((t, i) => (
               <div key={i} className="grid grid-cols-[1fr_1fr_1fr_44px] gap-3 items-end">
                 <label className="flex flex-col gap-2 text-[13px] text-muted"><span>Name</span><input value={t.id} onChange={(e) => set({ tiers: settings.tiers.map((x, j) => (j === i ? { ...x, id: e.target.value } : x)) })} className={small} /></label>
-                <Num label="Lock" suffix="days" value={t.lockSeconds / 86_400} onChange={(v) => set({ tiers: settings.tiers.map((x, j) => (j === i ? { ...x, lockSeconds: Math.round(Number(v) * 86_400) } : x)) })} />
+                <Num label="Lock (0.5 is 12 hours)" suffix="days" value={t.lockSeconds / 86_400} onChange={(v) => set({ tiers: settings.tiers.map((x, j) => (j === i ? { ...x, lockSeconds: Math.round(Number(v) * 86_400) } : x)) })} />
                 <Num label="Multiplier" suffix="x" value={t.multiplierBps / 10_000} onChange={(v) => set({ tiers: settings.tiers.map((x, j) => (j === i ? { ...x, multiplierBps: Math.round(Number(v) * 10_000) } : x)) })} />
                 <button type="button" aria-label={`Remove tier ${t.id}`} onClick={() => set({ tiers: settings.tiers.filter((_, j) => j !== i) })} className="w-11 h-11 rounded-full border border-white/10 text-muted hover:text-ink cursor-pointer">×</button>
               </div>
             ))}
-            {settings.tiers.length < 6 && <button type="button" onClick={() => set({ tiers: [...settings.tiers, { id: "new", lockSeconds: 86_400, multiplierBps: 10_000 }] })} className="self-start text-sm font-semibold text-lime min-h-11 cursor-pointer">Add a tier</button>}
+            {settings.tiers.length < 8 && <button type="button" onClick={() => set({ tiers: [...settings.tiers, { id: "new", lockSeconds: 86_400, multiplierBps: 10_000 }] })} className="self-start text-sm font-semibold text-lime min-h-11 cursor-pointer">Add a tier</button>}
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <Num label="Max early exit penalty" suffix="%" value={pct(settings.maxPenaltyBps)} onChange={(v) => set({ maxPenaltyBps: toBps(v) })} />
             <Num label="Reward stream period" suffix="hours" value={settings.rewardPeriodSeconds / 3600} onChange={(v) => set({ rewardPeriodSeconds: Math.round(Number(v) * 3600) })} />
             <Num label="Swap slippage cap" suffix="%" value={pct(settings.slippageBps)} onChange={(v) => set({ slippageBps: toBps(v) })} />
-            <Num label="Launch fee" suffix="SOL" value={Number(settings.launchFeeLamports) / 1e9} onChange={(v) => set({ launchFeeLamports: String(Math.round(Number(v) * 1e9)) })} />
+            <Num label="Platform launch fee (farm rent is added per launch)" suffix="SOL" value={Number(settings.launchFeeLamports) / 1e9} onChange={(v) => set({ launchFeeLamports: String(Math.round(Number(v) * 1e9)) })} />
             <Num label="Creator payout minimum" suffix="SOL" value={Number(settings.creatorPayoutMin[SOL] ?? "0") / 1e9} onChange={(v) => set({ creatorPayoutMin: { ...settings.creatorPayoutMin, [SOL]: String(Math.round(Number(v) * 1e9)) } })} />
             <Num label="First buy cap" suffix="% of supply" value={pct(settings.devBuyCapBps)} onChange={(v) => set({ devBuyCapBps: toBps(v) })} />
             <Num label="Keeper interval" suffix="minutes" value={settings.keeperIntervalSeconds / 60} onChange={(v) => set({ keeperIntervalSeconds: Math.round(Number(v) * 60) })} />

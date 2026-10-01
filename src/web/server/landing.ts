@@ -1,4 +1,8 @@
 import type { SQL } from "bun";
+import { quoteCoin } from "@/domain/quotes";
+
+export type Icons = (mints: string[]) => Promise<Record<string, string | null>>;
+export type CoinRef = { mint: string; symbol: string; icon: string | null };
 
 const SUPPLY = 1_000_000_000;
 const DAY = 86_400_000;
@@ -6,7 +10,8 @@ const LIST = 6;
 
 export type TokenRow = {
   mint: string; symbol: string; name: string | null; image: string | null; status: string; createdAt: string;
-  basket: string[];
+  basket: CoinRef[];
+  quote: CoinRef;
   price: number | null; priceUsd: number | null; mcapUsd: number | null; change24h: number; volume24hUsd: number; trades24h: number;
   progress: number | null;
 };
@@ -18,7 +23,7 @@ export type Landing = {
 export type ExploreSort = "trending" | "mcap" | "new" | "gainers" | "graduating";
 export type ExploreFilter = "all" | "live" | "graduated";
 
-async function tokenRows(sql: SQL, now: number): Promise<TokenRow[]> {
+async function tokenRows(sql: SQL, now: number, icons?: Icons): Promise<TokenRow[]> {
   const since = new Date(now - DAY);
   const rows = await sql`
     with last as (
@@ -33,20 +38,24 @@ async function tokenRows(sql: SQL, now: number): Promise<TokenRow[]> {
       select distinct on (launch_id) launch_id, curve_reserve, curve_threshold from trades
       where curve_reserve is not null order by launch_id, slot desc, seq desc
     )
-    select l.mint, l.symbol, l.name, l.image, l.status, l.created_at, last.price, last.quote_usd,
+    select l.mint, l.symbol, l.name, l.image, l.status, l.created_at, l.quote_mint, last.price, last.quote_usd,
       coalesce(ref.price, first.price) as ref_price, coalesce(day.vol, 0) as vol, coalesce(day.n, 0) as n,
       curve.curve_reserve::float8 as reserve, curve.curve_threshold::float8 as threshold,
-      coalesce((select json_agg(coalesce(b.symbol, left(b.reward_mint, 4)) order by b.weight_bps desc, b.reward_mint)
+      coalesce((select json_agg(json_build_object('mint', b.reward_mint, 'symbol', coalesce(b.symbol, left(b.reward_mint, 4))) order by b.weight_bps desc, b.reward_mint)
                 from baskets b where b.launch_id = l.id), '[]') as basket
     from launches l
     left join last on last.launch_id = l.id left join ref on ref.launch_id = l.id left join first on first.launch_id = l.id
     left join day on day.launch_id = l.id left join curve on curve.launch_id = l.id`;
-  return rows.map((r: any) => {
+  const baskets: { mint: string; symbol: string }[][] = rows.map((r: any) => (typeof r.basket === "string" ? JSON.parse(r.basket) : r.basket));
+  const allMints = [...new Set([...baskets.flat().map((b) => b.mint), ...rows.map((r: any) => r.quote_mint as string)])];
+  const icon = icons ? await icons(allMints) : {};
+  return rows.map((r: any, i: number) => {
     const priceUsd = r.price === null || r.quote_usd === null ? null : r.price * r.quote_usd;
     return {
       mint: r.mint, symbol: r.symbol ?? r.mint.slice(0, 4), name: r.name, image: r.image, status: r.status,
       createdAt: new Date(r.created_at).toISOString(),
-      basket: typeof r.basket === "string" ? JSON.parse(r.basket) : r.basket,
+      basket: baskets[i]!.map((b) => ({ ...b, icon: icon[b.mint] ?? null })),
+      quote: { mint: r.quote_mint, symbol: quoteCoin(r.quote_mint)?.symbol ?? r.quote_mint.slice(0, 4), icon: icon[r.quote_mint] ?? null },
       price: r.price, priceUsd, mcapUsd: priceUsd === null ? null : priceUsd * SUPPLY,
       change24h: r.price !== null && r.ref_price ? (r.price / r.ref_price - 1) * 100 : 0,
       volume24hUsd: Number(r.vol), trades24h: r.n,
@@ -58,7 +67,7 @@ async function tokenRows(sql: SQL, now: number): Promise<TokenRow[]> {
 const byNew = (a: TokenRow, b: TokenRow) => b.createdAt.localeCompare(a.createdAt);
 const byVolume = (a: TokenRow, b: TokenRow) => b.volume24hUsd - a.volume24hUsd || byNew(a, b);
 
-export async function landing(sql: SQL, now = Date.now()): Promise<Landing> {
+export async function landing(sql: SQL, now = Date.now(), icons?: Icons): Promise<Landing> {
   const since = new Date(now - DAY);
   const [stats] = await sql`
     with px as (
@@ -73,7 +82,7 @@ export async function landing(sql: SQL, now = Date.now()): Promise<Landing> {
       (select coalesce(sum((d.detail->>'amount')::float8 * (s.data->'split'->>'basketBps')::float8 / 10000 * px.unit * px.quote_usd), 0)
          from distributions d join settings s on s.version = d.settings_version join px on px.launch_id = d.launch_id
          where d.kind = 'split' and d.status = 'confirmed') as stakers`;
-  const tokens = await tokenRows(sql, now);
+  const tokens = await tokenRows(sql, now, icons);
   const recent = await recentTrades(sql, null, 8);
   return {
     stats: {
@@ -88,9 +97,9 @@ export async function landing(sql: SQL, now = Date.now()): Promise<Landing> {
   };
 }
 
-export async function exploreTokens(sql: SQL, o: { sort: ExploreSort; filter?: ExploreFilter; q?: string }, now = Date.now()): Promise<TokenRow[]> {
+export async function exploreTokens(sql: SQL, o: { sort: ExploreSort; filter?: ExploreFilter; q?: string }, now = Date.now(), icons?: Icons): Promise<TokenRow[]> {
   const q = o.q?.trim().toLowerCase() ?? "";
-  let list = (await tokenRows(sql, now))
+  let list = (await tokenRows(sql, now, icons))
     .filter((t) => o.filter === "live" ? t.status === "live" : o.filter === "graduated" ? t.status === "graduated" : true)
     .filter((t) => !q || t.mint.toLowerCase() === q || t.symbol.toLowerCase().includes(q) || (t.name ?? "").toLowerCase().includes(q));
   if (o.sort === "graduating") list = list.filter((t) => t.progress !== null);

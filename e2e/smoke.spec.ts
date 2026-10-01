@@ -20,9 +20,11 @@ test("launch, see the token, stake, exit early and see the burn", async ({ page 
   await page.locator('input[type="file"]').setInputFiles("e2e/fixtures/cat.png");
   await page.getByLabel("Name").fill("End To End");
   await page.getByLabel("Symbol").fill(symbol);
-  await page.getByRole("button", { name: /Add a reward token/ }).click();
-  await page.getByRole("dialog").getByPlaceholder("Name, symbol or address").fill("ZEC");
-  await page.getByRole("dialog").getByRole("button", { name: /ZEC.*Add/ }).click();
+  await page.getByRole("button", { name: /Add reward tokens/ }).click();
+  const picker = page.getByRole("dialog");
+  await picker.getByRole("checkbox", { name: /ZEC/ }).click();
+  await picker.getByRole("checkbox", { name: /CATE/ }).click();
+  await picker.getByRole("button", { name: "Add 2 tokens" }).click();
   await expect(page.getByRole("dialog")).toHaveCount(0);
   await page.getByPlaceholder("0").first().fill("1");
   await page.getByRole("button", { name: `Launch ${symbol}` }).click();
@@ -36,7 +38,7 @@ test("launch, see the token, stake, exit early and see the burn", async ({ page 
   keeperPass();
   await page.goto(`/t/${mint}/stake`);
   await expect(page.getByText("Staking opens a few minutes after launch")).toHaveCount(0);
-  await page.getByRole("button", { name: /1\.5x\s*30 days/ }).click();
+  await page.getByRole("button", { name: /2x\s*30 days/ }).click();
   await page.getByRole("button", { name: "Max" }).click();
   await page.getByRole("button", { name: "Stake for 30 days" }).click();
   await expect(page.getByText(/30 days, unlocks/)).toBeVisible();
@@ -48,7 +50,7 @@ test("launch, see the token, stake, exit early and see the burn", async ({ page 
 
   keeperPass();
   await page.goto(`/t/${mint}`);
-  await expect(page.getByText(new RegExp(`^[1-9][\\d,]* ${symbol} burned$`))).toBeVisible();
+  await expect(page.getByText(new RegExp(`^[1-9][\\d,]* ${symbol} burned`))).toBeVisible();
 });
 
 test("pages fit a phone screen", async ({ page }) => {

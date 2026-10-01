@@ -7,6 +7,9 @@ import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 import { Button } from "@/web/ui/Button";
 import { fmtAmount } from "@/web/ui/format";
 import { signAndSendAll } from "@/web/wallet/send";
+import { StakeForm } from "@/web/stake/StakeForm";
+import { useUsd, usdText } from "@/web/ui/usd";
+import type { Tier } from "@/web/stake/useStake";
 
 const SOL = "So11111111111111111111111111111111111111112";
 const FEE_RESERVE = 10_000_000n;
@@ -18,13 +21,15 @@ function toBase(v: string, decimals: number): bigint | null {
   return BigInt(w || "0") * 10n ** BigInt(decimals) + BigInt((f + "0".repeat(decimals)).slice(0, decimals));
 }
 
-export function TradePanel({ mint, symbol, quoteMint, quoteSymbol, quoteDecimals }: {
+export function TradePanel({ mint, symbol, quoteMint, quoteSymbol, quoteDecimals, stake }: {
   mint: string; symbol: string; quoteMint: string; quoteSymbol: string; quoteDecimals: number;
+  stake: { tiers: Tier[]; maxPenaltyBps: number; ready: boolean; earns: string };
 }) {
   const wallet = useWallet();
   const { connection } = useConnection();
   const modal = useWalletModal();
-  const [side, setSide] = useState<"buy" | "sell">("buy");
+  const [tab, setTab] = useState<"buy" | "sell" | "stake">("buy");
+  const side = tab === "sell" ? "sell" : "buy";
   const [amount, setAmount] = useState("");
   const [slippageBps, setSlippage] = useState(100);
   const [quote, setQuote] = useState<Quote | null>(null);
@@ -67,6 +72,10 @@ export function TradePanel({ mint, symbol, quoteMint, quoteSymbol, quoteDecimals
     return () => clearTimeout(t);
   }, [amountBase, side, slippageBps, mint]);
 
+  const px = useUsd([quoteMint, mint]);
+  const inPrice = side === "buy" ? px[quoteMint] : px[mint];
+  const outPrice = side === "buy" ? px[mint] : px[quoteMint];
+  const whole = (base: string | bigint, decimals: number) => Number(BigInt(base)) / 10 ** decimals;
   const have = balances ? (side === "buy" ? balances.quote : balances.token) : null;
   const spendable = have === null ? null : side === "buy" && quoteMint === SOL ? (have > FEE_RESERVE ? have - FEE_RESERVE : 0n) : have;
   const tooMuch = amountBase !== null && spendable !== null && amountBase > spendable;
@@ -102,25 +111,29 @@ export function TradePanel({ mint, symbol, quoteMint, quoteSymbol, quoteDecimals
 
   return (
     <div className="panel flex flex-col gap-4 p-5 md:p-6 min-w-0">
-      <div role="group" aria-label="Buy or sell" className="grid grid-cols-2 gap-1.5 p-1.5 bg-ground rounded-full">
-        {(["buy", "sell"] as const).map((s) => (
+      <div role="group" aria-label="Buy, sell or stake" className="grid grid-cols-3 gap-1.5 p-1.5 bg-ground rounded-full">
+        {(["buy", "sell", "stake"] as const).map((s) => (
           <button
             key={s}
             type="button"
-            aria-pressed={side === s}
-            onClick={() => { setSide(s); setAmount(""); setMsg(null); }}
-            className={`font-display font-bold text-[15px] py-3 min-h-11 rounded-full cursor-pointer capitalize ${side === s ? (s === "buy" ? "bg-lime text-ground" : "bg-burn text-ground") : "text-muted hover:text-ink"}`}
+            aria-pressed={tab === s}
+            onClick={() => { setTab(s); setAmount(""); setMsg(null); }}
+            className={`font-display font-bold text-[15px] py-3 min-h-11 rounded-full cursor-pointer capitalize ${tab === s ? (s === "buy" ? "bg-lime text-ground" : s === "sell" ? "bg-burn text-ground" : "bg-violet-light text-ground") : "text-muted hover:text-ink"}`}
           >
             {s}
           </button>
         ))}
       </div>
+      {tab === "stake" ? <StakeForm mint={mint} symbol={symbol} {...stake} /> : <>
 
       <label className="flex flex-col gap-2.5 text-[13px] text-muted">
-        <span className="flex justify-between"><span>You pay</span>{have !== null && <span className="font-mono">Balance {fmtAmount(have, inDecimals, 4)} {inSymbol}</span>}</span>
+        <span className="flex justify-between"><span>You pay</span>{have !== null && <span className="font-mono">Balance {fmtAmount(have, inDecimals, 4)} {inSymbol}{usdText(whole(have, inDecimals), inPrice) && <span className="text-faint"> · {usdText(whole(have, inDecimals), inPrice)}</span>}</span>}</span>
         <span className="flex items-center bg-ground border border-white/10 rounded-[20px] px-5 focus-within:border-lime/60">
           <input inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0" aria-label={`Amount of ${inSymbol}`} className="flex-1 min-w-0 font-display font-bold text-[28px] md:text-[32px] text-ink bg-transparent border-0 py-4 outline-none" />
-          <span className="font-display font-bold text-[15px] text-muted pl-2">{inSymbol}</span>
+          <span className="flex flex-col items-end pl-2">
+            <span className="font-display font-bold text-[15px] text-muted">{inSymbol}</span>
+            {amountBase && amountBase > 0n && usdText(whole(amountBase, inDecimals), inPrice) && <span className="font-mono text-[12px] text-faint">≈ {usdText(whole(amountBase, inDecimals), inPrice)}</span>}
+          </span>
         </span>
       </label>
 
@@ -131,7 +144,7 @@ export function TradePanel({ mint, symbol, quoteMint, quoteSymbol, quoteDecimals
       </div>
 
       <div className="flex flex-col text-sm">
-        <span className="flex justify-between py-2 border-b line"><span className="text-muted">You get about</span><span className="font-mono">{quote ? `${fmtAmount(quote.amountOut, outDecimals, 4)} ${outSymbol}` : "…"}</span></span>
+        <span className="flex justify-between py-2 border-b line"><span className="text-muted">You get about</span><span className="font-mono">{quote ? `${fmtAmount(quote.amountOut, outDecimals, 4)} ${outSymbol}` : "…"}{quote && usdText(whole(quote.amountOut, outDecimals), outPrice) && <span className="text-faint"> ≈ {usdText(whole(quote.amountOut, outDecimals), outPrice)}</span>}</span></span>
         <span className="flex justify-between py-2 border-b line"><span className="text-muted">At least</span><span className="font-mono">{quote ? `${fmtAmount(quote.minOut, outDecimals, 4)} ${outSymbol}` : "…"}</span></span>
         <span className="flex justify-between items-center py-2">
           <span className="text-muted">Max slippage</span>
@@ -152,6 +165,7 @@ export function TradePanel({ mint, symbol, quoteMint, quoteSymbol, quoteDecimals
         {busy ? "Approve in your wallet" : !owner ? "Connect wallet" : `${side === "buy" ? "Buy" : "Sell"} ${symbol}`}
       </Button>
       <p className="m-0 text-[12px] text-faint text-center">{quote?.venue === "damm" ? "Trades on the graduated Meteora pool" : "Trades on the bonding curve"}</p>
+      </>}
     </div>
   );
 }

@@ -109,7 +109,6 @@ docker compose up -d
 solana-test-validator ... (flags in "Local end-to-end run" above)
 bun run seed                                  # writes .env.local and config-keys.json, launches CAT and DOG
 bun --env-file=.env.local scripts/keeper-once.ts
-bun --env-file=.env.local scripts/migrate-full-curves.ts   # stands in for Meteora's migration keepers, which do not run locally
 bun --env-file=.env.local run indexer         # keep running; fills charts and the home page
 bun run dev                                   # http://localhost:3000 (webpack dev server), connect "Test Wallet"
 bun run warm                                  # compiles every route once; a first compile reloads open pages

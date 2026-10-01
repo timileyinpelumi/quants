@@ -1,3 +1,4 @@
+import { launchCost } from "../../src/domain/launch-cost";
 import { test, expect } from "bun:test";
 import { freshDb } from "../helpers/db";
 import { FakeChain } from "../helpers/fake-chain";
@@ -19,7 +20,7 @@ async function setup(verified = true, tokenProgram = "TokenkegQfeZyiNwAJbNbGKPFX
   const sql = await freshDb();
   await saveSettings(sql, defaultSettings(OURS), "test");
   const meteora = new FakeMeteora(new FakeChain());
-  return { sql, meteora, deps: { sql, meteora, configKeys, ourtokenMint: OURS, keeperAddress: KEEPER, isVerified: async () => verified, tokenProgramOf: async () => tokenProgram } };
+  return { sql, meteora, deps: { sql, meteora, configKeys, quoteMints: [NATIVE_MINT, OURS], keeperAddress: KEEPER, isVerified: async () => verified, tokenProgramOf: async () => tokenProgram } };
 }
 
 test("prepares a transaction against the right config key with the launch fee", async () => {
@@ -28,7 +29,7 @@ test("prepares a transaction against the right config key with the launch fee", 
   expect(r.pool).toStartWith("pool-");
   expect(typeof r.transaction).toBe("string");
   expect(meteora.launches[0]!.configKey).toBe("CfgSol200");
-  expect(meteora.launches[0]!.launchFeeLamports).toBe(300_000_000n);
+  expect(meteora.launches[0]!.launchFeeLamports).toBe(launchCost(defaultSettings(OURS), valid.basket.length).total);
   expect(meteora.launches[0]!.feeReceiver).toBe(KEEPER);
 });
 

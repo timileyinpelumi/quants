@@ -20,7 +20,7 @@ export function Chart({ mint, quoteSymbol }: { mint: string; quoteSymbol: string
       .then((j) => { if (!live) return; setUnit(j.unit ?? "usd"); const next: Candle[] = j.candles ?? []; setCandles((prev) => (JSON.stringify(prev) === JSON.stringify(next) ? prev : next)); })
       .catch(() => live && setCandles((c) => c ?? []));
     load();
-    const t = setInterval(load, 15_000);
+    const t = setInterval(load, 10_000);
     return () => { live = false; clearInterval(t); };
   }, [mint, tf]);
 

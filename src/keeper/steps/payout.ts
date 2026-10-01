@@ -1,3 +1,4 @@
+import { quoteCoin } from "../../domain/quotes";
 import type { KeeperDeps } from "../deps";
 import type { LaunchRow } from "../launch-row";
 import type { VersionedSettings } from "../../domain/settings";
@@ -11,7 +12,7 @@ export async function payoutStep(deps: KeeperDeps, launch: LaunchRow, s: Version
   const mint = launch.quoteMint;
   const targets = [
     { bucket: "treasury" as const, to: deps.wallets.treasury, min: 1n },
-    { bucket: "creator" as const, to: launch.creator, min: s.creatorPayoutMin[mint] ?? 1n },
+    { bucket: "creator" as const, to: launch.creator, min: s.creatorPayoutMin[mint] ?? quoteCoin(mint)?.payoutMin ?? 1n },
   ];
   for (const t of targets) {
     const amount = await getBalance(deps.sql, launch.id, t.bucket, mint);

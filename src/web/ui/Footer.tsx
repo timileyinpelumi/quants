@@ -11,6 +11,7 @@ export function Footer() {
       <nav aria-label="Footer" className="flex flex-wrap gap-x-6 gap-y-2 text-sm">
         <Link href="/docs" className="text-muted hover:text-ink min-h-11 flex items-center">Docs</Link>
         <Link href="/explore" className="text-muted hover:text-ink min-h-11 flex items-center">Explore</Link>
+        <Link href="/rewards" className="text-muted hover:text-ink min-h-11 flex items-center">Rewards</Link>
         <Link href="/portfolio" className="text-muted hover:text-ink min-h-11 flex items-center">Portfolio</Link>
         <Link href="/terms" className="text-muted hover:text-ink min-h-11 flex items-center">Terms and risks</Link>
       </nav>

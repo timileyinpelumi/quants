@@ -1,30 +1,32 @@
-import json
-d = json.load(open("glyphs.json"))
-q, word = d["q"], d["word"]
-qx0, qy0, qx1, qy1 = d["qb"]; wx0, wy0, wx1, wy1 = d["wb"]
-s = 66 / (qy1 - qy0)
-qcx, qcy = (qx0 + qx1) / 2, (qy0 + qy1) / 2
+# Writes the mark, both logo lockups and the app icon. The mark is drawn from shapes, so it needs no font;
+# the wordmark path (Unbounded Black) is kept in word.json, made once with outline.py.
+import json, os
+here = os.path.dirname(os.path.abspath(__file__))
+word = json.load(open(os.path.join(here, "word.json")))
 
-def mark(ox=0, oy=0, gid="m"):
-    return f'''<g transform="translate({ox} {oy})">
-  <defs><linearGradient id="{gid}f" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#DBFF72"/><stop offset="1" stop-color="#C8FF3D"/></linearGradient></defs>
-  <rect width="128" height="128" rx="40" fill="#8FBF16"/>
-  <rect width="128" height="119" rx="40" fill="url(#{gid}f)"/>
-  <g transform="translate(52 58) scale({s:.4f}) translate({-qcx:.2f} {-qcy:.2f})"><path d="{q}" fill="#0A0A0F"/></g>
-  <circle cx="103" cy="38" r="7" fill="#8B7BFF"/>
-  <circle cx="103" cy="58" r="7" fill="#FF7A59"/>
-  <circle cx="103" cy="78" r="7" fill="#4FB8FF"/>
+def mark(gid="m"):
+    return f'''<g>
+  <defs><linearGradient id="{gid}t" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1D1C27"/><stop offset="1" stop-color="#0E0D14"/></linearGradient></defs>
+  <rect width="128" height="128" rx="36" fill="url(#{gid}t)"/>
+  <rect x="1" y="1" width="126" height="126" rx="35" fill="none" stroke="#FFFFFF" stroke-opacity="0.09" stroke-width="2"/>
+  <circle cx="57" cy="60" r="25.5" fill="none" stroke="#C8FF3D" stroke-width="17"/>
+  <path d="M74 60 H91 V97 L74 107 Z" fill="#C8FF3D"/>
+  <circle cx="57" cy="60" r="7" fill="#9D8CFF"/>
+  <circle cx="96" cy="27" r="5.5" fill="#9D8CFF"/>
+  <circle cx="107.5" cy="39" r="4" fill="#FF7A59"/>
+  <circle cx="113" cy="53.5" r="3" fill="#4FB8FF"/>
 </g>'''
 
 def logo(fill):
-    ws = 0.8
-    ty = 64 - ((wy0 + wy1) / 2) * ws
-    return f'''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {128 + 32 + (wx1 - wx0) * 0.8 + 4:.0f} 128" role="img" aria-label="quants">
-{mark(gid="l")}
-<g transform="translate({128 + 32 - wx0 * ws:.2f} {ty:.2f}) scale({ws})"><path d="{word}" fill="{fill}"/></g>
+    return f'''<svg xmlns="http://www.w3.org/2000/svg" viewBox="{word["viewBox"]}" role="img" aria-label="quants">
+{mark("l")}
+<g transform="{word["transform"]}"><path d="{word["path"]}" fill="{fill}"/></g>
 </svg>
 '''
 
-open("quants-mark.svg", "w").write(f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="quants">\n{mark()}\n</svg>\n')
-open("quants-logo.svg", "w").write(logo("#F4F2EE"))
-open("quants-logo-dark.svg", "w").write(logo("#0A0A0F"))
+out = os.path.join(here, "..", "public", "brand")
+mark_svg = f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="quants">\n{mark()}\n</svg>\n'
+open(os.path.join(out, "quants-mark.svg"), "w").write(mark_svg)
+open(os.path.join(here, "..", "src", "app", "icon.svg"), "w").write(mark_svg)
+open(os.path.join(out, "quants-logo.svg"), "w").write(logo("#F4F2EE"))
+open(os.path.join(out, "quants-logo-dark.svg"), "w").write(logo("#0A0A0F"))

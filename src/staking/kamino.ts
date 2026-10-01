@@ -58,6 +58,8 @@ export class KaminoBackend implements StakingAdapter {
 
   async totalStaked(farm: string) { return (await this.state(farm)).totalStakedAmount; }
 
+  async vaultAuthority(farm: string) { return String((await this.state(farm)).farmVaultsAuthority); }
+
   async rewardState(farm: string, rewardMint: string) {
     const r = (await this.state(farm)).rewardInfos.find((x) => x.token.mint === rewardMint);
     if (!r) throw new Error(`reward ${rewardMint} not on farm ${farm}`);

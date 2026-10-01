@@ -6,7 +6,8 @@ import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 import { Avatar } from "@/web/ui/Avatar";
 import { Button } from "@/web/ui/Button";
 import { Jazzicon } from "@/web/ui/Jazzicon";
-import { fmtAmount, shortAddr } from "@/web/ui/format";
+import { fmtAmount, fmtCompact, shortAddr, lockLabel } from "@/web/ui/format";
+import { useUsd, usdText } from "@/web/ui/usd";
 
 type Position = {
   tierId: string; multiplierBps: number; lockSeconds: number; staked: string; unlocksAt: number; locked: boolean;
@@ -35,7 +36,7 @@ export function PortfolioApp() {
   const wallet = useWallet();
   const modal = useWalletModal();
   const owner = wallet.publicKey?.toBase58();
-  const [holdings, setHoldings] = useState<{ sol: string; tokens: Held[] } | null>(null);
+  const [holdings, setHoldings] = useState<{ sol: string; solIcon?: string | null; tokens: Held[] } | null>(null);
   const [stakes, setStakes] = useState<StakeLaunch[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -68,6 +69,14 @@ export function PortfolioApp() {
 
   const skeleton = <div className="flex flex-col gap-2">{[0, 1].map((i) => <div key={i} className="h-16 rounded-2xl bg-white/[0.03] animate-pulse" />)}</div>;
   const stakeCount = stakes?.reduce((a, l) => a + l.positions.length, 0);
+  const SOL_MINT = "So11111111111111111111111111111111111111112";
+  const px = useUsd([SOL_MINT, ...(holdings?.tokens.map((t) => t.mint) ?? []), ...(stakes ?? []).flatMap((l) => [l.mint, ...l.positions.flatMap((p) => p.pending.map((r) => r.mint))])]);
+  const usdOf = (base: string, decimals: number, mint: string) => usdText(Number(BigInt(base)) / 10 ** decimals, px[mint]);
+  const worth = (base: string, decimals: number, mint: string) => (Number(BigInt(base)) / 10 ** decimals) * (px[mint] ?? 0);
+  const total = holdings && px[SOL_MINT] != null
+    ? worth(holdings.sol, 9, SOL_MINT) + holdings.tokens.reduce((a, t) => a + worth(t.amount, t.decimals, t.mint), 0)
+      + (stakes ?? []).reduce((a, l) => a + l.positions.reduce((b, p) => b + worth(p.staked, 6, l.mint), 0), 0)
+    : null;
 
   return (
     <main className="flex flex-col gap-12 wrap pt-10 md:pt-14 pb-16">
@@ -80,8 +89,8 @@ export function PortfolioApp() {
           </div>
         </div>
         <div className="grid grid-cols-3 gap-6 md:gap-12">
+          <div className="flex flex-col gap-1"><span className="text-[13px] text-muted">Worth about</span><span className="font-display font-bold text-2xl">{total === null ? "…" : `$${fmtCompact(total)}`}</span></div>
           <div className="flex flex-col gap-1"><span className="text-[13px] text-muted">SOL</span><span className="font-display font-bold text-2xl">{holdings ? fmtAmount(holdings.sol, 9, 3) : "…"}</span></div>
-          <div className="flex flex-col gap-1"><span className="text-[13px] text-muted">Tokens</span><span className="font-display font-bold text-2xl">{holdings ? holdings.tokens.length : "…"}</span></div>
           <div className="flex flex-col gap-1"><span className="text-[13px] text-muted">Stakes</span><span className="font-display font-bold text-2xl">{stakeCount ?? "…"}</span></div>
         </div>
       </div>
@@ -91,9 +100,9 @@ export function PortfolioApp() {
       <Section title="Native">
         {holdings ? (
           <div className="grid grid-cols-[44px_minmax(0,1fr)_auto] gap-4 items-center py-4 border-t line">
-            <span className="w-11 h-11 rounded-[14px] flex items-center justify-center font-display font-black text-ground puff" style={{ background: "linear-gradient(145deg, #9945FF, #14F195)" }} aria-hidden>S</span>
+            {holdings.solIcon ? <Avatar seed="SOL" label="SOL" image={holdings.solIcon} size={44} /> : <span className="w-11 h-11 rounded-[14px] flex items-center justify-center font-display font-black text-ground puff" style={{ background: "linear-gradient(145deg, #9945FF, #14F195)" }} aria-hidden>S</span>}
             <span className="flex flex-col"><span className="font-semibold">SOL</span><span className="text-[13px] text-muted">Solana</span></span>
-            <span className="font-mono">{fmtAmount(holdings.sol, 9, 4)}</span>
+            <span className="flex flex-col items-end font-mono"><span>{fmtAmount(holdings.sol, 9, 4)}</span>{usdOf(holdings.sol, 9, SOL_MINT) && <span className="text-[13px] text-faint">{usdOf(holdings.sol, 9, SOL_MINT)}</span>}</span>
           </div>
         ) : !error && skeleton}
       </Section>
@@ -111,7 +120,7 @@ export function PortfolioApp() {
                     <span className="font-semibold truncate">{t.symbol ?? shortAddr(t.mint)}</span>
                     <span className="text-[13px] text-muted truncate">{t.name ?? shortAddr(t.mint)}</span>
                   </span>
-                  <span className="font-mono text-right">{fmtAmount(t.amount, t.decimals, 4)}</span>
+                  <span className="flex flex-col items-end font-mono text-right"><span>{fmtAmount(t.amount, t.decimals, 4)}</span>{usdOf(t.amount, t.decimals, t.mint) && <span className="text-[13px] text-faint">{usdOf(t.amount, t.decimals, t.mint)}</span>}</span>
                 </>
               );
               const cls = "grid grid-cols-[44px_minmax(0,1fr)_auto] gap-4 items-center py-4 border-t line";
@@ -146,11 +155,11 @@ export function PortfolioApp() {
                     <div key={p.tierId} className="grid grid-cols-[56px_minmax(0,1fr)] md:grid-cols-[72px_minmax(0,1fr)_minmax(0,1fr)] gap-4 items-center py-4 border-t line">
                       <span className="font-display font-black text-2xl text-violet-light">{p.multiplierBps / 10_000}x</span>
                       <span className="flex flex-col gap-1">
-                        <span className="font-mono">{fmtAmount(p.staked, 6, 2)} {symbol}</span>
-                        <span className="text-[13px] text-muted">{days(p.lockSeconds)} days, {p.locked ? `unlocks ${dateOf(p.unlocksAt)}` : p.staked === "0" ? "exited" : "unlocked"}</span>
+                        <span className="font-mono">{fmtAmount(p.staked, 6, 2)} {symbol}{usdOf(p.staked, 6, l.mint) && <span className="text-faint"> · {usdOf(p.staked, 6, l.mint)}</span>}</span>
+                        <span className="text-[13px] text-muted">{lockLabel(p.lockSeconds)}, {p.locked ? `unlocks ${dateOf(p.unlocksAt)}` : p.staked === "0" ? "exited" : "unlocked"}</span>
                       </span>
                       <span className="col-span-2 md:col-span-1 flex flex-wrap gap-x-4 gap-y-1 font-mono text-[13px] md:justify-end">
-                        {p.pending.map((r) => <span key={r.mint}><span className="text-muted">Earned </span>{fmtAmount(r.amount, r.decimals ?? 0, 4)} {r.symbol ?? ""}</span>)}
+                        {p.pending.map((r) => <span key={r.mint}><span className="text-muted">Earned </span>{fmtAmount(r.amount, r.decimals ?? 0, 4)} {r.symbol ?? ""}{r.decimals !== null && usdOf(r.amount, r.decimals, r.mint) && <span className="text-faint"> · {usdOf(r.amount, r.decimals, r.mint)}</span>}</span>)}
                       </span>
                     </div>
                   ))}

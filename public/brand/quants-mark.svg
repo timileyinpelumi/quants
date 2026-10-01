@@ -1,11 +1,13 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="quants">
-<g transform="translate(0 0)">
-  <defs><linearGradient id="mf" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#DBFF72"/><stop offset="1" stop-color="#C8FF3D"/></linearGradient></defs>
-  <rect width="128" height="128" rx="40" fill="#8FBF16"/>
-  <rect width="128" height="119" rx="40" fill="url(#mf)"/>
-  <g transform="translate(52 58) scale(0.8707) translate(-40.65 21.40)"><path d="M78.60000000000001 -57.5V16.5H53.2V-16.0L54.2 -21.5V-40.5L53.2 -43.300000000000004V-57.5ZM60.7 -28.700000000000003Q59.7 -19.5 55.75 -12.65Q51.800000000000004 -5.800000000000001 45.45 -2.0000000000000004Q39.1 1.8 30.900000000000002 1.8Q22.5 1.8 16.15 -2.0000000000000004Q9.8 -5.800000000000001 6.25 -12.700000000000001Q2.7 -19.6 2.7 -28.700000000000003Q2.7 -37.9 6.25 -44.8Q9.8 -51.7 16.15 -55.5Q22.5 -59.300000000000004 30.900000000000002 -59.300000000000004Q39.1 -59.300000000000004 45.45 -55.550000000000004Q51.800000000000004 -51.800000000000004 55.800000000000004 -44.95Q59.800000000000004 -38.1 60.7 -28.700000000000003ZM28.3 -28.700000000000003Q28.3 -25.400000000000002 29.65 -22.85Q31.0 -20.3 33.45 -18.8Q35.9 -17.3 39.1 -17.3Q42.400000000000006 -17.3 45.5 -18.8Q48.6 -20.3 50.95 -22.85Q53.300000000000004 -25.400000000000002 54.2 -28.700000000000003Q53.300000000000004 -32.0 50.95 -34.6Q48.6 -37.2 45.5 -38.7Q42.400000000000006 -40.2 39.1 -40.2Q35.9 -40.2 33.45 -38.7Q31.0 -37.2 29.65 -34.6Q28.3 -32.0 28.3 -28.700000000000003Z" fill="#0A0A0F"/></g>
-  <circle cx="103" cy="38" r="7" fill="#8B7BFF"/>
-  <circle cx="103" cy="58" r="7" fill="#FF7A59"/>
-  <circle cx="103" cy="78" r="7" fill="#4FB8FF"/>
+<g>
+  <defs><linearGradient id="mt" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1D1C27"/><stop offset="1" stop-color="#0E0D14"/></linearGradient></defs>
+  <rect width="128" height="128" rx="36" fill="url(#mt)"/>
+  <rect x="1" y="1" width="126" height="126" rx="35" fill="none" stroke="#FFFFFF" stroke-opacity="0.09" stroke-width="2"/>
+  <circle cx="57" cy="60" r="25.5" fill="none" stroke="#C8FF3D" stroke-width="17"/>
+  <path d="M74 60 H91 V97 L74 107 Z" fill="#C8FF3D"/>
+  <circle cx="57" cy="60" r="7" fill="#9D8CFF"/>
+  <circle cx="96" cy="27" r="5.5" fill="#9D8CFF"/>
+  <circle cx="107.5" cy="39" r="4" fill="#FF7A59"/>
+  <circle cx="113" cy="53.5" r="3" fill="#4FB8FF"/>
 </g>
 </svg>

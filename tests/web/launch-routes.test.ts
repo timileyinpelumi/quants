@@ -84,3 +84,20 @@ test("an empty search returns popular tokens", async () => {
   expect(j.tokens.map((t: any) => t.symbol)).toEqual(["SOL"]);
   expect(j.popular).toBe(true);
 });
+
+test("a USDC launch with a first buy swaps SOL to USDC first, like any non-SOL pair", async () => {
+  const USDC = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
+  const c = await makeWebContext();
+  c.configKeys[`${USDC}:200`] = "CfgUsdc200";
+  (c.jupiter as any).rates.set(USDC, 150);
+  const r = await post(prepare, body({ quoteMint: USDC, devBuySol: "1000000000" }));
+  const j = await r.json();
+  expect(j.transactions.map((t: any) => t.versioned)).toEqual([true, false]);
+  expect((c.meteora as any).launches[0].quoteMint).toBe(USDC);
+});
+
+test("a pair token outside the supported list is refused", async () => {
+  await makeWebContext();
+  const r = await post(prepare, body({ quoteMint: "BONK111111111111111111111111111111111111111" }));
+  expect(r.status).toBe(400);
+});

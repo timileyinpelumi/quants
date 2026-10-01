@@ -10,6 +10,13 @@ const config: NextConfig = {
   // keep every compiled route in dev; recompiling a disposed one reloads open pages
   // launches seeded before uploads moved out of public/ still point at /dev-uploads
   async rewrites() { return [{ source: "/dev-uploads/:cid", destination: "/api/dev-uploads/:cid" }]; },
+  // The build runs on Turbopack; the webpack hook below only affects the webpack dev server.
+  turbopack: {},
+  // Under Bun the dev server's file watcher misses edits, so dev polls for changes instead.
+  webpack: (cfg, { dev }) => {
+    if (dev) cfg.watchOptions = { ...cfg.watchOptions, poll: 1000, aggregateTimeout: 300 };
+    return cfg;
+  },
   onDemandEntries: { maxInactiveAge: 24 * 60 * 60 * 1000, pagesBufferLength: 100 },
 };
 export default config;
