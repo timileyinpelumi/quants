@@ -1,0 +1,10 @@
+.env*
+config-keys.json
+.dev-uploads
+test-results
+playwright-report
+spike
+brand-src
+.superpowers
+.next
+o.txt

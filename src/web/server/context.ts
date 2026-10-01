@@ -62,7 +62,8 @@ export function getContext(): WebContext {
     trade: new TradeLive(conn),
     prices: new JupiterPrices(e.JUPITER_API_KEY ? "https://api.jup.ag/price/v3" : "https://lite-api.jup.ag/price/v3", e.JUPITER_API_KEY),
     icons: new TokenIcons(e.JUPITER_API_KEY ? "https://api.jup.ag/tokens/v2" : "https://lite-api.jup.ag/tokens/v2", e.JUPITER_API_KEY),
-    configKeys: JSON.parse(readFileSync(e.CONFIG_KEYS_PATH ?? "config-keys.json", "utf8")),
+    // hosted deploys pass the keys as JSON since config-keys.json is not committed
+    configKeys: JSON.parse(e.CONFIG_KEYS ?? readFileSync(e.CONFIG_KEYS_PATH ?? "config-keys.json", "utf8")),
     keeperAddress: e.KEEPER_ADDRESS!,
     spillWallet: new PublicKey(e.SPILL_ADDRESS!),
     ourtokenMint: e.OURTOKEN_MINT!,

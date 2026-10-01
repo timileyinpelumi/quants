@@ -10,3 +10,5 @@ playwright-report
 .dev-uploads
 .env.local
 config-keys.json
+.vercel
+.env*
