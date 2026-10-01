@@ -82,7 +82,7 @@ export default async function TokenPage({ params }: { params: Promise<{ mint: st
           <div className="flex flex-col gap-2">
             <div className="flex justify-between items-baseline pb-3 gap-4">
               <h2 className="m-0 font-display font-black text-2xl md:text-[28px] tracking-tight">Stake {symbol}, earn</h2>
-              <Link href={`/t/${mint}/stake`} className="font-semibold text-[15px] text-lime min-h-11 flex items-center">Stake now</Link>
+              <Link href={`/t/${mint}/stake`} className="font-semibold text-[15px] text-accent min-h-11 flex items-center">Stake now</Link>
             </div>
             {d.basket.map((b) => (
               <div key={b.mint} className="grid grid-cols-[44px_minmax(0,1fr)_auto] gap-4 items-center py-3.5 border-t line">
@@ -113,12 +113,12 @@ export default async function TokenPage({ params }: { params: Promise<{ mint: st
             </div>
             {d.tiers.map((t) => (
               <div key={t.tierId} className="grid grid-cols-[72px_minmax(0,1fr)_64px] md:grid-cols-[88px_minmax(0,1fr)_140px_64px] gap-4 items-center py-4 border-t line">
-                <span className="font-display font-black text-2xl text-violet-light">{t.multiplierBps / 10_000}x</span>
+                <span className="font-display font-black text-2xl text-stake-light">{t.multiplierBps / 10_000}x</span>
                 <span className="flex flex-col gap-0.5">
                   <span className="font-semibold">{lockLabel(t.lockSeconds)}</span>
                   <span className="font-mono text-[13px] text-muted">{tokens(t.staked)} {symbol} staked{t.staked !== null && usd(Number(BigInt(t.staked)) / 1e6, tokenUsd) ? `, ${usd(Number(BigInt(t.staked)) / 1e6, tokenUsd)}` : ""}</span>
                 </span>
-                <span className="hidden md:flex h-2 rounded-full bg-white/[0.07] overflow-hidden"><span className="bg-violet rounded-full" style={{ width: `${t.sharePct}%` }} /></span>
+                <span className="hidden md:flex h-2 rounded-full bg-white/[0.07] overflow-hidden"><span className="bg-stake rounded-full" style={{ width: `${t.sharePct}%` }} /></span>
                 <span className="font-mono text-[15px] text-right">{t.sharePct}%</span>
               </div>
             ))}

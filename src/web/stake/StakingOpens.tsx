@@ -19,7 +19,7 @@ export function StakingOpens({ initial }: { initial: Opens | null }) {
     <div role="group" className="flex flex-col gap-2" aria-label="Staking progress">
       <span className="flex justify-between text-[13px] text-muted"><span>Staking opens at 100%</span><span className="font-mono text-ink">{o.percent}%</span></span>
       <span className="h-2 rounded-full bg-white/[0.07] overflow-hidden flex">
-        <span className="rounded-full bg-violet-light transition-[width] duration-700" style={{ width: `${o.percent}%` }} />
+        <span className="rounded-full bg-stake-light transition-[width] duration-700" style={{ width: `${o.percent}%` }} />
       </span>
       <span className="text-[13px] text-muted leading-normal">
         {needed === null

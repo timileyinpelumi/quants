@@ -136,7 +136,7 @@ export function PortfolioApp() {
         {stakes === null ? !error && skeleton : stakes.length === 0 ? (
           <div className="flex flex-col items-start gap-4 py-8 border-t line">
             <p className="m-0 text-muted">No stakes yet. Stake a token to earn its reward basket.</p>
-            <Link href="/explore" className="font-display font-bold text-ground bg-lime glow-lime rounded-full px-6 min-h-12 flex items-center">Explore tokens</Link>
+            <Link href="/explore" className="font-display font-bold text-ground bg-accent glow-accent rounded-full px-6 min-h-12 flex items-center">Explore tokens</Link>
           </div>
         ) : (
           <div className="flex flex-col gap-8">
@@ -149,11 +149,11 @@ export function PortfolioApp() {
                       <Avatar seed={l.mint} label={symbol} image={l.image} size={36} />
                       <span className="font-display font-bold text-lg truncate">{symbol}</span>
                     </Link>
-                    <Link href={`/t/${l.mint}/stake`} className="text-sm font-semibold text-lime min-h-11 flex items-center shrink-0">Manage</Link>
+                    <Link href={`/t/${l.mint}/stake`} className="text-sm font-semibold text-accent min-h-11 flex items-center shrink-0">Manage</Link>
                   </div>
                   {l.positions.map((p) => (
                     <div key={p.tierId} className="grid grid-cols-[56px_minmax(0,1fr)] md:grid-cols-[72px_minmax(0,1fr)_minmax(0,1fr)] gap-4 items-center py-4 border-t line">
-                      <span className="font-display font-black text-2xl text-violet-light">{p.multiplierBps / 10_000}x</span>
+                      <span className="font-display font-black text-2xl text-stake-light">{p.multiplierBps / 10_000}x</span>
                       <span className="flex flex-col gap-1">
                         <span className="font-mono">{fmtAmount(p.staked, 6, 2)} {symbol}{usdOf(p.staked, 6, l.mint) && <span className="text-faint"> · {usdOf(p.staked, 6, l.mint)}</span>}</span>
                         <span className="text-[13px] text-muted">{lockLabel(p.lockSeconds)}, {p.locked ? `unlocks ${dateOf(p.unlocksAt)}` : p.staked === "0" ? "exited" : "unlocked"}</span>

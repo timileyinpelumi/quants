@@ -81,7 +81,7 @@ function AccountModal({ owner, onClose }: { owner: string; onClose: () => void }
           <Jazzicon address={owner} size={52} />
           <div className="flex flex-col gap-1 min-w-0 flex-1">
             <span className="font-mono text-base truncate">{shortAddr(owner)}</span>
-            <button type="button" onClick={copy} className="self-start text-[13px] text-lime cursor-pointer min-h-6">{copied ? "Copied" : "Copy address"}</button>
+            <button type="button" onClick={copy} className="self-start text-[13px] text-accent cursor-pointer min-h-6">{copied ? "Copied" : "Copy address"}</button>
           </div>
           <button type="button" aria-label="Close" onClick={onClose} className="w-11 h-11 rounded-full border border-white/10 text-muted hover:text-ink flex items-center justify-center cursor-pointer shrink-0">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M6 6l12 12" /><path d="M18 6L6 18" /></svg>
@@ -127,7 +127,7 @@ function AccountModal({ owner, onClose }: { owner: string; onClose: () => void }
         </div>
 
         <div className="grid grid-cols-3 gap-2 p-6 pt-3 border-t line">
-          <Link href="/portfolio" onClick={onClose} className="col-span-3 flex items-center justify-center font-display font-bold text-[15px] min-h-12 rounded-full bg-violet-light text-ground glow-violet">Your stakes</Link>
+          <Link href="/portfolio" onClick={onClose} className="col-span-3 flex items-center justify-center font-display font-bold text-[15px] min-h-12 rounded-full bg-stake-light text-ground glow-stake">Your stakes</Link>
           <button type="button" onClick={() => { onClose(); modal.setVisible(true); }} className="col-span-1 text-sm font-semibold min-h-11 rounded-full bg-raised-2 border border-white/10 cursor-pointer">Switch</button>
           <button type="button" onClick={async () => { onClose(); await wallet.disconnect(); }} className="col-span-2 text-sm font-semibold min-h-11 rounded-full border border-burn/40 text-burn cursor-pointer">Disconnect</button>
         </div>

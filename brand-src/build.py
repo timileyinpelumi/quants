@@ -9,8 +9,8 @@ def mark(gid="m"):
   <defs><linearGradient id="{gid}t" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1D1C27"/><stop offset="1" stop-color="#0E0D14"/></linearGradient></defs>
   <rect width="128" height="128" rx="36" fill="url(#{gid}t)"/>
   <rect x="1" y="1" width="126" height="126" rx="35" fill="none" stroke="#FFFFFF" stroke-opacity="0.09" stroke-width="2"/>
-  <circle cx="57" cy="60" r="25.5" fill="none" stroke="#C8FF3D" stroke-width="17"/>
-  <path d="M74 60 H91 V97 L74 107 Z" fill="#C8FF3D"/>
+  <circle cx="57" cy="60" r="25.5" fill="none" stroke="#4C9DFF" stroke-width="17"/>
+  <path d="M74 60 H91 V97 L74 107 Z" fill="#4C9DFF"/>
   <circle cx="57" cy="60" r="7" fill="#9D8CFF"/>
   <circle cx="96" cy="27" r="5.5" fill="#9D8CFF"/>
   <circle cx="107.5" cy="39" r="4" fill="#FF7A59"/>

@@ -119,7 +119,7 @@ export function TradePanel({ mint, symbol, quoteMint, quoteSymbol, quoteDecimals
             type="button"
             aria-pressed={tab === s}
             onClick={() => { setTab(s); setAmount(""); setMsg(null); }}
-            className={`font-display font-bold text-[15px] py-3 min-h-11 rounded-full cursor-pointer capitalize ${tab === s ? (s === "buy" ? "bg-lime text-ground" : s === "sell" ? "bg-burn text-ground" : "bg-violet-light text-ground") : "text-muted hover:text-ink"}`}
+            className={`font-display font-bold text-[15px] py-3 min-h-11 rounded-full cursor-pointer capitalize ${tab === s ? (s === "buy" ? "bg-accent text-ground" : s === "sell" ? "bg-burn text-ground" : "bg-stake-light text-ground") : "text-muted hover:text-ink"}`}
           >
             {s}
           </button>
@@ -129,7 +129,7 @@ export function TradePanel({ mint, symbol, quoteMint, quoteSymbol, quoteDecimals
 
       <label className="flex flex-col gap-2.5 text-[13px] text-muted">
         <span className="flex justify-between"><span>You pay</span>{have !== null && <span className="font-mono">Balance {fmtAmount(have, inDecimals, 4)} {inSymbol}{usdText(whole(have, inDecimals), inPrice) && <span className="text-faint"> · {usdText(whole(have, inDecimals), inPrice)}</span>}</span>}</span>
-        <span className="flex items-center bg-ground border border-white/10 rounded-[20px] px-5 focus-within:border-lime/60">
+        <span className="flex items-center bg-ground border border-white/10 rounded-[20px] px-5 focus-within:border-accent/60">
           <input inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0" aria-label={`Amount of ${inSymbol}`} className="flex-1 min-w-0 font-display font-bold text-[28px] md:text-[32px] text-ink bg-transparent border-0 py-4 outline-none" />
           <span className="flex flex-col items-end pl-2">
             <span className="font-display font-bold text-[15px] text-muted">{inSymbol}</span>
@@ -160,9 +160,9 @@ export function TradePanel({ mint, symbol, quoteMint, quoteSymbol, quoteDecimals
       {partial && <p className="m-0 text-sm text-violet-light">Only {fmtAmount(quote!.filledIn, inDecimals, 4)} {inSymbol} fills before this token graduates. The rest stays in your wallet.</p>}
       {tooMuch && <p className="m-0 text-sm text-burn">Not enough {inSymbol}{side === "buy" && quoteMint === SOL ? " after the 0.01 SOL kept for fees" : ""}.</p>}
       {quoteError && <p className="m-0 text-sm text-burn">{quoteError}</p>}
-      {msg && <p role="status" className={`m-0 text-sm ${msg.ok ? "text-lime" : "text-burn"}`}>{msg.text}</p>}
+      {msg && <p role="status" className={`m-0 text-sm ${msg.ok ? "text-accent" : "text-burn"}`}>{msg.text}</p>}
 
-      <Button size="lg" variant={side === "buy" ? "lime" : "burn"} disabled={busy || (!!owner && (!quote || tooMuch))} onClick={trade}>
+      <Button size="lg" variant={side === "buy" ? "accent" : "burn"} disabled={busy || (!!owner && (!quote || tooMuch))} onClick={trade}>
         {busy ? "Approve in your wallet" : !owner ? "Connect wallet" : `${side === "buy" ? "Buy" : "Sell"} ${symbol}`}
       </Button>
       <p className="m-0 text-[12px] text-faint text-center">{quote?.venue === "damm" ? "Trades on the graduated Meteora pool" : "Trades on the bonding curve"}</p>

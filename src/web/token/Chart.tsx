@@ -32,10 +32,10 @@ export function Chart({ mint, quoteSymbol }: { mint: string; quoteSymbol: string
       grid: { vertLines: { visible: false }, horzLines: { color: "rgba(255,255,255,0.05)" } },
       rightPriceScale: { borderVisible: false },
       timeScale: { borderVisible: false, timeVisible: tf !== "1W" },
-      crosshair: { vertLine: { color: "rgba(200,255,61,0.35)" }, horzLine: { color: "rgba(200,255,61,0.35)" } },
+      crosshair: { vertLine: { color: "rgba(76,157,255,0.35)" }, horzLine: { color: "rgba(76,157,255,0.35)" } },
     });
     const s = chart.addSeries(AreaSeries, {
-      lineColor: "#C8FF3D", lineWidth: 3, topColor: "rgba(200,255,61,0.28)", bottomColor: "rgba(200,255,61,0)",
+      lineColor: "#4C9DFF", lineWidth: 3, topColor: "rgba(76,157,255,0.28)", bottomColor: "rgba(76,157,255,0)",
       priceFormat: { type: "custom", minMove: 1e-12, formatter: (p: number) => (unit === "usd" ? `$${fmtPrice(p, 5)}` : fmtPrice(p, 5)) },
     });
     s.setData(candles.map((c) => ({ time: c.time as UTCTimestamp, value: c.close })));

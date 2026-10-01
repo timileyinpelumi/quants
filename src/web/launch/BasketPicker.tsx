@@ -43,7 +43,7 @@ export function BasketPicker({ value, onChange }: { value: BasketItem[]; onChang
               <span className="text-[13px] text-muted truncate">{b.name}</span>
             </span>
             <span className="hidden md:flex h-2 rounded-full bg-white/[0.07] overflow-hidden">
-              <span className="bg-lime rounded-full" style={{ width: `${b.weight}%` }} />
+              <span className="bg-accent rounded-full" style={{ width: `${b.weight}%` }} />
             </span>
             <label className="flex items-center justify-end gap-1 font-mono">
               <span className="sr-only">Weight for {b.symbol}</span>
@@ -51,7 +51,7 @@ export function BasketPicker({ value, onChange }: { value: BasketItem[]; onChang
                 inputMode="numeric"
                 value={b.weight}
                 onChange={(e) => setWeight(b.mint, Number(e.target.value))}
-                className="w-14 bg-transparent text-right text-base outline-none border-b border-white/15 focus:border-lime/60 py-1"
+                className="w-14 bg-transparent text-right text-base outline-none border-b border-white/15 focus:border-accent/60 py-1"
               />
               <span className="text-muted">%</span>
             </label>
@@ -70,7 +70,7 @@ export function BasketPicker({ value, onChange }: { value: BasketItem[]; onChang
       {value.length > 0 && (
         <div className="flex justify-between text-[13px]">
           <span className={total === 100 ? "text-muted" : "text-burn"}>{total === 100 ? "Weights add up to 100" : `Weights add up to ${total}. They must add up to 100.`}</span>
-          {value.length > 1 && <button type="button" onClick={() => onChange(evenly(value))} className="text-lime cursor-pointer min-h-11 -my-3">Split evenly</button>}
+          {value.length > 1 && <button type="button" onClick={() => onChange(evenly(value))} className="text-accent cursor-pointer min-h-11 -my-3">Split evenly</button>}
         </div>
       )}
 
@@ -78,9 +78,9 @@ export function BasketPicker({ value, onChange }: { value: BasketItem[]; onChang
         <button
           type="button"
           onClick={() => setPicking(true)}
-          className="flex items-center gap-3 px-5 min-h-16 rounded-2xl border-[1.5px] border-dashed border-lime/40 bg-lime/[0.04] text-lime font-semibold cursor-pointer hover:border-lime/70 hover:bg-lime/[0.07] text-left"
+          className="flex items-center gap-3 px-5 min-h-16 rounded-2xl border-[1.5px] border-dashed border-accent/40 bg-accent/[0.04] text-accent font-semibold cursor-pointer hover:border-accent/70 hover:bg-accent/[0.07] text-left"
         >
-          <span className="w-9 h-9 rounded-full bg-lime/15 flex items-center justify-center shrink-0" aria-hidden>
+          <span className="w-9 h-9 rounded-full bg-accent/15 flex items-center justify-center shrink-0" aria-hidden>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round"><path d="M12 5v14" /><path d="M5 12h14" /></svg>
           </span>
           <span className="flex flex-col">

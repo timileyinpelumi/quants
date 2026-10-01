@@ -6,7 +6,7 @@ export const metadata: Metadata = { title: "Portfolio" };
 
 export default function PortfolioPage() {
   return (
-    <div className="bg-stake flex-1">
+    <div className="bg-stake-page flex-1">
       <Header active="portfolio" />
       <PortfolioApp />
     </div>

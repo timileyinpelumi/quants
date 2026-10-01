@@ -15,12 +15,12 @@ export const dynamic = "force-dynamic";
 const SOL = "So11111111111111111111111111111111111111112";
 
 const usd = (n: number | null) => (n === null ? "No price" : `$${fmtCompact(n)}`);
-const change = (c: number) => <span className={c >= 0 ? "text-lime" : "text-burn"}>{c >= 0 ? "+" : ""}{c.toFixed(1)}%</span>;
+const change = (c: number) => <span className={c >= 0 ? "text-accent" : "text-burn"}>{c >= 0 ? "+" : ""}{c.toFixed(1)}%</span>;
 
 function Progress({ value }: { value: number }) {
   return (
     <span className="inline-flex h-1.5 w-full rounded-full bg-white/[0.07] overflow-hidden">
-      <span className="rounded-full" style={{ width: `${value}%`, background: "linear-gradient(90deg, #9D8CFF, #C8FF3D)" }} />
+      <span className="rounded-full" style={{ width: `${value}%`, background: "linear-gradient(90deg, #9D8CFF, #4C9DFF)" }} />
     </span>
   );
 }
@@ -60,21 +60,21 @@ export default async function HomePage() {
         <section className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,520px)] gap-8 lg:gap-12 items-center">
           <div className="flex flex-col gap-5">
             <h1 className="m-0 font-display font-black text-[38px] md:text-[56px] leading-[1.02] tracking-[-0.03em]">
-              Launch a token that <span className="text-lime">pays its stakers.</span>
+              Launch a token that <span className="text-accent">pays its stakers.</span>
             </h1>
             <p className="m-0 text-[17px] md:text-lg text-muted leading-relaxed max-w-xl">
               Most of every trading fee buys up to ten tokens the creator picks and pays them to the token's stakers.
               Lock longer for a bigger share.
             </p>
             <div className="flex flex-wrap gap-3">
-              <Link href="/launch" className="font-display font-bold text-ground bg-lime glow-lime rounded-full px-6 min-h-12 flex items-center">Launch a token</Link>
+              <Link href="/launch" className="font-display font-bold text-ground bg-accent glow-accent rounded-full px-6 min-h-12 flex items-center">Launch a token</Link>
               <Link href="/docs" className="font-display font-bold rounded-full px-6 min-h-12 flex items-center bg-raised-2 border border-white/10">How it works</Link>
             </div>
           </div>
           <div className="flex flex-col gap-6 bg-surface border line rounded-[28px] p-6 md:p-7">
             <div className="flex flex-col gap-1.5">
               <span className="text-[13px] text-muted">Fees set aside for stakers</span>
-              <span className="font-display font-black text-[44px] md:text-[56px] leading-none tracking-tight text-lime">{usd(d.stats.stakersUsd)}</span>
+              <span className="font-display font-black text-[44px] md:text-[56px] leading-none tracking-tight text-accent">{usd(d.stats.stakersUsd)}</span>
             </div>
             <div className="grid grid-cols-2 gap-x-6 gap-y-4 pt-5 border-t line">
               {[["Volume today", usd(d.stats.volume24hUsd)], ["Volume all time", usd(d.stats.volumeAllUsd)], ["Tokens launched", fmtCompact(d.stats.launches)], ["Traders today", fmtCompact(d.stats.traders24h)]].map(([l, v]) => (
@@ -130,7 +130,7 @@ export default async function HomePage() {
           <h2 className="m-0 pb-3 font-display font-bold text-xl">Latest trades</h2>
           {d.recent.length === 0 ? <p className="m-0 py-6 border-t line text-muted text-sm">No trades yet.</p> : d.recent.map((t) => (
             <Link key={`${t.signature}:${t.eventIndex}`} href={`/t/${t.mint}`} className="grid grid-cols-[56px_minmax(0,1fr)_auto] md:grid-cols-[72px_minmax(0,1fr)_minmax(0,1fr)_120px] gap-3 md:gap-6 items-center py-3 border-t line hover:bg-white/[0.02] text-sm">
-              <span className={`font-semibold ${t.side === "buy" ? "text-lime" : "text-burn"}`}>{t.side === "buy" ? "Buy" : "Sell"}</span>
+              <span className={`font-semibold ${t.side === "buy" ? "text-accent" : "text-burn"}`}>{t.side === "buy" ? "Buy" : "Sell"}</span>
               <span className="font-display font-bold truncate">{t.symbol}</span>
               <span className="hidden md:block font-mono text-muted truncate">{shortAddr(t.trader)}</span>
               <span className="flex flex-col items-end font-mono">

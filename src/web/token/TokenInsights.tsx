@@ -37,7 +37,7 @@ function Bar({ buy, sell }: { buy: number; sell: number }) {
   const total = buy + sell || 1;
   return (
     <span className="flex h-1.5 w-full rounded-full overflow-hidden bg-white/[0.07]">
-      <span className="bg-lime" style={{ width: `${(buy / total) * 100}%` }} />
+      <span className="bg-accent" style={{ width: `${(buy / total) * 100}%` }} />
       <span className="bg-burn" style={{ width: `${(sell / total) * 100}%` }} />
     </span>
   );
@@ -125,7 +125,7 @@ export function TokenInsights({ mint, symbol, quoteSymbol }: { mint: string; sym
           </div>
           {!live || trades.length === 0 ? <p className="m-0 py-6 border-t line text-muted text-sm">No trades yet.</p> : trades.map((t) => (
             <div key={`${t.signature}:${t.eventIndex}`} className="grid grid-cols-[52px_minmax(0,1fr)_auto] md:grid-cols-[64px_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.4fr)_90px] gap-3 md:gap-6 items-center py-2.5 border-t line text-sm font-mono">
-              <span className={`font-sans font-semibold ${t.side === "buy" ? "text-lime" : "text-burn"}`}>{t.side === "buy" ? "Buy" : "Sell"}</span>
+              <span className={`font-sans font-semibold ${t.side === "buy" ? "text-accent" : "text-burn"}`}>{t.side === "buy" ? "Buy" : "Sell"}</span>
               <span className="md:text-right truncate">{fmtCompact(t.amount)}</span>
               <span className={`text-right ${t.quoteValue >= big && live.trades.length > 5 ? "text-violet-light font-semibold" : ""}`}>{t.valueUsd === null ? `${fmtPrice(t.quoteValue)} ${quoteSymbol}` : `$${fmtPrice(t.valueUsd)}`}</span>
               <span className="hidden md:block min-w-0"><Wallet address={t.trader} tag={tagFor(t.trader)} /></span>
@@ -141,15 +141,15 @@ export function TokenInsights({ mint, symbol, quoteSymbol }: { mint: string; sym
       {tab === "Activity" && a && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-x-8 gap-y-6 py-2">
           <div className="flex flex-col gap-1"><span className="text-[13px] text-muted">Price change</span>
-            <span className={`font-display font-bold text-2xl ${a.change === null ? "" : a.change >= 0 ? "text-lime" : "text-burn"}`}>{a.change === null ? "No trades" : `${a.change >= 0 ? "+" : ""}${a.change.toFixed(1)}%`}</span></div>
+            <span className={`font-display font-bold text-2xl ${a.change === null ? "" : a.change >= 0 ? "text-accent" : "text-burn"}`}>{a.change === null ? "No trades" : `${a.change >= 0 ? "+" : ""}${a.change.toFixed(1)}%`}</span></div>
           <div className="flex flex-col gap-1"><span className="text-[13px] text-muted">Volume</span><span className="font-display font-bold text-2xl">{compact(a.buyValue + a.sellValue)}</span></div>
           <div className="flex flex-col gap-1"><span className="text-[13px] text-muted">Net flow</span>
-            <span className={`font-display font-bold text-2xl ${a.buyValue >= a.sellValue ? "text-lime" : "text-burn"}`}>{a.buyValue >= a.sellValue ? "+" : "-"}{compact(Math.abs(a.buyValue - a.sellValue))}</span></div>
+            <span className={`font-display font-bold text-2xl ${a.buyValue >= a.sellValue ? "text-accent" : "text-burn"}`}>{a.buyValue >= a.sellValue ? "+" : "-"}{compact(Math.abs(a.buyValue - a.sellValue))}</span></div>
           <div className="flex flex-col gap-1"><span className="text-[13px] text-muted">Wallets</span><span className="font-display font-bold text-2xl">{a.buyers + a.sellers}</span></div>
           {[["Trades", a.buys, a.sells, (n: number) => String(n)], ["Volume", a.buyValue, a.sellValue, compact], ["Wallets", a.buyers, a.sellers, (n: number) => String(n)]].map(([label, b, s, f]) => (
             <div key={label as string} className="col-span-2 flex flex-col gap-2">
               <span className="flex justify-between text-[13px]">
-                <span className="text-lime">{(f as (n: number) => string)(b as number)} {label === "Wallets" ? "buyers" : "buys"}</span>
+                <span className="text-accent">{(f as (n: number) => string)(b as number)} {label === "Wallets" ? "buyers" : "buys"}</span>
                 <span className="text-muted">{label as string}</span>
                 <span className="text-burn">{(f as (n: number) => string)(s as number)} {label === "Wallets" ? "sellers" : "sells"}</span>
               </span>
@@ -170,7 +170,7 @@ export function TokenInsights({ mint, symbol, quoteSymbol }: { mint: string; sym
               <span className="hidden md:flex flex-col items-end"><span>{value(t.spent)}</span><span className="text-[12px] text-muted">{fmtCompact(t.bought)} {symbol}</span></span>
               <span className="hidden md:flex flex-col items-end"><span>{value(t.received)}</span><span className="text-[12px] text-muted">{fmtCompact(t.sold)} {symbol}</span></span>
               <span className="hidden md:block text-right">{fmtCompact(t.position)}</span>
-              <span className={`text-right ${t.pnl >= 0 ? "text-lime" : "text-burn"}`}>{t.pnl >= 0 ? "+" : "-"}{value(Math.abs(t.pnl))}</span>
+              <span className={`text-right ${t.pnl >= 0 ? "text-accent" : "text-burn"}`}>{t.pnl >= 0 ? "+" : "-"}{value(Math.abs(t.pnl))}</span>
             </div>
           ))}
           {(live?.traders.length ?? 0) >= LIVE_TRADERS && (
@@ -186,7 +186,7 @@ export function TokenInsights({ mint, symbol, quoteSymbol }: { mint: string; sym
             <div className="grid grid-cols-3 gap-6">
               <div className="flex flex-col gap-1"><span className="text-[13px] text-muted">Holders</span><span className="font-display font-bold text-2xl">{live.holders.count === null ? "Unknown" : fmtCompact(live.holders.count)}</span></div>
               <div className="flex flex-col gap-1"><span className="text-[13px] text-muted">Top 10 hold</span><span className="font-display font-bold text-2xl">{live.holders.top10Pct.toFixed(1)}%</span></div>
-              <div className="flex flex-col gap-1"><span className="text-[13px] text-muted">Staked</span><span className="font-display font-bold text-2xl text-violet-light">{live.holders.stakedPct.toFixed(1)}%</span></div>
+              <div className="flex flex-col gap-1"><span className="text-[13px] text-muted">Staked</span><span className="font-display font-bold text-2xl text-stake-light">{live.holders.stakedPct.toFixed(1)}%</span></div>
             </div>
             <div className="flex flex-col">
               {live.holders.list.map((h, i) => (

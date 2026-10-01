@@ -46,7 +46,7 @@ export function PaymentsList({ initial, next }: { initial: PricedPayment[]; next
       {paged.items.map((p) => (
         <div key={p.id} className="grid grid-cols-[minmax(0,1fr)_auto] gap-3 items-center py-3 border-t line text-sm">
           <span className="flex flex-col min-w-0">
-            <Link href={`/t/${p.mint}`} className="font-display font-bold hover:text-lime truncate">{p.symbol} stakers</Link>
+            <Link href={`/t/${p.mint}`} className="font-display font-bold hover:text-accent truncate">{p.symbol} stakers</Link>
             <span className="font-mono text-[12px] text-muted">{fmtCompact(p.amount)} {p.reward}{p.priceUsd != null ? ` ($${fmtPrice(p.amount * p.priceUsd)})` : ""} added to the farm</span>
           </span>
           <a href={`https://solscan.io/tx/${p.signature}`} target="_blank" rel="noreferrer" className="font-mono text-[12px] text-muted hover:text-ink text-right">{fmtAgo(p.at)}</a>

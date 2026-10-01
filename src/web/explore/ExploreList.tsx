@@ -39,17 +39,17 @@ export function ExploreList({ initial, nextOffset, query }: { initial: TokenRow[
           </span>
           <span className="flex flex-col items-end font-mono text-sm md:hidden">
             <span>{usd(t.mcapUsd)}</span>
-            {t.price !== null && <span className={`text-[12px] ${t.change24h >= 0 ? "text-lime" : "text-burn"}`}>{t.change24h >= 0 ? "+" : ""}{t.change24h.toFixed(1)}%</span>}
+            {t.price !== null && <span className={`text-[12px] ${t.change24h >= 0 ? "text-accent" : "text-burn"}`}>{t.change24h >= 0 ? "+" : ""}{t.change24h.toFixed(1)}%</span>}
           </span>
           <span className="hidden md:block text-right font-mono text-sm">{usd(t.mcapUsd)}</span>
-          <span className={`hidden md:block text-right font-mono text-sm ${t.change24h >= 0 ? "text-lime" : "text-burn"}`}>{t.price === null ? "" : `${t.change24h >= 0 ? "+" : ""}${t.change24h.toFixed(1)}%`}</span>
+          <span className={`hidden md:block text-right font-mono text-sm ${t.change24h >= 0 ? "text-accent" : "text-burn"}`}>{t.price === null ? "" : `${t.change24h >= 0 ? "+" : ""}${t.change24h.toFixed(1)}%`}</span>
           <span className="hidden md:block text-right font-mono text-sm">{t.volume24hUsd ? `$${fmtCompact(t.volume24hUsd)}` : "$0"}</span>
           <span className="hidden md:flex flex-col gap-1.5">
-            {t.status === "graduated" ? <span className="text-sm font-semibold text-lime">Graduated</span> : (
+            {t.status === "graduated" ? <span className="text-sm font-semibold text-accent">Graduated</span> : (
               <>
                 <span className="font-mono text-[12px] text-muted">{t.progress ?? 0}%</span>
                 <span className="inline-flex h-1.5 w-full max-w-32 rounded-full bg-white/[0.07] overflow-hidden">
-                  <span className="rounded-full" style={{ width: `${t.progress ?? 0}%`, background: "linear-gradient(90deg, #9D8CFF, #C8FF3D)" }} />
+                  <span className="rounded-full" style={{ width: `${t.progress ?? 0}%`, background: "linear-gradient(90deg, #9D8CFF, #4C9DFF)" }} />
                 </span>
               </>
             )}

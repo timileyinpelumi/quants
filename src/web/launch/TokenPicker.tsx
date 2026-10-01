@@ -68,7 +68,7 @@ export function TokenPicker({ open, onClose, onPick, taken, max }: {
           </button>
         </div>
         <div className="px-6 pb-4">
-          <label className="flex items-center gap-3 bg-ground border border-white/10 rounded-2xl px-4 focus-within:border-lime/60">
+          <label className="flex items-center gap-3 bg-ground border border-white/10 rounded-2xl px-4 focus-within:border-accent/60">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#9A97A8" strokeWidth="2" strokeLinecap="round" aria-hidden><circle cx="11" cy="11" r="7" /><path d="M20 20l-3.5-3.5" /></svg>
             <span className="sr-only">Search tokens</span>
             <input ref={input} value={q} onChange={(e) => setQ(e.target.value)} placeholder="Name, symbol or address" className="flex-1 min-w-0 bg-transparent py-4 text-lg outline-none" />
@@ -91,14 +91,14 @@ export function TokenPicker({ open, onClose, onPick, taken, max }: {
                 aria-checked={on || added}
                 disabled={added || full}
                 onClick={() => setSelected((cur) => (on ? cur.filter((x) => x.mint !== t.mint) : [...cur, t]))}
-                className={`w-full grid grid-cols-[40px_minmax(0,1fr)_auto] gap-3 items-center px-3 py-3 rounded-2xl text-left cursor-pointer disabled:opacity-40 disabled:cursor-default min-h-14 ${on ? "bg-lime/[0.08]" : "hover:bg-white/[0.04]"}`}
+                className={`w-full grid grid-cols-[40px_minmax(0,1fr)_auto] gap-3 items-center px-3 py-3 rounded-2xl text-left cursor-pointer disabled:opacity-40 disabled:cursor-default min-h-14 ${on ? "bg-accent/[0.08]" : "hover:bg-white/[0.04]"}`}
               >
                 <Avatar seed={t.mint} label={t.symbol} image={t.icon} size={40} />
                 <span className="flex flex-col min-w-0">
                   <span className="font-semibold truncate">{t.symbol}</span>
                   <span className="text-[13px] text-muted truncate">{t.name} · <span className="font-mono">{shortAddr(t.mint)}</span></span>
                 </span>
-                <span aria-hidden className={`w-6 h-6 rounded-full border flex items-center justify-center ${on || added ? "bg-lime border-lime text-ground" : "border-white/25"}`}>
+                <span aria-hidden className={`w-6 h-6 rounded-full border flex items-center justify-center ${on || added ? "bg-accent border-accent text-ground" : "border-white/25"}`}>
                   {(on || added) && <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12l5 5 9-10" /></svg>}
                 </span>
               </button>
@@ -108,7 +108,7 @@ export function TokenPicker({ open, onClose, onPick, taken, max }: {
         <div className="flex items-center justify-between gap-4 px-6 py-4 border-t line">
           <span className="text-sm text-muted">{selected.length ? selected.map((x) => x.symbol).join(", ") : `Pick up to ${max}`}</span>
           <button type="button" disabled={selected.length === 0} onClick={() => { onPick(selected); onClose(); }}
-            className="font-display font-bold text-ground bg-lime rounded-full px-6 min-h-11 cursor-pointer disabled:opacity-40 disabled:cursor-default shrink-0">
+            className="font-display font-bold text-ground bg-accent rounded-full px-6 min-h-11 cursor-pointer disabled:opacity-40 disabled:cursor-default shrink-0">
             {selected.length > 1 ? `Add ${selected.length} tokens` : "Add token"}
           </button>
         </div>

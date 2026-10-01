@@ -28,7 +28,7 @@ export function StakeForm({ mint, symbol, tiers, maxPenaltyBps, ready, earns, op
       <div role="group" aria-label="Lock tier" className="grid grid-cols-4 gap-1.5">
         {tiers.map((t) => (
           <button key={t.id} type="button" aria-pressed={t.id === tier} onClick={() => setTier(t.id)}
-            className={`flex flex-col items-center gap-0.5 py-3 rounded-2xl cursor-pointer ${t.id === tier ? "bg-violet-light text-ground" : "bg-ground border border-white/10 hover:border-white/25"}`}>
+            className={`flex flex-col items-center gap-0.5 py-3 rounded-2xl cursor-pointer ${t.id === tier ? "bg-stake-light text-ground" : "bg-ground border border-white/10 hover:border-white/25"}`}>
             <span className="font-display font-black text-lg">{mult(t.multiplierBps)}</span>
             <span className="text-[12px]">{lockShort(t.lockSeconds)}</span>
           </button>
@@ -36,10 +36,10 @@ export function StakeForm({ mint, symbol, tiers, maxPenaltyBps, ready, earns, op
       </div>
       <label className="flex flex-col gap-2.5 text-[13px] text-muted">
         <span className="flex justify-between"><span>You stake</span>{balance !== null && <span className="font-mono">Balance {fmtAmount(balance, STAKE_DECIMALS, 2)} {symbol}{usd(balance) && <span className="text-faint"> · {usd(balance)}</span>}</span>}</span>
-        <span className="flex items-center bg-ground border border-white/10 rounded-[20px] px-5 focus-within:border-violet/60">
+        <span className="flex items-center bg-ground border border-white/10 rounded-[20px] px-5 focus-within:border-stake/60">
           <input inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0" aria-label={`Amount of ${symbol} to stake`} className="flex-1 min-w-0 font-display font-bold text-[28px] text-ink bg-transparent border-0 py-4 outline-none" />
           {balance !== null && balance > 0n && (
-            <button type="button" onClick={() => setAmount(fmtAmount(balance, STAKE_DECIMALS, STAKE_DECIMALS).replace(/,/g, ""))} className="text-sm font-semibold text-violet-light px-2 min-h-11 cursor-pointer">Max</button>
+            <button type="button" onClick={() => setAmount(fmtAmount(balance, STAKE_DECIMALS, STAKE_DECIMALS).replace(/,/g, ""))} className="text-sm font-semibold text-stake-light px-2 min-h-11 cursor-pointer">Max</button>
           )}
           <span className="flex flex-col items-end pl-2">
             <span className="font-display font-bold text-[15px] text-muted">{symbol}</span>
@@ -55,7 +55,7 @@ export function StakeForm({ mint, symbol, tiers, maxPenaltyBps, ready, earns, op
       {tooMuch && <p className="m-0 text-sm text-burn">You hold less {symbol} than that.</p>}
       {!ready && <StakingOpens initial={opens} />}
       {error && <p role="alert" className="m-0 text-sm text-burn">{error}</p>}
-      <Button size="lg" variant="violet" disabled={!ready || busy !== null || (!!owner && (!amountBase || amountBase <= 0n || tooMuch))}
+      <Button size="lg" variant="stake" disabled={!ready || busy !== null || (!!owner && (!amountBase || amountBase <= 0n || tooMuch))}
         onClick={async () => { if (await act("stake", tier, { amount: amountBase?.toString() })) setAmount(""); }}>
         {busy?.startsWith("stake") ? "Approve in your wallet" : owner ? `Stake for ${lockLabel(selected.lockSeconds)}` : "Connect wallet"}
       </Button>
@@ -69,7 +69,7 @@ export function StakeForm({ mint, symbol, tiers, maxPenaltyBps, ready, earns, op
           ))}
         </div>
       )}
-      <Link href={`/t/${mint}/stake`} className="text-center text-sm text-violet-light min-h-9 flex items-center justify-center">{active.length ? "Claim rewards or manage stakes" : "See all lock tiers"}</Link>
+      <Link href={`/t/${mint}/stake`} className="text-center text-sm text-stake-light min-h-9 flex items-center justify-center">{active.length ? "Claim rewards or manage stakes" : "See all lock tiers"}</Link>
     </div>
   );
 }

@@ -1,8 +1,8 @@
 import type { ButtonHTMLAttributes } from "react";
 
 const variants = {
-  lime: "bg-lime text-ground glow-lime",
-  violet: "bg-violet-light text-ground glow-violet",
+  accent: "bg-accent text-ground glow-accent",
+  stake: "bg-stake-light text-ground glow-stake",
   burn: "bg-burn text-ground puff",
   ghost: "bg-raised-2 text-ink border border-white/10",
   outline: "bg-transparent text-ink border border-white/15",
@@ -16,7 +16,7 @@ const sizes = {
 
 export type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & { variant?: keyof typeof variants; size?: keyof typeof sizes };
 
-export function Button({ variant = "lime", size = "md", className = "", ...rest }: ButtonProps) {
+export function Button({ variant = "accent", size = "md", className = "", ...rest }: ButtonProps) {
   return (
     <button
       type="button"

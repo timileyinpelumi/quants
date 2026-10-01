@@ -88,7 +88,7 @@ export default async function DocsPage() {
           <H2 id="launch">Launching a token</H2>
           <P>Pick a name, a symbol and a square image, then pick the pair token: {quoteCoins().map((c) => c.symbol).join(", ")}. Choose a trading fee of 1%, 2%, 3% or 5% and pick your reward basket. An optional first buy of your own token goes in the same approval. It is paid in SOL and swapped to the pair token if needed.</P>
           <P>Every token has a supply of 1,000,000,000. Launching costs only the network fee for your own transaction and any first buy. A first buy is capped at {pct(s.devBuyCapBps)} of supply.</P>
-          <P>Staking does not open at launch. The staking farms are paid for out of the stakers&apos; share of trading fees, so a token can be staked once it has traded enough. See <a href="#opens" className="text-lime">When staking opens</a>.</P>
+          <P>Staking does not open at launch. The staking farms are paid for out of the stakers&apos; share of trading fees, so a token can be staked once it has traded enough. See <a href="#opens" className="text-accent">When staking opens</a>.</P>
 
           <H2 id="fees">Where fees go</H2>
           <P>Meteora keeps 20% of each trading fee. Of what is left:</P>
@@ -138,7 +138,7 @@ export default async function DocsPage() {
           <Table head={["Paired with", "Graduates at"]} rows={quoteCoins().filter((c) => c.graduation > 0).map((c) => [c.name === "quants" ? `${c.symbol} (platform token)` : `${c.symbol} (${c.name})`, `${c.graduation.toLocaleString("en-US")} ${c.symbol}`])} />
 
           <H2 id="risks">Risks</H2>
-          <P>Launched tokens are volatile and most lose value. Reward tokens can lose value too. Smart contracts can have bugs. Only use money you can afford to lose. Read the <Link href="/terms" className="text-lime">terms and risks</Link>.</P>
+          <P>Launched tokens are volatile and most lose value. Reward tokens can lose value too. Smart contracts can have bugs. Only use money you can afford to lose. Read the <Link href="/terms" className="text-accent">terms and risks</Link>.</P>
 
           <H2 id="wallets">Wallets and programs</H2>
           <P>Every fee quants collects moves through these wallets, and every launch, trade and stake runs on these programs. Each links to its record on Solscan.</P>
@@ -151,7 +151,7 @@ export default async function DocsPage() {
               ["cpamdpZCGKUy5JxQXB4dcpGPiikHawvSWAd6mEn1sGG", "Meteora DAMM v2 program, where graduated tokens trade"],
               ["FarmsPZpWu9i7Kky8tPN37rs2TpmMrAZrC7S7vJa91Hr", "Kamino Farms program, where stakes and rewards live"],
             ] as [string, string][]).map(([a, what]) => [
-              <a key={a} href={`https://solscan.io/account/${a}`} target="_blank" rel="noreferrer" className="font-mono text-lime">{a.slice(0, 4)}…{a.slice(-4)}</a>, what,
+              <a key={a} href={`https://solscan.io/account/${a}`} target="_blank" rel="noreferrer" className="font-mono text-accent">{a.slice(0, 4)}…{a.slice(-4)}</a>, what,
             ]),
           ]} />
 

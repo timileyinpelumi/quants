@@ -56,7 +56,7 @@ export default async function ExplorePage({ searchParams }: { searchParams: Prom
         {tokens.length === 0 ? (
           <div className="flex flex-col items-start gap-4 py-16 border-t line">
             <p className="m-0 text-lg text-muted">{q ? `Nothing matches "${q}".` : "Nothing here yet."}</p>
-            <Link href="/launch" className="font-display font-bold text-ground bg-lime glow-lime rounded-full px-6 min-h-12 flex items-center">Launch a token</Link>
+            <Link href="/launch" className="font-display font-bold text-ground bg-accent glow-accent rounded-full px-6 min-h-12 flex items-center">Launch a token</Link>
           </div>
         ) : (
           <ExploreList key={`${sort}:${filter}:${q}`} initial={tokens} nextOffset={nextOffset} query={{ sort, filter, q }} />

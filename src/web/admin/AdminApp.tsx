@@ -125,7 +125,7 @@ export function AdminApp({ pairs }: { pairs: Pair[] }) {
         <h1 className="m-0 font-display font-black text-[40px] md:text-[56px] tracking-[-0.03em] leading-none">Admin</h1>
         <p className="m-0 text-muted">Sign a message with an admin wallet to continue. Signing costs nothing.</p>
         <Button onClick={signIn}>{wallet.publicKey ? "Sign in" : "Connect wallet"}</Button>
-        {msg && <p role="alert" className={`m-0 text-sm ${msg.ok ? "text-lime" : "text-burn"}`}>{msg.text}</p>}
+        {msg && <p role="alert" className={`m-0 text-sm ${msg.ok ? "text-accent" : "text-burn"}`}>{msg.text}</p>}
         </div>
       </main>
     );
@@ -142,7 +142,7 @@ export function AdminApp({ pairs }: { pairs: Pair[] }) {
         <h1 className="m-0 font-display font-black text-[40px] md:text-[56px] tracking-[-0.03em] leading-none">Admin</h1>
         <Segmented label="Section" value={tab} onChange={setTab} options={[{ value: "settings", label: "Settings" }, { value: "keeper", label: "Keeper" }, { value: "baskets", label: "Baskets" }, { value: "pairs", label: "Pairs" }]} />
       </div>
-      {msg && <p role="status" className={`m-0 text-sm ${msg.ok ? "text-lime" : "text-burn"}`}>{msg.text}</p>}
+      {msg && <p role="status" className={`m-0 text-sm ${msg.ok ? "text-accent" : "text-burn"}`}>{msg.text}</p>}
 
       {tab === "settings" && settings && (
         <section className="flex flex-col gap-8 max-w-4xl">
@@ -168,7 +168,7 @@ export function AdminApp({ pairs }: { pairs: Pair[] }) {
                 <button type="button" aria-label={`Remove tier ${t.id}`} onClick={() => set({ tiers: settings.tiers.filter((_, j) => j !== i) })} className="w-11 h-11 rounded-full border border-white/10 text-muted hover:text-ink cursor-pointer">×</button>
               </div>
             ))}
-            {settings.tiers.length < 8 && <button type="button" onClick={() => set({ tiers: [...settings.tiers, { id: "new", lockSeconds: 86_400, multiplierBps: 10_000 }] })} className="self-start text-sm font-semibold text-lime min-h-11 cursor-pointer">Add a tier</button>}
+            {settings.tiers.length < 8 && <button type="button" onClick={() => set({ tiers: [...settings.tiers, { id: "new", lockSeconds: 86_400, multiplierBps: 10_000 }] })} className="self-start text-sm font-semibold text-accent min-h-11 cursor-pointer">Add a tier</button>}
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

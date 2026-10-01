@@ -15,7 +15,7 @@ export default async function StakePage({ params }: { params: Promise<{ mint: st
   if (!d) notFound();
   const symbol = d.launch.symbol ?? shortAddr(mint);
   return (
-    <div className="flex-1 bg-stake">
+    <div className="flex-1 bg-stake-page">
       <Header active="token" />
       <div className="wrap pt-8">
         <Link href={`/t/${mint}`} className="inline-flex items-center gap-3 min-h-11 text-muted hover:text-ink">

@@ -18,7 +18,7 @@ export const shortAddr = (a: string) => `${a.slice(0, 4)}…${a.slice(-4)}`;
 
 const PAIRS: [string, string][] = [
   ["#FFB86B", "#FF7A59"], ["#F9D976", "#F4B400"], ["#FFC1E3", "#FF7AB6"], ["#9FE7FF", "#4FB8FF"],
-  ["#C8FF3D", "#7BD61F"], ["#BDB2FF", "#8B7BFF"], ["#A7F3D0", "#34D399"],
+  ["#8CBEFF", "#3B7DE0"], ["#BDB2FF", "#8B7BFF"], ["#A7F3D0", "#34D399"],
 ];
 
 export function avatarGradient(seed: string): [string, string] {

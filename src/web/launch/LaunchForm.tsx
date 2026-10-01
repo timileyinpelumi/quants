@@ -185,7 +185,7 @@ export function LaunchForm({ split, tiers, maxPenaltyBps, quotes }: {
             <div className="grid grid-cols-[112px_minmax(0,1fr)] md:grid-cols-[132px_minmax(0,1fr)_200px] gap-5 items-start md:items-end">
               <div className="flex flex-col gap-2.5 text-[13px] text-muted row-span-2 md:row-span-1">
                 <span>Image</span>
-                <label className="w-28 h-28 md:w-[132px] md:h-[132px] rounded-[28px] border-[1.5px] border-dashed border-lime/45 bg-lime/5 flex flex-col items-center justify-center gap-2 text-lime text-[13px] cursor-pointer overflow-hidden focus-within:border-lime">
+                <label className="w-28 h-28 md:w-[132px] md:h-[132px] rounded-[28px] border-[1.5px] border-dashed border-accent/45 bg-accent/5 flex flex-col items-center justify-center gap-2 text-accent text-[13px] cursor-pointer overflow-hidden focus-within:border-accent">
                   {preview ? (
                     <img src={preview} alt="Token image preview" className="w-full h-full object-cover" />
                   ) : (
@@ -211,7 +211,7 @@ export function LaunchForm({ split, tiers, maxPenaltyBps, quotes }: {
                 <div role="radiogroup" aria-label="Paired with" className="flex flex-wrap gap-2">
                   {quotes.map((q) => (
                     <button key={q.mint} type="button" role="radio" aria-checked={pair === q.mint} onClick={() => setPair(q.mint)}
-                      className={`flex items-center gap-2 pl-2 pr-4 min-h-11 rounded-full border text-sm font-semibold cursor-pointer ${pair === q.mint ? "bg-raised-2 border-lime/60 text-ink" : "border-white/10 text-muted hover:text-ink"}`}>
+                      className={`flex items-center gap-2 pl-2 pr-4 min-h-11 rounded-full border text-sm font-semibold cursor-pointer ${pair === q.mint ? "bg-raised-2 border-accent/60 text-ink" : "border-white/10 text-muted hover:text-ink"}`}>
                       <Avatar seed={q.mint} label={q.symbol} image={q.icon} size={24} />
                       {q.symbol}
                     </button>
@@ -272,13 +272,13 @@ export function LaunchForm({ split, tiers, maxPenaltyBps, quotes }: {
         <div className="flex flex-col gap-3">
           <span className="text-[13px] text-muted">Where each trading fee goes</span>
           <div className="flex h-3.5 rounded-full overflow-hidden gap-[3px]">
-            <span className="bg-lime" style={{ width: `${split.basketBps / 100}%` }} />
+            <span className="bg-accent" style={{ width: `${split.basketBps / 100}%` }} />
             <span className="bg-violet" style={{ width: `${split.platformBps / 100}%` }} />
             <span className="bg-ink" style={{ width: `${split.creatorBps / 100}%` }} />
           </div>
           <div className="flex flex-col text-sm">
             {[
-              { c: "bg-lime", l: "Reward basket for stakers", v: split.basketBps },
+              { c: "bg-accent", l: "Reward basket for stakers", v: split.basketBps },
               { c: "bg-violet", l: "Platform", v: split.platformBps },
               { c: "bg-ink", l: "You, the creator", v: split.creatorBps },
             ].map((r, i) => (
@@ -294,8 +294,8 @@ export function LaunchForm({ split, tiers, maxPenaltyBps, quotes }: {
           <span className="text-[13px] text-muted">Lock tiers for stakers</span>
           <div className="grid grid-cols-4 gap-2">
             {tiers.map((t) => (
-              <span key={t.id} className="flex flex-col items-center gap-1 py-3.5 rounded-[18px] bg-violet/[0.08] border border-violet/20">
-                <span className="font-display font-black text-xl text-violet-light">{t.multiplierBps / 10_000}x</span>
+              <span key={t.id} className="flex flex-col items-center gap-1 py-3.5 rounded-[18px] bg-stake/[0.08] border border-stake/20">
+                <span className="font-display font-black text-xl text-stake-light">{t.multiplierBps / 10_000}x</span>
                 <span className="text-xs text-muted">{lockLabel(t.lockSeconds)}</span>
               </span>
             ))}

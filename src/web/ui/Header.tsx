@@ -28,7 +28,7 @@ export function Header({ active }: { active: HeaderKey }) {
     <header className="border-b line">
       <div className="wrap flex items-center gap-4 md:gap-8 py-4 md:py-5">
         <Link href="/" className="flex items-center gap-2.5 shrink-0" aria-label="quants home">
-          <img src="/brand/quants-mark.svg" alt="" width={32} height={32} className="w-8 h-8" style={{ filter: "drop-shadow(0 4px 14px rgba(200,255,61,0.18))" }} />
+          <img src="/brand/quants-mark.svg" alt="" width={32} height={32} className="w-8 h-8" style={{ filter: "drop-shadow(0 4px 14px rgba(76,157,255,0.18))" }} />
           <span className="font-display font-black text-xl md:text-2xl tracking-tight">quants</span>
         </Link>
         <nav aria-label="Main" className="hidden lg:flex gap-7 text-[15px] font-medium shrink-0">
@@ -36,7 +36,7 @@ export function Header({ active }: { active: HeaderKey }) {
         </nav>
         <Search className="hidden md:block flex-1 max-w-md" />
         <div className="ml-auto flex items-center gap-2.5 shrink-0">
-          <Link href="/launch" className={`hidden sm:flex items-center gap-1.5 font-display font-bold rounded-full px-5 min-h-11 ${active === "launch" ? "bg-raised-2 border border-white/10" : "text-ground bg-lime"}`}>
+          <Link href="/launch" className={`hidden sm:flex items-center gap-1.5 font-display font-bold rounded-full px-5 min-h-11 ${active === "launch" ? "bg-raised-2 border border-white/10" : "text-ground bg-accent"}`}>
             <span aria-hidden className="text-lg leading-none">+</span> Launch
           </Link>
           <WalletButton />

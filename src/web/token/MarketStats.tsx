@@ -13,7 +13,7 @@ export function MarketStats({ quoteSymbol }: { quoteSymbol: string }) {
       <div className="flex flex-col gap-1.5">
         <span className="text-[13px] text-muted">Price</span>
         <span className="font-display font-bold text-2xl md:text-[30px]">{m ? price : dash}</span>
-        {m && <span className={`font-mono text-sm ${m.change24h >= 0 ? "text-lime" : "text-burn"}`}>{m.change24h >= 0 ? "+" : ""}{m.change24h.toFixed(1)}% today</span>}
+        {m && <span className={`font-mono text-sm ${m.change24h >= 0 ? "text-accent" : "text-burn"}`}>{m.change24h >= 0 ? "+" : ""}{m.change24h.toFixed(1)}% today</span>}
       </div>
       <div className="flex flex-col gap-1.5">
         <span className="text-[13px] text-muted">Market cap</span>
@@ -38,14 +38,14 @@ export function GraduationBar({ initial, quoteSymbol, quoteDecimals }: { initial
     return (
       <>
         <span className="text-[13px] text-muted">Graduated</span>
-        <span className="font-mono text-sm text-lime">Trading on Meteora DAMM v2</span>
+        <span className="font-mono text-sm text-accent">Trading on Meteora DAMM v2</span>
       </>
     );
   }
   return (
     <>
       <span className="flex justify-between text-[13px] text-muted"><span>To graduation</span><span className="font-mono text-ink">{c.progress}%</span></span>
-      <span className="h-3 rounded-full bg-white/[0.07] overflow-hidden flex"><span className="rounded-full transition-[width] duration-700" style={{ width: `${c.progress}%`, background: "linear-gradient(90deg, #9D8CFF, #C8FF3D)" }} /></span>
+      <span className="h-3 rounded-full bg-white/[0.07] overflow-hidden flex"><span className="rounded-full transition-[width] duration-700" style={{ width: `${c.progress}%`, background: "linear-gradient(90deg, #9D8CFF, #4C9DFF)" }} /></span>
       <span className="font-mono text-[13px] text-muted">{whole(c.reserve)} of {whole(c.threshold)} {quoteSymbol}{live?.quoteUsd ? ` · $${fmtCompact(Number(BigInt(c.threshold)) / 10 ** quoteDecimals * live.quoteUsd)} target` : ""}</span>
     </>
   );

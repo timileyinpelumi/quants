@@ -34,7 +34,7 @@ export function StakeApp({ mint, symbol, tiers, maxPenaltyBps, ready, opens }: {
     <main className="grid grid-cols-1 lg:grid-cols-[560px_minmax(0,1fr)] gap-12 lg:gap-16 wrap pt-10 md:pt-14 pb-16">
       <section className="flex flex-col gap-7 min-w-0">
         <h1 className="m-0 font-display font-black text-[40px] md:text-[52px] leading-[1.02] tracking-[-0.03em]">
-          Lock longer.<br /><span className="text-violet-light">Earn more.</span>
+          Lock longer.<br /><span className="text-stake-light">Earn more.</span>
         </h1>
 
         <div className="flex flex-col gap-3">
@@ -48,7 +48,7 @@ export function StakeApp({ mint, symbol, tiers, maxPenaltyBps, ready, opens }: {
                   type="button"
                   aria-pressed={on}
                   onClick={() => setTier(t.id)}
-                  className={`flex flex-col items-center gap-1 py-5 min-h-24 rounded-3xl cursor-pointer transition-colors ${on ? "bg-violet-light text-ground border border-violet-light glow-violet" : "bg-surface text-ink border border-white/10 hover:border-white/25"}`}
+                  className={`flex flex-col items-center gap-1 py-5 min-h-24 rounded-3xl cursor-pointer transition-colors ${on ? "bg-stake-light text-ground border border-stake-light glow-stake" : "bg-surface text-ink border border-white/10 hover:border-white/25"}`}
                 >
                   <span className="font-display font-black text-2xl md:text-[28px]">{mult(t.multiplierBps)}</span>
                   <span className="text-[13px]">{lockLabel(t.lockSeconds)}</span>
@@ -60,10 +60,10 @@ export function StakeApp({ mint, symbol, tiers, maxPenaltyBps, ready, opens }: {
 
         <label className="flex flex-col gap-2.5 text-[13px] text-muted">
           <span className="flex justify-between"><span>Amount</span>{balance !== null && <span className="font-mono">You hold {fmtAmount(balance, DECIMALS, 2)} {symbol}{usd(balance) && <span className="text-faint"> · {usd(balance)}</span>}</span>}</span>
-          <span className="flex items-center bg-surface border border-white/10 rounded-[22px] px-5 md:px-6 focus-within:border-violet/60">
+          <span className="flex items-center bg-surface border border-white/10 rounded-[22px] px-5 md:px-6 focus-within:border-stake/60">
             <input inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0" className="flex-1 min-w-0 font-display font-bold text-[28px] md:text-[32px] text-ink bg-transparent border-0 py-5 outline-none" />
             {balance !== null && balance > 0n && (
-              <button type="button" onClick={() => setAmount(fmtAmount(balance, DECIMALS, DECIMALS).replace(/,/g, ""))} className="text-sm font-semibold text-violet-light px-2 min-h-11 cursor-pointer">Max</button>
+              <button type="button" onClick={() => setAmount(fmtAmount(balance, DECIMALS, DECIMALS).replace(/,/g, ""))} className="text-sm font-semibold text-stake-light px-2 min-h-11 cursor-pointer">Max</button>
             )}
             <span className="font-display font-bold text-[15px] text-muted pl-2">{symbol}</span>
           </span>
@@ -103,7 +103,7 @@ export function StakeApp({ mint, symbol, tiers, maxPenaltyBps, ready, opens }: {
             {positions.map((p) => (
               <div key={p.tierId} className="flex flex-col gap-4 py-5 border-t line">
                 <div className="grid grid-cols-[56px_minmax(0,1fr)] md:grid-cols-[72px_minmax(0,1fr)_200px_auto] gap-4 items-center">
-                  <span className="font-display font-black text-2xl text-violet-light">{mult(p.multiplierBps)}</span>
+                  <span className="font-display font-black text-2xl text-stake-light">{mult(p.multiplierBps)}</span>
                   <span className="flex flex-col gap-1">
                     <span className="font-mono">{fmtAmount(p.staked, DECIMALS, 2)} {symbol}{usd(p.staked) && <span className="text-faint"> · {usd(p.staked)}</span>}</span>
                     <span className="text-[13px] text-muted">{lockLabel(p.lockSeconds)}, {p.locked ? `unlocks ${dateOf(p.unlocksAt)}` : p.staked === "0" ? "exited" : "unlocked"}</span>
@@ -112,7 +112,7 @@ export function StakeApp({ mint, symbol, tiers, maxPenaltyBps, ready, opens }: {
                     {p.pending.map((r) => <span key={r.mint}>{fmtAmount(r.amount, r.decimals ?? 0, 4)} {r.symbol ?? ""}{r.decimals !== null && usd(r.amount, r.decimals, r.mint) && <span className="text-faint"> · {usd(r.amount, r.decimals, r.mint)}</span>}</span>)}
                   </span>
                   <span className="col-span-2 md:col-span-1 flex gap-2 md:justify-end">
-                    <Button size="sm" variant="lime" disabled={busy !== null || p.pending.every((r) => r.amount === "0")} onClick={() => act("claim", p.tierId)}>
+                    <Button size="sm" variant="accent" disabled={busy !== null || p.pending.every((r) => r.amount === "0")} onClick={() => act("claim", p.tierId)}>
                       {busy === `claim:${p.tierId}` ? "Approve" : "Claim"}
                     </Button>
                     {p.locked ? (
