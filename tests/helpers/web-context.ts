@@ -58,6 +58,7 @@ export async function makeWebContext(over: Partial<WebContext> = {}) {
     adminWallets: new Set([ADMIN.publicKey.toBase58()]),
     sessionSecret: crypto.getRandomValues(new Uint8Array(32)),
     tokenProgramOf: async () => CLASSIC,
+    stocks: { list: async () => [], icons: async () => ({}) },
     ...over,
   };
   setContextForTests(ctx);

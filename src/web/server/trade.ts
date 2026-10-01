@@ -2,6 +2,7 @@ import { z } from "zod";
 import type { WebContext } from "./context";
 import { LaunchError } from "@/launch/prepare";
 import { quoteCoin } from "@/domain/quotes";
+import { allQuotes } from "./quotes";
 import type { Side, TradeTarget } from "@/meteora/trade";
 
 const addr = z.string().regex(/^[1-9A-HJ-NP-Za-km-z]{32,44}$/, "Wallet address is not valid");
@@ -14,7 +15,7 @@ async function target(ctx: WebContext, mint: string): Promise<TradeTarget> {
   if (!l) throw new LaunchError("invalid_input", "Token not found");
   return {
     pool: l.pool, dammPool: l.status === "graduated" ? l.damm_pool : null, baseMint: l.mint, quoteMint: l.quote_mint,
-    baseDecimals: 6, quoteDecimals: quoteCoin(l.quote_mint)?.decimals ?? 6,
+    baseDecimals: 6, quoteDecimals: quoteCoin(l.quote_mint, await allQuotes(ctx))?.decimals ?? 6,
   };
 }
 

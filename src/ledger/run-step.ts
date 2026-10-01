@@ -1,9 +1,10 @@
 import type { SQL } from "bun";
 import type { ChainPort, SignedTx } from "../chain/port";
 import {
-  beginStep, confirmStep, failStep, failuresSinceConfirmed, markSent, resetToPending, retryFailed, sentSignatures, sentSinceConfirmed,
-  type Delta, type DeltaResolver, type StepInput, type StepRow,
+  beginStep, confirmStep, failStep, failuresSinceConfirmed, markSent, releasePaused, resetToPending, retryFailed, sentSignatures, sentSinceConfirmed,
+  MINT_PAUSED, type Delta, type DeltaResolver, type StepInput, type StepRow,
 } from "./ledger";
+import { isPausedError } from "../chain/mints";
 
 export const MAX_ATTEMPTS = 5;
 export type Outcome = "confirmed" | "failed" | "pending";
@@ -77,6 +78,10 @@ export async function runTxStep(
   try {
     tx = await spec.build(row);
   } catch (e) {
+    if (isPausedError(e)) {
+      await failStep(sql, row.id, MINT_PAUSED);
+      return "pending";
+    }
     await failStep(sql, row.id, `build failed: ${e}`, true);
     return "failed";
   }
@@ -84,7 +89,8 @@ export async function runTxStep(
   row = { ...row, status: "sent", signature: tx.signature, lastValidBlockHeight: tx.lastValidBlockHeight, attempts: row.attempts + 1 };
   try {
     await tx.send();
-  } catch {
+  } catch (e) {
+    if (isPausedError(e)) await releasePaused(sql, row.id, tx.signature);
     return "pending";
   }
   const state = await chain.waitForConfirmation(tx.signature, tx.lastValidBlockHeight);

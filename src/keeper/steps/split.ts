@@ -9,13 +9,13 @@ export async function splitStep(deps: KeeperDeps, launch: LaunchRow, s: Versione
   const mint = launch.quoteMint;
   const amount = await getBalance(deps.sql, launch.id, "unsplit", mint);
   if (amount === 0n) return false;
-  const r = splitFees(amount, s.split);
+  const r = splitFees(amount, s.split, launch.tradingOnly);
   return runDbStep(deps.sql, {
     launchId: launch.id, idemKey: `split:${launch.id}:${runId}`, kind: "split", settingsVersion: s.version,
-    detail: { amount: amount.toString() },
+    detail: { amount: amount.toString(), ...(launch.tradingOnly ? { tradingOnly: true } : {}) },
     deltas: [
       { bucket: "unsplit", mint, amount: -amount },
-      { bucket: "basket", mint, amount: r.basket },
+      ...(launch.tradingOnly ? [] : [{ bucket: "basket" as const, mint, amount: r.basket }]),
       { bucket: "treasury", mint, amount: r.platform },
       { bucket: "creator", mint, amount: r.creator },
     ],

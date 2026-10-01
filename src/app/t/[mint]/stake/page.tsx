@@ -24,14 +24,21 @@ export default async function StakePage({ params }: { params: Promise<{ mint: st
           <span className="text-sm">Back to token</span>
         </Link>
       </div>
-      <StakeApp
-        mint={mint}
-        symbol={symbol}
-        tiers={d.tiers.map((t) => ({ id: t.tierId, lockSeconds: t.lockSeconds, multiplierBps: t.multiplierBps }))}
-        maxPenaltyBps={d.maxPenaltyBps}
-        ready={d.stakeReady}
-        opens={d.stakingOpens}
-      />
+      {d.launch.tradingOnly ? (
+        <main className="wrap pt-10 pb-16">
+          <h1 className="m-0 font-display font-black text-[32px] md:text-[40px] tracking-tight">No staking for {symbol}</h1>
+          <p className="m-0 mt-3 text-lg text-muted max-w-[560px]">{symbol} is paired with a stock, so it is trading only. It has no reward basket and no staking.</p>
+        </main>
+      ) : (
+        <StakeApp
+          mint={mint}
+          symbol={symbol}
+          tiers={d.tiers.map((t) => ({ id: t.tierId, lockSeconds: t.lockSeconds, multiplierBps: t.multiplierBps }))}
+          maxPenaltyBps={d.maxPenaltyBps}
+          ready={d.stakeReady}
+          opens={d.stakingOpens}
+        />
+      )}
     </div>
   );
 }

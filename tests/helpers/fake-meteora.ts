@@ -11,7 +11,9 @@ export class FakeMeteora implements MeteoraPort {
   progress = new Map<string, { quoteReserve: bigint; threshold: bigint; migrated: boolean }>();
   firstBuyQuotes: { configKey: string; amount: bigint }[] = [];
   firstBuyOut = async (_configKey: string, amount: bigint) => amount;
+  thresholds = new Map<string, bigint>();
   constructor(private chain: FakeChain) {}
+  async configThreshold(configKey: string) { return this.thresholds.get(configKey) ?? 0n; }
   async firstBuyMaxOut(configKey: string, amount: bigint) { this.firstBuyQuotes.push({ configKey, amount }); return this.firstBuyOut(configKey, amount); }
   async pendingPartnerQuoteFee(pool: string) { return this.partnerFee.get(pool) ?? 0n; }
   async buildClaimPartnerFee(pool: string) {

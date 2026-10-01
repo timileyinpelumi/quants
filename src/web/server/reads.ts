@@ -17,13 +17,14 @@ export function stakingOpens(p: PoolRow): StakingOpens | null {
 export interface LaunchListItem {
   mint: string; name: string | null; symbol: string | null; image: string | null; pool: string; quoteMint: string;
   feeTierBps: number; status: "live" | "graduated"; createdAt: string; basket: { mint: string; symbol: string | null }[]; burned: string;
+  tradingOnly: boolean;
 }
 
 export async function listLaunches(sql: SQL, opts: { graduated?: boolean; limit?: number; offset?: number; mint?: string }): Promise<LaunchListItem[]> {
   const graduated = opts.graduated ?? null;
   const mint = opts.mint ?? null;
   const rows = await sql`
-    select l.mint, l.name, l.symbol, l.image, l.pool, l.quote_mint, l.fee_tier_bps, l.status, l.created_at,
+    select l.mint, l.name, l.symbol, l.image, l.pool, l.quote_mint, l.fee_tier_bps, l.status, l.created_at, l.trading_only,
       coalesce((select json_agg(json_build_object('mint', b.reward_mint, 'symbol', b.symbol) order by b.weight_bps desc, b.reward_mint)
                 from baskets b where b.launch_id = l.id), '[]') as basket,
       coalesce((select sum((d.detail->>'amount')::numeric) from distributions d
@@ -36,6 +37,7 @@ export async function listLaunches(sql: SQL, opts: { graduated?: boolean; limit?
   return rows.map((r: any) => ({
     mint: r.mint, name: r.name, symbol: r.symbol, image: r.image, pool: r.pool, quoteMint: r.quote_mint, feeTierBps: r.fee_tier_bps,
     status: r.status, createdAt: new Date(r.created_at).toISOString(), basket: typeof r.basket === "string" ? JSON.parse(r.basket) : r.basket, burned: r.burned,
+    tradingOnly: r.trading_only === true,
   }));
 }
 

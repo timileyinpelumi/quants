@@ -5,6 +5,7 @@ import { getContext } from "@/web/server/context";
 import { loadLatestSettings } from "@/domain/settings";
 import { fmtAmount, lockLabel, lockShort } from "@/web/ui/format";
 import { quoteCoins } from "@/domain/quotes";
+import { launchableQuotes } from "@/web/server/quotes";
 import { launchCost } from "@/domain/launch-cost";
 import { usdPrices } from "@/web/server/prices";
 
@@ -14,7 +15,7 @@ export const dynamic = "force-dynamic";
 const SOL = "So11111111111111111111111111111111111111112";
 const sections = [
   ["glance", "At a glance"], ["how", "How it works"], ["launch", "Launching a token"], ["fees", "Where fees go"], ["basket", "The reward basket"],
-  ["opens", "When staking opens"], ["staking", "Staking and lock tiers"], ["early", "Leaving early"], ["graduation", "Graduation"], ["risks", "Risks"], ["wallets", "Wallets and programs"], ["faq", "Questions"],
+  ["opens", "When staking opens"], ["staking", "Staking and lock tiers"], ["early", "Leaving early"], ["graduation", "Graduation"], ["stocks", "Stock pairs"], ["risks", "Risks"], ["wallets", "Wallets and programs"], ["faq", "Questions"],
 ] as const;
 
 function H2({ id, children }: { id: string; children: React.ReactNode }) {
@@ -51,6 +52,9 @@ export default async function DocsPage() {
   const volumeToOpen = (rent: bigint, feeBps: number) => Math.ceil(Number(rent) / 1e9 / stakerShare(feeBps));
   const pct = (bps: number) => `${bps / 100}%`;
   const solGrad = quoteCoins()[0]!.graduation;
+  const stocks = (await launchableQuotes(ctx)).filter((c) => c.tradingOnly);
+  const owners = s.split.platformBps + s.split.creatorBps;
+  const creatorOnly = owners ? Math.round((s.split.creatorBps * 10_000) / owners) : 0;
 
   return (
     <div className="bg-launch flex-1">
@@ -136,6 +140,13 @@ export default async function DocsPage() {
           <H2 id="graduation">Graduation</H2>
           <P>New tokens trade on a bonding curve. When the curve has raised the amount below in its pair token, the token graduates to a Meteora DAMM v2 pool with permanently locked liquidity. Trading, fees, rewards and staking continue as before.</P>
           <Table head={["Paired with", "Graduates at"]} rows={quoteCoins().filter((c) => c.graduation > 0).map((c) => [c.name === "quants" ? `${c.symbol} (platform token)` : `${c.symbol} (${c.name})`, `${c.graduation.toLocaleString("en-US")} ${c.symbol}`])} />
+
+          <H2 id="stocks">Stock pairs</H2>
+          <P>A token can also be paired with a tokenized stock from xStocks or Backpack{stocks.length ? `: ${stocks.map((c) => c.symbol).join(", ")}` : ""}. These launches are trading only. They have no reward basket and no staking, because Kamino farms cannot hold stock tokens. The share of fees that would buy rewards goes to the creator and the platform instead, so the creator gets {pct(creatorOnly)} and the platform {pct(10_000 - creatorOnly)} of what is left after Meteora&apos;s 20%.</P>
+          <P>The company behind a stock token can pause it, for example around a corporate action. While it is paused nobody can buy or sell tokens paired with it, and quants waits to collect fees, pay creators and graduate those tokens until it is resumed. Nothing is lost while it waits.</P>
+          <P>Meteora accepts a stock as a pair only once it has a token badge for that stock, and quants offers only stocks that have one and that pass its checks: no transfer fee and no transfer hook.</P>
+          <P>Some stock tokens scale the amount a wallet shows, to account for dividends and splits. quants shows balances and trade amounts the way your wallet does. Transactions, charts and graduation progress use the amounts recorded on chain.</P>
+          {stocks.some((c) => c.graduation > 0) && <Table head={["Paired with", "Graduates at"]} rows={stocks.filter((c) => c.graduation > 0).map((c) => [`${c.symbol} (${c.name})`, `${c.graduation.toLocaleString("en-US")} ${c.symbol}`])} />}
 
           <H2 id="risks">Risks</H2>
           <P>Launched tokens are volatile and most lose value. Reward tokens can lose value too. Smart contracts can have bugs. Only use money you can afford to lose. Read the <Link href="/terms" className="text-accent">terms and risks</Link>.</P>

@@ -14,7 +14,13 @@ const publicUri = (u: string) => u.startsWith("https://") || (process.env.ALLOW_
 const addr = z.string().regex(/^[1-9A-HJ-NP-Za-km-z]{32,44}$/, "Address is not valid");
 const uint = z.string().regex(/^\d+$/).default("0").transform((v) => BigInt(v));
 
-const launchInput = (quoteMints: string[]) => z.object({
+const basketItem = z.object({ mint: addr, weightBps: z.number().int().positive(), symbol: z.string().max(20).optional(), decimals: z.number().int().min(0).max(18).optional() });
+const basketInput = z.array(basketItem).min(1, "Pick at least one reward token").max(10, "Pick at most 10 reward tokens")
+  .refine((b) => new Set(b.map((x) => x.mint)).size === b.length, "Each reward token can be picked once")
+  .refine((b) => b.reduce((a, x) => a + x.weightBps, 0) === 10_000, "Basket weights must add up to 100");
+const noBasket = z.array(basketItem).max(0, "Tokens paired with a stock are trading only and have no reward basket").default([]);
+
+const launchInput = (quoteMints: string[], tradingOnly: boolean) => z.object({
   name: z.string().trim().min(1, "Add a name").max(32, "Name is 32 characters at most"),
   symbol: z.string().regex(/^[A-Za-z0-9]{1,10}$/, "Symbol is 1 to 10 letters or numbers"),
   uri: z.string().url().refine(publicUri, "Metadata link must be HTTPS"),
@@ -22,9 +28,7 @@ const launchInput = (quoteMints: string[]) => z.object({
   creator: addr,
   quoteMint: z.string().refine((m) => quoteMints.includes(m), "That pair token is not supported"),
   feeTierBps: z.number().refine((v) => (FEE_TIERS_BPS as readonly number[]).includes(v), "Trading fee must be 1%, 2% or 3%"),
-  basket: z.array(z.object({ mint: addr, weightBps: z.number().int().positive(), symbol: z.string().max(20).optional(), decimals: z.number().int().min(0).max(18).optional() })).min(1, "Pick at least one reward token").max(10, "Pick at most 10 reward tokens")
-    .refine((b) => new Set(b.map((x) => x.mint)).size === b.length, "Each reward token can be picked once")
-    .refine((b) => b.reduce((a, x) => a + x.weightBps, 0) === 10_000, "Basket weights must add up to 100"),
+  basket: tradingOnly ? noBasket : basketInput,
   devBuyQuoteAmount: uint,
   devBuyMinOut: uint,
 });
@@ -36,10 +40,13 @@ const SUPPLY_BASE_UNITS = 1_000_000_000n * 1_000_000n;
 
 export async function prepareLaunch(
   deps: { sql: SQL; meteora: MeteoraPort; configKeys: Record<string, string>; quoteMints: string[];
+    /** Pair tokens that cannot back staking farms (tokenized stocks): their launches have no basket and no stake pool. */
+    tradingOnlyMints?: string[];
     isVerified: (mint: string) => Promise<boolean>; tokenProgramOf: (mint: string) => Promise<string> },
   raw: unknown,
 ) {
-  const parsed = launchInput(deps.quoteMints).safeParse(raw);
+  const tradingOnly = (deps.tradingOnlyMints ?? []).includes((raw as { quoteMint?: unknown } | null)?.quoteMint as string);
+  const parsed = launchInput(deps.quoteMints, tradingOnly).safeParse(raw);
   if (!parsed.success) throw new LaunchError("invalid_input", parsed.error.issues.map((i) => i.message).join("; "));
   const input = parsed.data;
   for (const b of input.basket) {
@@ -66,9 +73,9 @@ export async function prepareLaunch(
     devBuyQuoteAmount: input.devBuyQuoteAmount, devBuyMinOut: input.devBuyMinOut,
   });
   const mint = baseMint.publicKey.toBase58();
-  await deps.sql`insert into prepared_launches (mint, pool, quote_mint, fee_tier_bps, config_key, creator, basket, settings_version, name, symbol, uri, image)
+  await deps.sql`insert into prepared_launches (mint, pool, quote_mint, fee_tier_bps, config_key, creator, basket, settings_version, name, symbol, uri, image, trading_only)
     values (${mint}, ${pool}, ${input.quoteMint}, ${input.feeTierBps}, ${configKey}, ${input.creator},
-            ${JSON.stringify(input.basket)}::text::jsonb, ${settings.version}, ${input.name}, ${input.symbol}, ${input.uri}, ${input.image ?? null})`;
+            ${JSON.stringify(input.basket)}::text::jsonb, ${settings.version}, ${input.name}, ${input.symbol}, ${input.uri}, ${input.image ?? null}, ${tradingOnly})`;
   return {
     transaction: tx.serialize({ requireAllSignatures: false }).toString("base64"),
     mint,

@@ -33,13 +33,14 @@ export async function recordLaunch(sql: SQL, prep: any, spillWallet: PublicKey):
   const spillAccount = getAssociatedTokenAddressSync(new PublicKey(i.mint), spillWallet).toBase58();
   const [sv] = await sql`select data from settings where version = ${prep.settings_version}`;
   const basket = typeof prep.basket === "string" ? JSON.parse(prep.basket) : prep.basket;
+  const tradingOnly = prep.trading_only === true;
   const rent = sv ? launchCost(parseSettings(sv.data), basket.length).rent.toString() : null;
   const [row] = await deps.sql`
-    with s as (select data from settings where version = ${prep.settings_version}),
+    with s as (select data from settings where version = ${prep.settings_version} and not ${tradingOnly}),
     l as (
-      insert into launches (mint, pool, quote_mint, fee_tier_bps, config_key, creator, status, settings_version, name, symbol, uri, image)
+      insert into launches (mint, pool, quote_mint, fee_tier_bps, config_key, creator, status, settings_version, name, symbol, uri, image, trading_only)
       values (${i.mint}, ${prep.pool}, ${prep.quote_mint}, ${prep.fee_tier_bps}, ${prep.config_key}, ${prep.creator}, 'live', ${prep.settings_version},
-              ${prep.name}, ${prep.symbol}, ${prep.uri}, ${prep.image})
+              ${prep.name}, ${prep.symbol}, ${prep.uri}, ${prep.image}, ${tradingOnly})
       on conflict (mint) do nothing returning id
     ), b as (
       insert into baskets (launch_id, reward_mint, weight_bps, symbol, decimals)

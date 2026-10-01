@@ -40,10 +40,13 @@ export async function reconcile(deps: KeeperDeps) {
 }
 
 export async function processLaunch(deps: KeeperDeps, launch: LaunchRow, s: VersionedSettings, runId: string) {
-  const l = await graduateStep(deps, launch, s, runId);
-  await claimStep(deps, l, s, runId);
+  // Every transfer of a paused quote mint fails, so the steps that move it wait for the issuer to resume it.
+  const paused = await deps.chain.isPaused(launch.quoteMint);
+  const l = await graduateStep(deps, launch, s, runId, paused);
+  if (!paused) await claimStep(deps, l, s, runId);
   await splitStep(deps, l, s, runId);
-  await payoutStep(deps, l, s, runId);
+  if (!paused) await payoutStep(deps, l, s, runId);
+  if (l.tradingOnly) return;
   if (await openStakingStep(deps, l, s, runId)) {
     await createFarmsStep(deps, l, s, runId);
     await swapStep(deps, l, s, runId);

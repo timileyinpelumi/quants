@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Avatar } from "@/web/ui/Avatar";
-import { CoinStack } from "@/web/ui/CoinStack";
+import { CoinStack, CoinTag } from "@/web/ui/CoinStack";
+import { TradingOnly } from "@/web/ui/StakingAt";
 import { fmtAgo, fmtCompact, shortAddr } from "@/web/ui/format";
 import type { TokenRow } from "@/web/server/landing";
 
@@ -30,6 +31,7 @@ export function TokenCard({ t }: { t: TokenRow }) {
           <span className="flex items-baseline gap-2 min-w-0">
             <span className="font-display font-bold text-lg truncate">{t.symbol}</span>
             <span className="font-mono text-[11px] text-faint shrink-0">{fmtAgo(t.createdAt)}</span>
+            {t.tradingOnly && <TradingOnly />}
           </span>
           <span className="text-[13px] text-muted truncate">{t.name ?? shortAddr(t.mint)}</span>
         </span>
@@ -52,15 +54,20 @@ export function TokenCard({ t }: { t: TokenRow }) {
           <Meter value={t.progress ?? 0} color={CURVE} />
         </span>
       )}
-      {t.stakingPct !== null && (
+      {!t.tradingOnly && t.stakingPct !== null && (
         <span className="flex flex-col gap-1.5">
           <span className="flex justify-between text-[12px] text-stake-light"><span>Staking opens</span><span className="font-mono">{t.stakingPct}%</span></span>
           <Meter value={t.stakingPct} color="var(--color-stake-light)" />
         </span>
       )}
       <span className="flex items-center gap-2 text-[12px] text-muted min-w-0 pt-3 border-t line">
-        <span className="shrink-0">Earns</span>
-        <CoinStack coins={t.basket} size={18} max={4} />
+        {t.tradingOnly ? <>
+          <span className="shrink-0">Paired with</span>
+          <CoinTag coin={t.quote} size={18} />
+        </> : <>
+          <span className="shrink-0">Earns</span>
+          <CoinStack coins={t.basket} size={18} max={4} />
+        </>}
       </span>
     </Link>
   );

@@ -17,8 +17,14 @@ export function splitByWeights<K extends string>(amount: bigint, entries: { key:
   return out;
 }
 
-export function splitFees(amount: bigint, s: FeeSplit) {
+// Trading only launches have no stakers, so the basket share goes to the platform and creator in proportion to theirs.
+export function splitFees(amount: bigint, s: FeeSplit, tradingOnly = false) {
   if (amount < 0n) throw new Error("negative amount");
+  if (tradingOnly) {
+    const total = BigInt(s.platformBps + s.creatorBps);
+    const platform = total === 0n ? amount : (amount * BigInt(s.platformBps)) / total;
+    return { basket: 0n, platform, creator: amount - platform };
+  }
   const platform = (amount * BigInt(s.platformBps)) / BPS;
   const creator = (amount * BigInt(s.creatorBps)) / BPS;
   return { basket: amount - platform - creator, platform, creator };

@@ -8,6 +8,7 @@ export class FakeChain implements ChainPort {
   sent: string[] = [];
   nextOutcome: SigState = "confirmed";
   sendThrows = false;
+  paused = new Set<string>();
   private n = 0;
 
   tx(label = "tx"): SignedTx {
@@ -29,4 +30,5 @@ export class FakeChain implements ChainPort {
   async buildTransfer() { return this.tx("transfer"); }
   async buildBurn() { return this.tx("burn"); }
   async balance(owner: string, mint: string) { return this.balances.get(`${owner}:${mint}`) ?? 0n; }
+  async isPaused(mint: string) { return this.paused.has(mint); }
 }

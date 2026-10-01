@@ -32,7 +32,7 @@ export function ExploreList({ initial, nextOffset, query }: { initial: TokenRow[
               <span className="flex items-baseline gap-2 min-w-0">
                 <span className="font-display font-bold text-lg truncate">{t.symbol}</span>
                 <span className="font-mono text-[12px] text-faint shrink-0">{fmtAgo(t.createdAt)}</span>
-                <StakingAt pct={t.stakingPct} />
+                <StakingAt pct={t.stakingPct} tradingOnly={t.tradingOnly} />
               </span>
               <span className="text-[13px] text-muted truncate flex items-center gap-1.5">{t.name ?? shortAddr(t.mint)} · <CoinTag coin={t.quote} size={14} /></span>
             </span>
@@ -54,7 +54,7 @@ export function ExploreList({ initial, nextOffset, query }: { initial: TokenRow[
               </>
             )}
           </span>
-          <span className="hidden md:flex text-sm min-w-0"><CoinStack coins={t.basket} /></span>
+          <span className="hidden md:flex text-sm min-w-0">{t.tradingOnly ? <span className="text-muted">No staking</span> : <CoinStack coins={t.basket} />}</span>
         </Link>
       ))}
       <LoadMore auto done={paged.done} state={paged.state} onMore={paged.more} doneText={paged.pages > 0 ? "No more tokens" : undefined} />

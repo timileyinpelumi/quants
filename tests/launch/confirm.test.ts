@@ -46,6 +46,24 @@ test("records launch, basket and a pending stake pool from what prepare stored",
   expect(BigInt(sp.basket_value_lamports)).toBe(0n);
 });
 
+test("a trading only launch is recorded without a basket or stake pool", async () => {
+  const sql = await freshDb();
+  await saveSettings(sql, defaultSettings(OURS), "t");
+  const meteora = new FakeMeteora(new FakeChain());
+  const STOCK = "Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh";
+  const p = await prepareLaunch(
+    { sql, meteora, configKeys: { [`${STOCK}:200`]: "CfgStock200" }, quoteMints: [STOCK], tradingOnlyMints: [STOCK], isVerified: async () => true, tokenProgramOf: async () => "" },
+    { name: "Cat", symbol: "CAT", uri: "https://x.test/cat.json", creator: CREATOR, quoteMint: STOCK, feeTierBps: 200, basket: [] },
+  );
+  meteora.pools.set(p.pool, { baseMint: p.mint, config: "CfgStock200", creator: CREATOR });
+  const id = await confirmLaunch({ sql, conn: conn(true), meteora, spillWallet: SPILL }, { signature: "sig", mint: p.mint });
+  const [l] = await sql`select trading_only, quote_mint from launches where id = ${id}`;
+  expect(l).toEqual({ trading_only: true, quote_mint: STOCK });
+  expect(await sql`select * from baskets where launch_id = ${id}`).toHaveLength(0);
+  expect(await sql`select * from stake_pools where launch_id = ${id}`).toHaveLength(0);
+  expect(await sql`select * from stake_tiers where launch_id = ${id}`).toHaveLength(0);
+});
+
 test("confirm is idempotent on mint", async () => {
   const { sql, meteora, p } = await prepared();
   const deps = { sql, conn: conn(true), meteora, spillWallet: SPILL };

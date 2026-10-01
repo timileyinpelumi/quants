@@ -42,6 +42,24 @@ The target is written into each config key when `scripts/create-configs.ts` runs
 
 Keep `config-keys.json` next to `.env` on the server (it is gitignored because the dev seed regenerates it); the web app reads it from `CONFIG_KEYS_PATH`. Save the initial settings from a script or the admin page (plan 2) with `saveSettings(sql, defaultSettings(OURTOKEN_MINT), "<admin>")`.
 
+### Stock pairs
+
+Tokenized stocks (xStocks from Backed, and Backpack stocks such as `SPCX.US`) can be pair tokens. They are Token-2022 mints, so:
+
+- **Trading only.** Kamino farms reject these mints, so a launch against a stock has no reward basket, no stake pool and no farms. The keeper splits its fees between the treasury and the creator in proportion to `platformBps` and `creatorBps` (the basket share is shared out the same way) and never runs the rent, swap or fund steps for it. The launch form hides the basket and staking for these pairs, and the token page, explore and home show a Trading only tag instead of staking.
+- **Token badge.** DBC rejects Token-2022 quote mints with extensions unless the config and every pool pass the mint's DBC token badge (`deriveTokenBadgeAddress(mint)`). Meteora creates badges, and the xStocks and Backpack stocks checked so far have one on mainnet. `create-configs.ts` refuses a stock with extensions and no badge, and `MeteoraLive.buildLaunchTx` passes the badge whenever the quote mint is Token-2022 and the badge account exists.
+- **Pause risk.** The issuer can pause the mint (Token-2022 pausable extension), for example around corporate actions. While it is paused every transfer fails with custom program error `0x43`: nobody can trade the paired tokens, and the keeper skips migrate, claim and payout for those launches without recording failures or alerting. A paused error that slips through while building or sending is recorded as `mint paused`, gives back its attempt and does not count toward the retry cap. Everything resumes on the first run after the issuer unpauses.
+- **Scaled UI amounts.** Stock mints can carry a scaled UI multiplier (dividends, splits). Balances and amounts in the trade panel are shown multiplied by the mint's current multiplier, as wallets show them; transactions, the ledger, charts and graduation progress use raw on-chain amounts. Jupiter prices are per displayed unit, so USD values can drift by the multiplier while it is not 1.
+
+Which stocks are offered: the web app reads the xStocks list (`api.xstocks.fi/api/v2/public/assets`, Solana deployments) and Backpack's assets (`api.backpack.exchange/api/v1/assets`, `.US` symbols with a Solana mint) once a day into the `stock_quotes` table. A stock is offered only when `config-keys.json` has config keys for its mint, and each such mint is checked on chain once: Token-2022, no transfer fee, no transfer hook program. To add stocks on mainnet, create their config keys and merge the printed keys into `config-keys.json`:
+
+```bash
+# graduation is --graduation-usd worth at the current Jupiter price (default 12000), or set per mint with <mint>=<whole units>
+bun --env-file=.env scripts/create-configs.ts --stocks Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh,<mint>=<units> > stock-keys.json
+```
+
+Locally, `scripts/dev-seed.ts` creates two Token-2022 stand-in stocks with no extensions (NVDAx and SPCX.US), their config keys and a trading only launch (`SEED_STOCK_MINT`), and lists them through `LOCAL_STOCKS` instead of the issuers' lists. `LOCAL_STOCKS` is a dev switch and refuses to start against a non-local RPC.
+
 ## Running the keeper
 
 ```bash

@@ -1,5 +1,5 @@
-import { Connection, PublicKey } from "@solana/web3.js";
-import { getMint } from "@solana/spl-token";
+import { Connection } from "@solana/web3.js";
+import { fetchMint } from "../src/chain/mints";
 import { db } from "../src/db/client";
 import { RpcHistory } from "../src/indexer/history";
 import { JupiterPrices } from "../src/indexer/prices";
@@ -17,7 +17,7 @@ const r = await indexOnce({
   sql: db(e.DATABASE_URL),
   history: new RpcHistory(conn),
   quoteUsd: (m) => prices.usd(m),
-  decimals: async (m) => (await getMint(conn, new PublicKey(m))).decimals,
+  decimals: async (m) => (await fetchMint(conn, m)).decimals,
 });
 console.log(JSON.stringify(r));
 process.exit(0);

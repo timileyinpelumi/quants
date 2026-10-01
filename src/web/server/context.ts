@@ -12,6 +12,8 @@ import { DevPinata, PinataRest, type PinataPort } from "./pinata";
 import { TokenIcons } from "./icons";
 import { JupiterPrices } from "@/indexer/prices";
 import { checkWebEnv } from "@/env";
+import { StockRegistry } from "@/stocks/registry";
+import type { StockListing } from "@/stocks/sources";
 
 export interface WebContext {
   sql: SQL;
@@ -30,6 +32,7 @@ export interface WebContext {
   adminWallets: Set<string>;
   sessionSecret: Uint8Array;
   tokenProgramOf(mint: string): Promise<string>;
+  stocks: Pick<StockRegistry, "list" | "icons">;
 }
 
 // Local development only: a validator's own mints are unknown to Jupiter, so LOCAL_TOKEN_LIST stands in for token search.
@@ -54,24 +57,32 @@ export function getContext(): WebContext {
   const conn = new Connection(e.RPC_URL!, "confirmed");
   // The web server never signs: these throwaway keypairs only satisfy constructors whose signing paths it never calls.
   const chain = new SolanaChain(conn, Keypair.generate(), Keypair.generate());
+  const sql = sharedDb();
+  const meteora = new MeteoraLive(chain, e.DAMM_V2_MIGRATION_CONFIG!);
+  // hosted deploys pass the keys as JSON since config-keys.json is not committed
+  const configKeys: Record<string, string> = JSON.parse(e.CONFIG_KEYS ?? readFileSync(e.CONFIG_KEYS_PATH ?? "config-keys.json", "utf8"));
   const ctx: WebContext = {
-    sql: sharedDb(),
+    sql,
     conn,
-    meteora: new MeteoraLive(chain, e.DAMM_V2_MIGRATION_CONFIG!),
+    meteora,
     staking: new KaminoBackend(chain, e.RPC_URL!, e.KAMINO_GLOBAL_CONFIG!),
     jupiter: withLocalTokens(new JupiterLive(e.JUPITER_BASE_URL ?? "https://api.jup.ag/swap/v1", chain, fetch, e.JUPITER_API_KEY), e.LOCAL_TOKEN_LIST),
     pinata: e.PINATA_JWT === "stub" ? new DevPinata() : new PinataRest(e.PINATA_JWT!),
     trade: new TradeLive(conn),
     prices: new JupiterPrices(e.JUPITER_API_KEY ? "https://api.jup.ag/price/v3" : "https://lite-api.jup.ag/price/v3", e.JUPITER_API_KEY),
     icons: new TokenIcons(e.JUPITER_API_KEY ? "https://api.jup.ag/tokens/v2" : "https://lite-api.jup.ag/tokens/v2", e.JUPITER_API_KEY),
-    // hosted deploys pass the keys as JSON since config-keys.json is not committed
-    configKeys: JSON.parse(e.CONFIG_KEYS ?? readFileSync(e.CONFIG_KEYS_PATH ?? "config-keys.json", "utf8")),
+    configKeys,
     keeperAddress: e.KEEPER_ADDRESS!,
     spillWallet: new PublicKey(e.SPILL_ADDRESS!),
     ourtokenMint: e.OURTOKEN_MINT!,
     adminWallets: new Set((e.ADMIN_WALLETS ?? "").split(",").map((s) => s.trim()).filter(Boolean)),
     sessionSecret: new TextEncoder().encode(e.ADMIN_SESSION_SECRET!),
     tokenProgramOf: async (mint) => (await conn.getAccountInfo(new PublicKey(mint)))?.owner.toBase58() ?? "",
+    // LOCAL_STOCKS (local validator only) lists stand-in stock mints in place of the xStocks and Backpack lists.
+    stocks: new StockRegistry({
+      sql, conn, fetch, configKeys, threshold: (k) => meteora.configThreshold(k),
+      local: e.LOCAL_STOCKS ? (JSON.parse(e.LOCAL_STOCKS) as StockListing[]) : undefined,
+    }),
   };
   g.__quantsCtx = ctx;
   return ctx;

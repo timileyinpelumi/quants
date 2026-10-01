@@ -2,8 +2,7 @@ import Link from "next/link";
 import { Header } from "@/web/ui/Header";
 import { fmtCompact, fmtPrice } from "@/web/ui/format";
 import { getContext } from "@/web/server/context";
-import { iconsFor } from "@/web/server/icons";
-import { quoteCoins } from "@/domain/quotes";
+import { allQuotes, quoteIcons } from "@/web/server/quotes";
 import { HOME_TABS, landing, type Featured } from "@/web/server/landing";
 import { HomeGrid } from "@/web/home/HomeGrid";
 import { BuyTicker } from "@/web/home/BuyTicker";
@@ -49,7 +48,7 @@ function FeaturedToken({ f }: { f: Featured }) {
 
 export default async function HomePage() {
   const ctx = getContext();
-  const d = await landing(ctx.sql, Date.now(), (m) => iconsFor(ctx.icons, m, quoteCoins()));
+  const d = await landing(ctx.sql, Date.now(), async (m) => quoteIcons(ctx, m, await allQuotes(ctx)));
   return (
     <div className="flex-1 bg-launch">
       <Header active="home" />

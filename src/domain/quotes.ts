@@ -12,11 +12,14 @@ export interface QuoteCoin {
   platform: boolean;
   /** Default smallest creator payout, in base units, when settings do not set one for this mint. */
   payoutMin: bigint;
+  kind: "crypto" | "xstocks" | "backpack";
+  /** Tokenized stocks cannot back Kamino farms, so launches against them have no basket and no staking. */
+  tradingOnly: boolean;
 }
 
 type Env = Record<string, string | undefined>;
 
-const MAINNET: Omit<QuoteCoin, "platform">[] = [
+const MAINNET: Omit<QuoteCoin, "platform" | "kind" | "tradingOnly">[] = [
   { mint: NATIVE_MINT, symbol: "SOL", name: "Solana", decimals: 9, graduation: 85, iconMint: NATIVE_MINT, payoutMin: 50_000_000n },
   { mint: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", symbol: "USDC", name: "USD Coin", decimals: 6, graduation: 12_000, iconMint: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", payoutMin: 5_000_000n },
   { mint: "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB", symbol: "USDT", name: "Tether USD", decimals: 6, graduation: 12_000, iconMint: "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB", payoutMin: 5_000_000n },
@@ -25,13 +28,13 @@ const MAINNET: Omit<QuoteCoin, "platform">[] = [
 
 export function quoteCoins(env: Env = process.env): QuoteCoin[] {
   const local = env.QUOTE_MINTS ? (JSON.parse(env.QUOTE_MINTS) as Record<string, string>) : {};
-  const list: QuoteCoin[] = MAINNET.map((c) => ({ ...c, mint: local[c.symbol] ?? c.mint, platform: false }));
+  const list: QuoteCoin[] = MAINNET.map((c) => ({ ...c, mint: local[c.symbol] ?? c.mint, platform: false, kind: "crypto", tradingOnly: false }));
   const ours = env.OURTOKEN_MINT ?? env.NEXT_PUBLIC_OURTOKEN_MINT;
   if (ours) {
     list.push({
       mint: ours, symbol: env.OURTOKEN_SYMBOL ?? env.NEXT_PUBLIC_OURTOKEN_SYMBOL ?? "OURTOKEN", name: "quants",
       decimals: Number(env.OURTOKEN_DECIMALS ?? 6), graduation: Number(env.OURTOKEN_GRADUATION ?? env.NEXT_PUBLIC_OURTOKEN_GRADUATION ?? 0),
-      iconMint: null, platform: true, payoutMin: 0n,
+      iconMint: null, platform: true, payoutMin: 0n, kind: "crypto", tradingOnly: false,
     });
   }
   const targets = env.QUOTE_GRADUATIONS ? (JSON.parse(env.QUOTE_GRADUATIONS) as Record<string, unknown>) : {};
@@ -44,4 +47,9 @@ export function quoteCoins(env: Env = process.env): QuoteCoin[] {
   return list;
 }
 
-export const quoteCoin = (mint: string, list = quoteCoins()) => list.find((c) => c.mint === mint);
+// The stock pairs this process last loaded, so synchronous lookups by mint also find stocks.
+const g = globalThis as { __quantsStocks?: QuoteCoin[] };
+export const setStockQuotes = (list: QuoteCoin[]) => { g.__quantsStocks = list; };
+export const stockQuotes = (): QuoteCoin[] => g.__quantsStocks ?? [];
+
+export const quoteCoin = (mint: string, list = [...quoteCoins(), ...stockQuotes()]) => list.find((c) => c.mint === mint);
