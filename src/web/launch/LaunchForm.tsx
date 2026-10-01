@@ -10,11 +10,12 @@ import { Segmented } from "@/web/ui/Segmented";
 import { fmtAmount, lockLabel, lockShort } from "@/web/ui/format";
 import { signAndSendAll, SendError, type UnsignedTx } from "@/web/wallet/send";
 import { BasketPicker, basketTotal, type BasketItem } from "./BasketPicker";
+import { PairPicker, type PairOption } from "./PairPicker";
 import { launchCost } from "@/domain/launch-cost";
 import { useUsd, usdText } from "@/web/ui/usd";
 
 const SOL = "So11111111111111111111111111111111111111112";
-export type QuoteOption = { mint: string; symbol: string; name: string; graduation: number; icon: string | null };
+export type QuoteOption = PairOption;
 const FEES = [100, 200, 300, 500];
 
 type Tier = { id: string; lockSeconds: number; multiplierBps: number };
@@ -81,6 +82,12 @@ export function LaunchForm({ split, tiers, maxPenaltyBps, quotes }: {
     setPreview(URL.createObjectURL(file));
   };
 
+  const tradingOnly = quotes.find((q) => q.mint === pair)?.tradingOnly ?? false;
+  // Trading only launches have no stakers: the keeper sends the basket share to the platform and creator pro rata.
+  const owners = split.platformBps + split.creatorBps;
+  const platformShare = owners ? Math.round((split.platformBps * 10_000) / owners) : 10_000;
+  const fees = tradingOnly ? { basketBps: 0, platformBps: platformShare, creatorBps: 10_000 - platformShare } : split;
+
   const devBuyLamports = useMemo(() => {
     const v = Number(devBuy);
     return devBuy.trim() === "" ? 0n : Number.isFinite(v) && v >= 0 ? BigInt(Math.round(v * 1e9)) : null;
@@ -90,8 +97,8 @@ export function LaunchForm({ split, tiers, maxPenaltyBps, quotes }: {
     !image && "Add an image",
     !name.trim() && "Add a name",
     !/^[A-Za-z0-9]{1,10}$/.test(symbol) && "Symbol is 1 to 10 letters or numbers",
-    basket.length === 0 && "Pick at least one reward token",
-    basket.length > 0 && basketTotal(basket) !== 100 && "Basket weights must add up to 100",
+    !tradingOnly && basket.length === 0 && "Pick at least one reward token",
+    !tradingOnly && basket.length > 0 && basketTotal(basket) !== 100 && "Basket weights must add up to 100",
     devBuyLamports === null && "First buy must be a number",
   ].filter(Boolean) as string[];
 
@@ -146,7 +153,7 @@ export function LaunchForm({ split, tiers, maxPenaltyBps, quotes }: {
       prepared = await postJson<{ mint: string; transactions: UnsignedTx[] }>("/api/launch/prepare", {
         name: name.trim(), symbol, uri: meta.uri, image: meta.image, creator: wallet.publicKey.toBase58(),
         quoteMint: pair, feeTierBps: fee, devBuySol: (devBuyLamports ?? 0n).toString(),
-        basket: basket.map((b) => ({ mint: b.mint, weightBps: b.weight * 100, symbol: b.symbol, decimals: b.decimals })),
+        basket: tradingOnly ? [] : basket.map((b) => ({ mint: b.mint, weightBps: b.weight * 100, symbol: b.symbol, decimals: b.decimals })),
       });
 
       setStatus("signing");
@@ -206,19 +213,7 @@ export function LaunchForm({ split, tiers, maxPenaltyBps, quotes }: {
           <div className={section}>
             <span className={num}>02</span>
             <div className="grid grid-cols-1 gap-7">
-              <div className="flex flex-col gap-3">
-                <span className="text-[13px] text-muted">Paired with</span>
-                <div role="radiogroup" aria-label="Paired with" className="flex flex-wrap gap-2">
-                  {quotes.map((q) => (
-                    <button key={q.mint} type="button" role="radio" aria-checked={pair === q.mint} onClick={() => setPair(q.mint)}
-                      className={`flex items-center gap-2 pl-2 pr-4 min-h-11 rounded-full border text-sm font-semibold cursor-pointer ${pair === q.mint ? "bg-raised-2 border-lime/60 text-ink" : "border-white/10 text-muted hover:text-ink"}`}>
-                      <Avatar seed={q.mint} label={q.symbol} image={q.icon} size={24} />
-                      {q.symbol}
-                    </button>
-                  ))}
-                </div>
-                <span className="text-[13px] text-muted">Your token trades against {pairLabel}. Fees are earned in {pairLabel}.</span>
-              </div>
+              <PairPicker quotes={quotes} value={pair} onChange={setPair} />
               <div className="flex flex-col gap-3">
                 <span className="text-[13px] text-muted">Trading fee</span>
                 <Segmented label="Trading fee" value={fee} onChange={setFee} options={FEES.map((f) => ({ value: f, label: `${f / 100}%` }))} />
@@ -228,7 +223,12 @@ export function LaunchForm({ split, tiers, maxPenaltyBps, quotes }: {
 
           <div className={section}>
             <span className={num}>03</span>
-            <BasketPicker value={basket} onChange={setBasket} />
+            {tradingOnly ? (
+              <div className="flex flex-col gap-2">
+                <span className="font-display font-bold text-xl">No reward basket</span>
+                <span className="text-[13px] text-muted">Tokens paired with a stock are trading only. These launches have no staking, so trading fees go to you and the platform.</span>
+              </div>
+            ) : <BasketPicker value={basket} onChange={setBasket} />}
           </div>
 
           <div className={section}>
@@ -272,17 +272,17 @@ export function LaunchForm({ split, tiers, maxPenaltyBps, quotes }: {
         <div className="flex flex-col gap-3">
           <span className="text-[13px] text-muted">Where each trading fee goes</span>
           <div className="flex h-3.5 rounded-full overflow-hidden gap-[3px]">
-            <span className="bg-lime" style={{ width: `${split.basketBps / 100}%` }} />
-            <span className="bg-violet" style={{ width: `${split.platformBps / 100}%` }} />
-            <span className="bg-ink" style={{ width: `${split.creatorBps / 100}%` }} />
+            <span className="bg-lime" style={{ width: `${fees.basketBps / 100}%` }} />
+            <span className="bg-violet" style={{ width: `${fees.platformBps / 100}%` }} />
+            <span className="bg-ink" style={{ width: `${fees.creatorBps / 100}%` }} />
           </div>
           <div className="flex flex-col text-sm">
             {[
-              { c: "bg-lime", l: "Reward basket for stakers", v: split.basketBps },
-              { c: "bg-violet", l: "Platform", v: split.platformBps },
-              { c: "bg-ink", l: "You, the creator", v: split.creatorBps },
-            ].map((r, i) => (
-              <span key={r.l} className={`flex justify-between py-2 ${i < 2 ? "border-b line" : ""}`}>
+              { c: "bg-lime", l: "Reward basket for stakers", v: fees.basketBps },
+              { c: "bg-violet", l: "Platform", v: fees.platformBps },
+              { c: "bg-ink", l: "You, the creator", v: fees.creatorBps },
+            ].filter((r) => r.v > 0).map((r, i, all) => (
+              <span key={r.l} className={`flex justify-between py-2 ${i < all.length - 1 ? "border-b line" : ""}`}>
                 <span className="flex items-center gap-2"><span className={`w-2 h-2 rounded-full ${r.c}`} />{r.l}</span>
                 <span className="font-mono">{r.v / 100}%</span>
               </span>
@@ -290,7 +290,7 @@ export function LaunchForm({ split, tiers, maxPenaltyBps, quotes }: {
           </div>
         </div>
 
-        <div className="flex flex-col gap-2.5">
+        {!tradingOnly && <div className="flex flex-col gap-2.5">
           <span className="text-[13px] text-muted">Lock tiers for stakers</span>
           <div className="grid grid-cols-4 gap-2">
             {tiers.map((t) => (
@@ -301,13 +301,15 @@ export function LaunchForm({ split, tiers, maxPenaltyBps, quotes }: {
             ))}
           </div>
           <span className="text-[13px] text-muted leading-normal">Leaving early burns up to {maxPenaltyBps / 100}% of the stake. quants never keeps it.</span>
-        </div>
+        </div>}
 
         <div className="flex flex-col text-sm border-t line pt-3">
-          <span className="flex flex-col gap-0.5 py-1.5">
+          {tradingOnly ? (
+            <span className="flex justify-between py-1.5"><span className="text-muted">Staking</span><span>None, trading only</span></span>
+          ) : <span className="flex flex-col gap-0.5 py-1.5">
             <span className="flex justify-between"><span className="text-muted">Staking opens</span><span className="font-mono text-right">after {solText(rent)}{usdOf(rent) && <span className="block text-[12px] text-faint">≈ {usdOf(rent)}</span>}</span></span>
             <span className="text-[13px] text-muted leading-normal">The stakers&apos; share of trading fees first pays for the staking farms, one per lock tier ({tiers.length}). Staking opens once it covers that.</span>
-          </span>
+          </span>}
           <span className="flex justify-between py-1.5"><span className="text-muted">Graduates at</span><span className="font-mono">{pairQuote ? `${pairQuote.graduation.toLocaleString("en-US")} ${pairQuote.symbol} raised` : ""}</span></span>
           <span className="flex justify-between py-1.5"><span className="text-muted">Supply</span><span className="font-mono">1,000,000,000</span></span>
         </div>

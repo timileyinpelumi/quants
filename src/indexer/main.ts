@@ -1,5 +1,5 @@
-import { Connection, PublicKey } from "@solana/web3.js";
-import { getMint } from "@solana/spl-token";
+import { Connection } from "@solana/web3.js";
+import { fetchMint } from "../chain/mints";
 import { db } from "../db/client";
 import { RpcHistory } from "./history";
 import { JupiterPrices } from "./prices";
@@ -32,7 +32,7 @@ const deps = {
   history: new RpcHistory(conn),
   quoteUsd: (mint: string) => prices.usd(mint),
   decimals: async (mint: string) => {
-    if (!decimals.has(mint)) decimals.set(mint, (await getMint(conn, new PublicKey(mint))).decimals);
+    if (!decimals.has(mint)) decimals.set(mint, (await fetchMint(conn, mint)).decimals);
     return decimals.get(mint)!;
   },
 };

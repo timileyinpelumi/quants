@@ -184,3 +184,16 @@ test("top traders route pages by offset", async () => {
   expect(p2.nextOffset).toBeNull();
   expect((await GET(new Request("http://x"), { params: Promise.resolve({ mint: "nope" }) })).status).toBe(404);
 });
+
+test("trading only launches are flagged and their splits pay no stakers", async () => {
+  const sql = await freshDb();
+  await saveSettings(sql, defaultSettings("OURS1111111111111111111111111111111111111111"), "t");
+  const [r] = await sql`insert into launches (mint, pool, quote_mint, fee_tier_bps, config_key, creator, status, settings_version, symbol, trading_only, created_at)
+    values ('mint-STK', 'pool-STK', 'Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh', 200, 'c', 'cr', 'live', 1, 'STK', true, ${new Date(NOW - 3_600_000)}) returning id`;
+  await trade(sql, Number(r.id), 30, 0.01, { value: 2 });
+  await sql`insert into distributions (launch_id, idem_key, step_key, kind, status, detail, settings_version)
+    values (${r.id}, 'split:s', 'split:s', 'split', 'confirmed', ${JSON.stringify({ amount: "1000000000", tradingOnly: true })}::text::jsonb, 1)`;
+  const d = await landing(sql, NOW);
+  expect(d.newest[0]).toMatchObject({ symbol: "STK", tradingOnly: true, stakingPct: null, basket: [] });
+  expect(d.stats.stakersUsd).toBe(0);
+});

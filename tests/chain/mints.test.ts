@@ -1,6 +1,6 @@
 import { test, expect } from "bun:test";
 import { Keypair, PublicKey } from "@solana/web3.js";
-import { readMint, mintPaused, uiMultiplier, stockMintProblem, isPausedError } from "../../src/chain/mints";
+import { readMint, fetchMint, mintPaused, uiMultiplier, stockMintProblem, isPausedError } from "../../src/chain/mints";
 import { mintData, mintAccount, pausable, scaledUi, transferFee, transferHook } from "../helpers/mint-data";
 
 const addr = Keypair.generate().publicKey;
@@ -11,6 +11,12 @@ test("reads decimals and program for classic and Token-2022 mints", () => {
   expect(t.decimals).toBe(8);
   expect(t.program.toBase58()).toBe("TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb");
   expect(() => readMint(addr, { ...mintAccount(mintData(6)), owner: PublicKey.default })).toThrow("not a token mint");
+});
+
+test("fetchMint reads decimals of a Token-2022 mint, which getMint would reject", async () => {
+  const conn = { getAccountInfo: async (k: PublicKey) => (k.equals(addr) ? mintAccount(mintData(8, [pausable(false)])) : null) } as any;
+  expect((await fetchMint(conn, addr.toBase58())).decimals).toBe(8);
+  await expect(fetchMint(conn, Keypair.generate().publicKey.toBase58())).rejects.toThrow("not found");
 });
 
 test("paused flag and scaled UI multiplier", () => {

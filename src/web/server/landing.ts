@@ -17,6 +17,7 @@ export type TokenRow = {
   progress: number | null;
   /** Percent of the way to opening staking; null once open. */
   stakingPct: number | null;
+  tradingOnly: boolean;
 };
 export type TradeRow = {
   signature: string; eventIndex: number; mint: string; symbol: string; side: "buy" | "sell"; valueUsd: number | null; quoteValue: number; quoteMint: string;
@@ -46,6 +47,7 @@ type RawToken = {
   mint: string; symbol: string; name: string | null; image: string | null; status: string; created_at: Date; quote_mint: string;
   price: number | null; quote_usd: number | null; vol: number; n: number; change: number; progress: number | null;
   pool_status: string | null; rent_lamports: string | null; basket_value_lamports: string | null; basket: string | { mint: string; symbol: string }[];
+  trading_only: boolean;
 };
 
 async function tokenQuery(sql: SQL, o: TokenQuery, now: number): Promise<RawToken[]> {
@@ -54,7 +56,7 @@ async function tokenQuery(sql: SQL, o: TokenQuery, now: number): Promise<RawToke
   const status = o.filter === "live" ? "live" : o.filter === "graduated" ? "graduated" : null;
   return sql`
     select * from (
-      select l.id, l.mint, coalesce(l.symbol, left(l.mint, 4)) as symbol, l.name, l.image, l.status, l.created_at, l.quote_mint,
+      select l.id, l.mint, coalesce(l.symbol, left(l.mint, 4)) as symbol, l.name, l.image, l.status, l.created_at, l.quote_mint, l.trading_only,
         last.price, last.quote_usd, d.vol, d.n, sp.status as pool_status, sp.rent_lamports, sp.basket_value_lamports,
         case when last.price is not null and coalesce(ref.price, first.price) <> 0 then (last.price / coalesce(ref.price, first.price) - 1) * 100 else 0 end as change,
         last.price * last.quote_usd * ${SUPPLY} as mcap,
@@ -91,6 +93,7 @@ async function toTokenRows(rows: RawToken[], icons?: Icons): Promise<TokenRow[]>
       price: r.price, priceUsd, mcapUsd: priceUsd === null ? null : priceUsd * SUPPLY,
       change24h: r.change, volume24hUsd: Number(r.vol), trades24h: r.n, progress: r.progress,
       stakingPct: r.pool_status ? stakingOpens({ status: r.pool_status, rent_lamports: r.rent_lamports, basket_value_lamports: r.basket_value_lamports ?? 0 })?.percent ?? null : null,
+      tradingOnly: r.trading_only === true,
     };
   });
 }
@@ -109,7 +112,7 @@ export async function landing(sql: SQL, now = Date.now(), icons?: Icons): Promis
       (select count(distinct trader)::int from trades where block_time > ${since}) as traders,
       (select coalesce(sum((d.detail->>'amount')::float8 * (s.data->'split'->>'basketBps')::float8 / 10000 * px.unit * px.quote_usd), 0)
          from distributions d join settings s on s.version = d.settings_version join px on px.launch_id = d.launch_id
-         where d.kind = 'split' and d.status = 'confirmed') as stakers`;
+         where d.kind = 'split' and d.status = 'confirmed' and d.detail->>'tradingOnly' is null) as stakers`;
   const lists = await Promise.all([
     tokenQuery(sql, { sort: "trending", traded: true, limit: LIST }, now),
     tokenQuery(sql, { sort: "new", limit: LIST }, now),

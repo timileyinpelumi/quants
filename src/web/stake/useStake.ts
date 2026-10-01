@@ -1,10 +1,10 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
 import { PublicKey } from "@solana/web3.js";
-import { getAssociatedTokenAddressSync } from "@solana/spl-token";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 import { signAndSendAll } from "@/web/wallet/send";
+import { tokenBalance } from "@/web/wallet/balance";
 
 export type Tier = { id: string; lockSeconds: number; multiplierBps: number };
 export type Position = {
@@ -38,7 +38,7 @@ export function useStake(mint: string) {
     if (!owner) { setPositions([]); setBalance(null); return; }
     const [p, b] = await Promise.all([
       fetch(`/api/launches/${mint}/positions?owner=${owner}`).then((r) => r.json()).catch(() => ({ positions: [] })),
-      connection.getTokenAccountBalance(getAssociatedTokenAddressSync(new PublicKey(mint), new PublicKey(owner))).then((r) => BigInt(r.value.amount)).catch(() => 0n),
+      tokenBalance(connection, mint, new PublicKey(owner)),
     ]);
     setPositions(p.positions ?? []);
     setBalance(b);

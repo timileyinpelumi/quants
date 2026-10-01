@@ -1,4 +1,4 @@
-import { PublicKey, type AccountInfo } from "@solana/web3.js";
+import { PublicKey, type AccountInfo, type Connection } from "@solana/web3.js";
 import {
   TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID, unpackMint, getPausableConfig, getScaledUiAmountConfig, getTransferFeeConfig, getTransferHook,
   type Mint,
@@ -17,7 +17,15 @@ export function readMint(address: PublicKey, info: AccountInfo<Buffer>): MintInf
   return { program: info.owner, decimals: mint.decimals, mint };
 }
 
-export const mintPaused = (m: Mint) => getPausableConfig(m)?.paused ?? false;
+/** Reads a classic or Token-2022 mint; spl-token's getMint assumes the classic program unless told otherwise. */
+export async function fetchMint(conn: Pick<Connection, "getAccountInfo">, mint: string): Promise<MintInfo> {
+  const key = new PublicKey(mint);
+  const info = await conn.getAccountInfo(key, "confirmed");
+  if (!info) throw new Error(`mint ${mint} not found`);
+  return readMint(key, info);
+}
+
+export const mintPaused =(m: Mint) => getPausableConfig(m)?.paused ?? false;
 
 /** The multiplier wallets apply to raw amounts for display; 1 for mints without the scaled UI amount extension. */
 export function uiMultiplier(m: Mint, nowSeconds = Math.floor(Date.now() / 1000)): number {

@@ -29,6 +29,7 @@ export function assertNoDevSwitches(env: RawEnv) {
     env.DEV_UPLOADS_BASE && "DEV_UPLOADS_BASE",
     env.LOCAL_TOKEN_LIST && "LOCAL_TOKEN_LIST",
     env.LOCAL_REWARD_MINTS && "LOCAL_REWARD_MINTS",
+    env.LOCAL_STOCKS && "LOCAL_STOCKS",
   ].filter(Boolean);
   if (on.length === 0 || env.ALLOW_DEV_SWITCHES === "1") return;
   let host = "";

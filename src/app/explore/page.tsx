@@ -1,8 +1,7 @@
 import Link from "next/link";
 import { Header } from "@/web/ui/Header";
 import { getContext } from "@/web/server/context";
-import { iconsFor } from "@/web/server/icons";
-import { quoteCoins } from "@/domain/quotes";
+import { allQuotes, quoteIcons } from "@/web/server/quotes";
 import { ExploreList } from "@/web/explore/ExploreList";
 import { exploreTokens, type ExploreFilter, type ExploreSort } from "@/web/server/landing";
 
@@ -18,7 +17,7 @@ export default async function ExplorePage({ searchParams }: { searchParams: Prom
   const filter = (p.graduated === "1" ? "graduated" : FILTERS.find(([k]) => k === p.filter)?.[0] ?? "all") as ExploreFilter;
   const q = p.q?.trim().slice(0, 100) ?? "";
   const ctx = getContext();
-  const rows = await exploreTokens(ctx.sql, { sort, filter, q, limit: PAGE + 1 }, Date.now(), (m) => iconsFor(ctx.icons, m, quoteCoins()));
+  const rows = await exploreTokens(ctx.sql, { sort, filter, q, limit: PAGE + 1 }, Date.now(), async (m) => quoteIcons(ctx, m, await allQuotes(ctx)));
   const tokens = rows.slice(0, PAGE);
   const nextOffset = rows.length > PAGE ? PAGE : null;
   const href = (o: { sort?: string; filter?: string }) => {

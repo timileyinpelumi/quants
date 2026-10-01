@@ -3,7 +3,8 @@ import { TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID } from "@solana/spl-token";
 import { z } from "zod";
 import type { WebContext } from "./context";
 import { iconsFor } from "./icons";
-import { quoteCoin, quoteCoins } from "@/domain/quotes";
+import { quoteCoin } from "@/domain/quotes";
+import { allQuotes } from "./quotes";
 import { NATIVE_MINT } from "@/domain/types";
 
 export interface HeldToken { mint: string; amount: string; decimals: number; symbol: string | null; name: string | null; image: string | null; kind: "launch" | "platform" | "reward" | "other" }
@@ -28,7 +29,7 @@ export async function walletOverview(ctx: WebContext, ownerRaw: string) {
   const rewards = mints.length ? await ctx.sql`select distinct on (reward_mint) reward_mint, symbol from baskets where reward_mint in ${ctx.sql(mints)} and symbol is not null` : [];
   const lmap = new Map(launches.map((l: any) => [l.mint, l]));
   const rmap = new Map(rewards.map((r: any) => [r.reward_mint, r.symbol as string]));
-  const quotes = quoteCoins();
+  const quotes = await allQuotes(ctx);
   const icons = await iconsFor(ctx.icons, [NATIVE_MINT, ...mints.filter((m) => !lmap.has(m))], quotes).catch(() => ({} as Record<string, string | null>));
   const tokens: HeldToken[] = [];
   for (const [mint, h] of held) {

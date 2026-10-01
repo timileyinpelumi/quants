@@ -29,6 +29,20 @@ test("OURTOKEN launch with a first buy puts the Jupiter swap first and caps the 
   expect((c.meteora as any).launches[0].devBuyQuoteAmount).toBe(1_980_000_000n);
 });
 
+test("a stock pair from the registry launches trading only, with no basket", async () => {
+  const STOCK = "Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh";
+  const stock = { mint: STOCK, symbol: "NVDAx", name: "NVIDIA xStock", decimals: 8, graduation: 50, iconMint: STOCK, platform: false, payoutMin: 0n, kind: "xstocks" as const, tradingOnly: true };
+  const c = await makeWebContext({ stocks: { list: async () => [stock], icons: async () => ({}) } });
+  c.configKeys[`${STOCK}:200`] = "CfgStock200";
+  const r = await post(prepare, body({ quoteMint: STOCK, basket: [] }));
+  const j = await r.json();
+  expect(r.status).toBe(200);
+  const [p] = await c.sql`select trading_only, basket from prepared_launches where mint = ${j.mint}`;
+  expect(p).toEqual({ trading_only: true, basket: [] });
+  const withBasket = await post(prepare, body({ quoteMint: STOCK }));
+  expect(withBasket.status).toBe(400);
+});
+
 test("OURTOKEN first buy with no route is a readable 400", async () => {
   await makeWebContext();
   const r = await post(prepare, body({ quoteMint: OURS, devBuySol: "1000000000" }));
