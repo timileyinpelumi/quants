@@ -12,7 +12,7 @@ function png(w: number, h: number): Uint8Array<ArrayBuffer> {
 const form = (fields: Record<string, string | File>) => {
   const f = new FormData();
   for (const [k, v] of Object.entries(fields)) f.set(k, v);
-  return new Request("http://x/api/metadata", { method: "POST", body: f });
+  return new Request("http://x/api/metadata", { method: "POST", body: f, headers: { "content-length": "1000" } });
 };
 
 test("uploads image then metadata and returns the uri", async () => {
@@ -59,13 +59,21 @@ test("a body larger than the upload limit is refused before it is read", async (
   expect(r.status).toBe(413);
 });
 
+test("a body without a content length is refused", async () => {
+  await makeWebContext();
+  const f = new FormData();
+  f.set("name", "Cat"); f.set("symbol", "CAT");
+  const r = await POST(new Request("http://x/api/metadata", { method: "POST", body: f }));
+  expect(r.status).toBe(411);
+});
+
 test("uploads are rate limited per address", async () => {
   await makeWebContext();
   const codes: number[] = [];
   for (let i = 0; i < 12; i++) {
     const f = new FormData();
     f.set("name", "Cat"); f.set("symbol", "CAT");
-    codes.push((await POST(new Request("http://x/api/metadata", { method: "POST", headers: { "x-forwarded-for": "9.9.9.9" }, body: f }))).status);
+    codes.push((await POST(new Request("http://x/api/metadata", { method: "POST", headers: { "x-forwarded-for": "9.9.9.9", "content-length": "1000" }, body: f }))).status);
   }
   expect(codes.filter((c) => c === 429).length).toBeGreaterThan(0);
 });

@@ -2,7 +2,7 @@ import { ZodError } from "zod";
 import { LaunchError } from "@/launch/prepare";
 
 export class LimitError extends Error {
-  constructor(public status: 413 | 429, message: string) { super(message); }
+  constructor(public status: 411 | 413 | 429, message: string) { super(message); }
 }
 
 const hits = new Map<string, { count: number; resetAt: number }>();
@@ -34,9 +34,11 @@ export function rateLimit(req: Request, bucket: string, limit: number, windowMs 
   if (++h.count > limit) throw new LimitError(429, "Too many requests, wait a minute and try again");
 }
 
+// Chunked bodies have no length to check up front, so they are refused.
 export function limitBody(req: Request, maxBytes: number) {
-  const len = Number(req.headers.get("content-length") ?? "0");
-  if (len > maxBytes) throw new LimitError(413, "That upload is too large");
+  const raw = req.headers.get("content-length");
+  if (raw === null || !/^\d+$/.test(raw)) throw new LimitError(411, "Upload size is missing");
+  if (Number(raw) > maxBytes) throw new LimitError(413, "That upload is too large");
 }
 
 export class AuthError extends Error {
@@ -50,7 +52,7 @@ export const json = (data: unknown, status = 200) =>
 
 export function jsonError(e: unknown): Response {
   if (e instanceof LaunchError) return json({ error: { code: e.code, message: e.message } }, 400);
-  if (e instanceof LimitError) return json({ error: { code: e.status === 413 ? "too_large" : "rate_limited", message: e.message } }, e.status);
+  if (e instanceof LimitError) return json({ error: { code: e.status === 413 ? "too_large" : e.status === 411 ? "length_required" : "rate_limited", message: e.message } }, e.status);
   if (e instanceof AuthError) return json({ error: { code: e.status === 401 ? "unauthorized" : "forbidden", message: e.message } }, e.status);
   if (e instanceof ZodError) return json({ error: { code: "invalid_input", message: e.issues.map((i) => i.message).join("; ") } }, 400);
   console.error(e);

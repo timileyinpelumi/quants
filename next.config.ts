@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { securityHeaders } from "./src/web/security-headers";
 
 const rpc = process.env.NEXT_PUBLIC_RPC_URL ?? "";
 if (process.env.NEXT_PUBLIC_TEST_WALLET_SECRET && !/^https?:\/\/(127\.0\.0\.1|localhost)/.test(rpc)) {
@@ -10,6 +11,9 @@ const config: NextConfig = {
   // keep every compiled route in dev; recompiling a disposed one reloads open pages
   // launches seeded before uploads moved out of public/ still point at /dev-uploads
   async rewrites() { return [{ source: "/dev-uploads/:cid", destination: "/api/dev-uploads/:cid" }]; },
+  async headers() {
+    return [{ source: "/:path*", headers: securityHeaders(rpc || "http://127.0.0.1:8899", process.env.NODE_ENV !== "production") }];
+  },
   // The build runs on Turbopack; the webpack hook below only affects the webpack dev server.
   turbopack: {},
   // Under Bun the dev server's file watcher misses edits, so dev polls for changes instead.
