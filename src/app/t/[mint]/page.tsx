@@ -42,7 +42,7 @@ export default async function TokenPage({ params }: { params: Promise<{ mint: st
     <div className="flex-1 bg-token">
       <Header active="token" />
       <main className="flex flex-col gap-10 wrap pt-8 md:pt-12 pb-16">
-        <section className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_auto] gap-8 items-end">
+        <section className="grid grid-cols-1 2xl:grid-cols-[minmax(0,1fr)_auto] gap-8 items-end">
           <div className="flex items-center gap-4 md:gap-6 min-w-0">
             <span className="shrink-0" style={{ filter: "drop-shadow(0 20px 40px rgba(255,122,89,0.25))" }}>
               <Avatar seed={mint} label={symbol} image={launch.image} size={96} />
