@@ -23,16 +23,17 @@ async function target(ctx: WebContext, mint: string): Promise<TradeTarget> {
 export async function quoteTrade(ctx: WebContext, params: URLSearchParams) {
   const q = z.object({ mint: z.string().min(1), side, amount, slippageBps: slippage }).parse(Object.fromEntries(params));
   const t = await target(ctx, q.mint);
-  try {
-    return await ctx.trade.quote(t, q.side as Side, BigInt(q.amount), q.slippageBps);
-  } catch (e) {
-    if (e instanceof Error && e.message === "graduated") throw new LaunchError("invalid_input", "This token just graduated. Refresh the page to trade on its new pool.");
-    throw e;
-  }
+  return ctx.trade.quote(t, q.side as Side, BigInt(q.amount), q.slippageBps).catch(readable);
+}
+
+function readable(e: unknown): never {
+  if (e instanceof Error && e.message === "graduated") throw new LaunchError("invalid_input", "This token just graduated. Refresh the page to trade on its new pool.");
+  if (e instanceof Error && e.message === "graduating") throw new LaunchError("invalid_input", "This token filled its curve and is moving to its new pool. Trading opens again in a few minutes.");
+  throw e;
 }
 
 export async function buildTrade(ctx: WebContext, raw: unknown) {
   const b = z.object({ mint: z.string().min(1), side, amount, minOut: z.string().regex(/^\d+$/), owner: addr }).parse(raw);
   const t = await target(ctx, b.mint);
-  return ctx.trade.buildSwapTx(t, b.side as Side, BigInt(b.amount), BigInt(b.minOut), b.owner);
+  return ctx.trade.buildSwapTx(t, b.side as Side, BigInt(b.amount), BigInt(b.minOut), b.owner).catch(readable);
 }

@@ -18,7 +18,7 @@ export function WalletButton() {
 
   if (!owner) {
     return (
-      <button type="button" onClick={() => modal.setVisible(true)} disabled={wallet.connecting} className="font-display font-bold text-sm md:text-[15px] px-5 min-h-11 rounded-full bg-lime text-ground glow-lime cursor-pointer disabled:opacity-60">
+      <button type="button" onClick={() => modal.setVisible(true)} disabled={wallet.connecting} className="font-display font-bold text-sm md:text-[15px] px-5 min-h-11 rounded-full bg-ink text-ground cursor-pointer disabled:opacity-60">
         {wallet.connecting ? "Connecting" : "Connect wallet"}
       </button>
     );

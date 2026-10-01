@@ -40,6 +40,16 @@ export class RpcHistory implements ChainHistory {
   // FIRST_READ_PAGES pages are taken, so older trades on a busy pool are not backfilled. With a cursor it pages
   // all the way back, and a backlog over MAX_PAGES is an error so the cursor never jumps over unread trades.
   async signaturesSince(address: string, until: string | null): Promise<SignatureInfo[]> {
+    try {
+      return await this.page(address, until);
+    } catch (e) {
+      // the RPC has pruned the cursor's transaction; what lies between is gone from it too, so start again from recent history
+      if (until && /Transaction \S+ not found/.test(String(e))) return this.page(address, null);
+      throw e;
+    }
+  }
+
+  private async page(address: string, until: string | null): Promise<SignatureInfo[]> {
     const out: SignatureInfo[] = [];
     let before: string | undefined;
     for (let i = 0; ; i++) {

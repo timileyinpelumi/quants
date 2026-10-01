@@ -28,6 +28,18 @@ test("graduated launches trade on the DAMM pool", async () => {
   expect((c as any).trade.calls[0].target).toMatchObject({ dammPool: "DAMMpool", quoteDecimals: 6 });
 });
 
+test("a curve that filled up and waits to move says so instead of failing", async () => {
+  const c = await setup();
+  (c as any).trade.fail = "graduating";
+  const r = await q("mint=CATmint&side=buy&amount=5");
+  expect(r.status).toBe(400);
+  expect((await r.json()).error.message).toMatch(/filled its curve/);
+  const OWNER_OK = "11111111111111111111111111111111";
+  const s = await swap({ mint: "CATmint", side: "buy", amount: "5", minOut: "1", owner: OWNER_OK });
+  expect(s.status).toBe(400);
+  expect((await s.json()).error.message).toMatch(/filled its curve/);
+});
+
 test("rejects bad input with readable errors", async () => {
   await setup();
   expect((await q("mint=CATmint&side=hold&amount=5")).status).toBe(400);

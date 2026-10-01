@@ -10,8 +10,8 @@ const mono = Geist_Mono({ subsets: ["latin"], variable: "--font-geist-mono" });
 
 export const metadata: Metadata = {
   title: { default: "quants", template: "%s · quants" },
-  description: "Launch a token. Stakers earn three.",
-  openGraph: { title: "quants", description: "Launch a token. Stakers earn three.", images: ["/brand/quants-logo-512h.png"] },
+  description: "Launch a token that pays its stakers. Trading fees buy up to three tokens the creator picks and pay them to people who stake it.",
+  openGraph: { title: "quants", description: "Launch a token that pays its stakers. Trading fees buy up to three tokens the creator picks and pay them to people who stake it.", images: ["/brand/quants-logo-512h.png"] },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

@@ -48,7 +48,7 @@ It runs every `keeperIntervalSeconds` (default 600) and logs one JSON line per r
 bun run indexer
 ```
 
-It reads every swap on every quants pool (the curve, then DAMM v2 after graduation) into `trades`. Charts, market stats, volume and the home page come from that table, so they lag the chain by one pass (`INDEXER_INTERVAL_SECONDS`, default 5). It logs a JSON line only when it wrote trades, skipped any, or an address failed. A transaction the RPC lists but will not return is waited on for 10 minutes, then skipped and counted in `skipped` (pruned RPC history causes this). A failing address is skipped for that pass and retried on the next one; one that fails every pass shows in every line. Only one indexer runs at a time (Postgres advisory lock); a second one exits.
+It reads every swap on every quants pool (the curve, then DAMM v2 after graduation) into `trades`. Charts, market stats, volume and the home page come from that table, so they lag the chain by one pass (`INDEXER_INTERVAL_SECONDS`, default 5). It logs a JSON line only when it wrote trades, skipped any, or an address failed. A transaction the RPC lists but will not return is waited on for 10 minutes, then skipped and counted in `skipped` (pruned RPC history causes this). If the RPC has pruned the transaction a cursor points at, the indexer reads that pool again from its recent history. A failing address is skipped for that pass and retried on the next one; one that fails every pass shows in every line. Only one indexer runs at a time (Postgres advisory lock); a second one exits.
 
 Each trade stores the quote token's USD price from Jupiter (`JUPITER_API_KEY`) at the time it was indexed. With no price the trade is stored without one and pages show values in the quote token.
 
@@ -109,6 +109,7 @@ docker compose up -d
 solana-test-validator ... (flags in "Local end-to-end run" above)
 bun run seed                                  # writes .env.local and config-keys.json, launches CAT and DOG
 bun --env-file=.env.local scripts/keeper-once.ts
+bun --env-file=.env.local scripts/migrate-full-curves.ts   # stands in for Meteora's migration keepers, which do not run locally
 bun --env-file=.env.local run indexer         # keep running; fills charts and the home page
 bun run dev                                   # http://localhost:3000 (webpack dev server), connect "Test Wallet"
 bun run warm                                  # compiles every route once; a first compile reloads open pages

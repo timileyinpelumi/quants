@@ -62,6 +62,8 @@ test.skipIf(!up)("buy and sell on the curve, then buy on the graduated pool", as
   expect(big.filledIn).toBeLessThan(20_000_000_000n);
   await signSend(await trade.buildSwapTx(target, "buy", 20_000_000_000n, big.minOut, owner), user);
   expect((await m.curveState(pool)).complete).toBe(true);
+  await expect(trade.quote(target, "buy", 100_000_000n, 100)).rejects.toThrow("graduating");
+  await expect(trade.buildSwapTx(target, "buy", 100_000_000n, 1n, owner)).rejects.toThrow("graduating");
   const mig = await m.buildMigrate(pool);
   await mig.send();
   await chain.waitForConfirmation(mig.signature, mig.lastValidBlockHeight);

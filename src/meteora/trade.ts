@@ -29,13 +29,15 @@ export class TradeLive implements TradePort {
     if (!p) throw new Error(`pool ${pool} not found`);
     const config = await this.dbc.state.getPoolConfig(p.poolState.config);
     if (!config) throw new Error("pool config not found");
-    return { p, config, migrated: p.poolState.isMigrated !== 0 };
+    return { p, config, migrated: p.poolState.isMigrated !== 0, complete: p.poolState.quoteReserve.gte(config.migrationQuoteThreshold) };
   }
 
   async quote(t: TradeTarget, side: Side, amountIn: bigint, slippageBps: number): Promise<TradeQuote> {
     if (t.dammPool) return this.dammQuote(t, side, amountIn, slippageBps);
-    const { p, config, migrated } = await this.curve(t.pool);
+    const { p, config, migrated, complete } = await this.curve(t.pool);
     if (migrated) throw new Error("graduated");
+    // a full curve rejects swaps until the keeper migrates it to DAMM v2
+    if (complete) throw new Error("graduating");
     const currentPoint = await getCurrentPoint(this.conn, config.activationType);
     const r = this.dbc.pool.swapQuote2({
       virtualPool: p, config, swapBaseForQuote: side === "sell", hasReferral: false, eligibleForFirstSwapWithMinFee: false,
@@ -81,6 +83,9 @@ export class TradeLive implements TradePort {
       });
       return this.unsigned(tx, owner);
     }
+    const { migrated, complete } = await this.curve(t.pool);
+    if (migrated) throw new Error("graduated");
+    if (complete) throw new Error("graduating");
     const tx = await this.dbc.pool.swap2({
       owner: user, pool: new PublicKey(t.pool), swapBaseForQuote: side === "sell", referralTokenAccount: null, payer: user,
       ...(side === "buy"

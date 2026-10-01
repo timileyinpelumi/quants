@@ -173,10 +173,8 @@ export function LaunchForm({ split, tiers, launchFeeLamports, maxPenaltyBps }: {
     <main className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_440px] gap-10 lg:gap-16 wrap pt-10 md:pt-14 pb-16">
       <section className="flex flex-col gap-10 min-w-0">
         <div className="flex flex-col gap-3.5">
-          <h1 className="m-0 font-display font-black text-[40px] md:text-[64px] leading-[1.02] tracking-[-0.03em]">
-            Launch a token.<br /><span className="text-lime">Stakers earn three.</span>
-          </h1>
-          <p className="m-0 text-lg text-muted max-w-[560px] leading-normal">Trading fees buy the tokens you pick and pay them to people who stake yours. Longer locks earn more.</p>
+          <h1 className="m-0 font-display font-black text-[40px] md:text-[56px] leading-[1.02] tracking-[-0.03em]">Launch a token</h1>
+          <p className="m-0 text-lg text-muted max-w-[560px] leading-normal">Pick up to three reward tokens. Trading fees on your token buy them and pay them to the people who stake it. Longer locks earn a bigger share.</p>
         </div>
 
         <div className="flex flex-col">

@@ -12,7 +12,7 @@ async function connect(page: Page) {
   await expect(page.getByRole("button", { name: /^Wallet / })).toBeVisible();
 }
 
-test("trade widget buys and sells on the curve", async ({ page }) => {
+test("trade widget buys and sells", async ({ page }) => {
   await page.goto(`/t/${CAT}`);
   await connect(page);
   await page.getByRole("button", { name: "0.1", exact: true }).click();
@@ -31,12 +31,20 @@ test("indexed trades fill the home page and the token chart", async ({ page }) =
   await page.goto("/");
   await expect(page.getByRole("heading", { name: /Launch a token/, level: 1 })).toBeVisible();
   await expect(page.getByText("Tokens launched")).toBeVisible();
-  const biggest = page.locator("section", { has: page.getByRole("heading", { name: "Biggest" }) });
-  await expect(biggest.getByRole("link", { name: /CAT/ }).first()).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Recent trades" })).toBeVisible();
+  await expect(page.getByText("Fees set aside for stakers")).toBeVisible();
+  const trending = page.locator("section", { has: page.getByRole("heading", { name: "Trending today" }) });
+  await expect(trending.getByRole("link", { name: /CAT/ }).first()).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Latest trades" })).toBeVisible();
+  await page.getByRole("searchbox", { name: "Search tokens" }).first().fill("cat");
+  await page.getByRole("searchbox", { name: "Search tokens" }).first().press("Enter");
+  await expect(page).toHaveURL(/\/explore\?q=cat/);
+  await expect(page.getByRole("link", { name: /CAT/ }).first()).toBeVisible();
+  await page.getByRole("link", { name: "Market cap" }).click();
+  await expect(page).toHaveURL(/sort=mcap/);
   await page.goto(`/t/${CAT}`);
   await expect(page.getByRole("img", { name: "Price chart" })).toBeVisible();
   await expect(page.getByText("Volume today")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Trades" })).toBeVisible();
 });
 
 test("wallet modal shows SOL and token balances and links to stakes", async ({ page }) => {

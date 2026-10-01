@@ -1,53 +1,96 @@
 import Link from "next/link";
 import { Header } from "@/web/ui/Header";
 import { Avatar } from "@/web/ui/Avatar";
-import { fmtAmount, shortAddr } from "@/web/ui/format";
+import { fmtAgo, fmtCompact, shortAddr } from "@/web/ui/format";
 import { getContext } from "@/web/server/context";
-import { listLaunches } from "@/web/server/reads";
+import { exploreTokens, type ExploreFilter, type ExploreSort } from "@/web/server/landing";
 
 export const dynamic = "force-dynamic";
 
-const SOL = "So11111111111111111111111111111111111111112";
+const SORTS: [ExploreSort, string][] = [["trending", "Trending"], ["mcap", "Market cap"], ["new", "New"], ["gainers", "Gainers"], ["graduating", "About to graduate"]];
+const FILTERS: [ExploreFilter, string][] = [["all", "All"], ["live", "On the curve"], ["graduated", "Graduated"]];
+const COLS = "md:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)_minmax(0,0.7fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.3fr)]";
 
-export default async function ExplorePage({ searchParams }: { searchParams: Promise<{ graduated?: string }> }) {
-  const graduated = (await searchParams).graduated === "1";
-  const launches = await listLaunches(getContext().sql, { graduated: graduated || undefined });
-  const tab = (on: boolean) => `px-5 min-h-11 flex items-center rounded-full text-sm font-semibold ${on ? "bg-raised-2 border border-white/10 text-ink" : "text-muted hover:text-ink"}`;
+const usd = (n: number | null) => (n === null ? "No trades" : `$${fmtCompact(n)}`);
+
+export default async function ExplorePage({ searchParams }: { searchParams: Promise<{ q?: string; sort?: string; filter?: string; graduated?: string }> }) {
+  const p = await searchParams;
+  const sort = (SORTS.find(([k]) => k === p.sort)?.[0] ?? "trending") as ExploreSort;
+  const filter = (p.graduated === "1" ? "graduated" : FILTERS.find(([k]) => k === p.filter)?.[0] ?? "all") as ExploreFilter;
+  const q = p.q?.trim() ?? "";
+  const tokens = await exploreTokens(getContext().sql, { sort, filter, q });
+  const href = (o: { sort?: string; filter?: string }) => {
+    const sp = new URLSearchParams();
+    if (q) sp.set("q", q);
+    sp.set("sort", o.sort ?? sort);
+    if ((o.filter ?? filter) !== "all") sp.set("filter", o.filter ?? filter);
+    return `/explore?${sp}`;
+  };
+  const pill = (on: boolean) => `px-4 min-h-10 flex items-center rounded-full text-sm font-semibold shrink-0 ${on ? "bg-raised-2 border border-white/10 text-ink" : "text-muted hover:text-ink"}`;
 
   return (
     <div className="flex-1 bg-launch">
       <Header active="explore" />
-      <main className="flex flex-col gap-8 wrap pt-10 md:pt-14 pb-16">
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-          <h1 className="m-0 font-display font-black text-[40px] md:text-[56px] tracking-[-0.03em] leading-none">Explore</h1>
-          <nav className="flex gap-2" aria-label="Filter">
-            <Link href="/explore" className={tab(!graduated)}>All</Link>
-            <Link href="/explore?graduated=1" className={tab(graduated)}>Graduated</Link>
+      <main className="flex flex-col gap-6 wrap pt-8 md:pt-12 pb-16">
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+          <h1 className="m-0 font-display font-black text-[36px] md:text-[48px] tracking-[-0.03em] leading-none">Explore</h1>
+          <form action="/explore" role="search" className="w-full md:w-96">
+            <input type="hidden" name="sort" value={sort} />
+            {filter !== "all" && <input type="hidden" name="filter" value={filter} />}
+            <input name="q" type="search" defaultValue={q} placeholder="Search by name, symbol or address" aria-label="Search tokens"
+              className="w-full h-11 px-4 rounded-full bg-raised-2 border border-white/[0.08] focus:border-white/20 outline-none text-sm placeholder:text-faint" />
+          </form>
+        </div>
+
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+          <nav aria-label="Sort" className="flex gap-1 overflow-x-auto">
+            {SORTS.map(([k, l]) => <Link key={k} href={href({ sort: k })} aria-current={sort === k ? "page" : undefined} className={pill(sort === k)}>{l}</Link>)}
+          </nav>
+          <nav aria-label="Filter" className="flex gap-1 overflow-x-auto">
+            {FILTERS.map(([k, l]) => <Link key={k} href={href({ filter: k })} aria-current={filter === k ? "page" : undefined} className={pill(filter === k)}>{l}</Link>)}
           </nav>
         </div>
-        {launches.length === 0 ? (
+
+        {tokens.length === 0 ? (
           <div className="flex flex-col items-start gap-4 py-16 border-t line">
-            <p className="m-0 text-lg text-muted">Nothing launched yet.</p>
-            <Link href="/launch" className="font-display font-bold text-ground bg-lime glow-lime rounded-full px-6 min-h-12 flex items-center">Launch the first one</Link>
+            <p className="m-0 text-lg text-muted">{q ? `Nothing matches "${q}".` : "Nothing here yet."}</p>
+            <Link href="/launch" className="font-display font-bold text-ground bg-lime glow-lime rounded-full px-6 min-h-12 flex items-center">Launch a token</Link>
           </div>
         ) : (
           <div className="flex flex-col">
-            {launches.map((l) => (
-              <Link key={l.mint} href={`/t/${l.mint}`} className="grid grid-cols-[52px_minmax(0,1fr)_auto] md:grid-cols-[52px_minmax(0,1.3fr)_minmax(0,1fr)_minmax(0,1fr)_160px] gap-4 md:gap-6 items-center py-4 border-t line hover:bg-white/[0.02]">
-                <Avatar seed={l.mint} label={l.symbol ?? "?"} image={l.image} size={52} />
-                <span className="flex flex-col gap-0.5 min-w-0">
-                  <span className="font-display font-bold text-lg truncate">{l.symbol ?? shortAddr(l.mint)}</span>
-                  <span className="text-[13px] text-muted truncate">{l.name ?? ""} · {l.quoteMint === SOL ? "SOL" : process.env.NEXT_PUBLIC_OURTOKEN_SYMBOL ?? "OURTOKEN"} · {l.feeTierBps / 100}% fee</span>
+            <div className={`hidden md:grid ${COLS} gap-6 pb-2 text-[12px] text-faint`}>
+              <span>Token</span><span className="text-right">Market cap</span><span className="text-right">24h</span><span className="text-right">Volume 24h</span><span>Graduation</span><span>Stakers earn</span>
+            </div>
+            {tokens.map((t) => (
+              <Link key={t.mint} href={`/t/${t.mint}`} className={`grid grid-cols-[minmax(0,1fr)_auto] ${COLS} gap-3 md:gap-6 items-center py-3.5 border-t line hover:bg-white/[0.02]`}>
+                <span className="flex items-center gap-3 min-w-0">
+                  <Avatar seed={t.mint} label={t.symbol} image={t.image} size={44} />
+                  <span className="flex flex-col min-w-0">
+                    <span className="flex items-baseline gap-2 min-w-0">
+                      <span className="font-display font-bold text-lg truncate">{t.symbol}</span>
+                      <span className="font-mono text-[12px] text-faint shrink-0">{fmtAgo(t.createdAt)}</span>
+                    </span>
+                    <span className="text-[13px] text-muted truncate">{t.name ?? shortAddr(t.mint)}</span>
+                  </span>
                 </span>
-                <span className="hidden md:flex flex-col gap-0.5">
-                  <span className="text-[13px] text-muted">Stakers earn</span>
-                  <span className="font-semibold truncate">{l.basket.map((b) => b.symbol ?? shortAddr(b.mint)).join(" + ")}</span>
+                <span className="flex flex-col items-end font-mono text-sm md:hidden">
+                  <span>{usd(t.mcapUsd)}</span>
+                  {t.price !== null && <span className={`text-[12px] ${t.change24h >= 0 ? "text-lime" : "text-burn"}`}>{t.change24h >= 0 ? "+" : ""}{t.change24h.toFixed(1)}%</span>}
                 </span>
-                <span className="hidden md:flex flex-col gap-0.5">
-                  <span className="text-[13px] text-muted">Burned</span>
-                  <span className="font-mono">{fmtAmount(l.burned, 6, 0)}</span>
+                <span className="hidden md:block text-right font-mono text-sm">{usd(t.mcapUsd)}</span>
+                <span className={`hidden md:block text-right font-mono text-sm ${t.change24h >= 0 ? "text-lime" : "text-burn"}`}>{t.price === null ? "" : `${t.change24h >= 0 ? "+" : ""}${t.change24h.toFixed(1)}%`}</span>
+                <span className="hidden md:block text-right font-mono text-sm">{t.volume24hUsd ? `$${fmtCompact(t.volume24hUsd)}` : "$0"}</span>
+                <span className="hidden md:flex flex-col gap-1.5">
+                  {t.status === "graduated" ? <span className="text-sm font-semibold text-lime">Graduated</span> : (
+                    <>
+                      <span className="font-mono text-[12px] text-muted">{t.progress ?? 0}%</span>
+                      <span className="inline-flex h-1.5 w-full max-w-32 rounded-full bg-white/[0.07] overflow-hidden">
+                        <span className="rounded-full" style={{ width: `${t.progress ?? 0}%`, background: "linear-gradient(90deg, #9D8CFF, #C8FF3D)" }} />
+                      </span>
+                    </>
+                  )}
                 </span>
-                <span className={`text-sm font-semibold text-right ${l.status === "graduated" ? "text-lime" : "text-muted"}`}>{l.status === "graduated" ? "Graduated" : "On the curve"}</span>
+                <span className="hidden md:block text-sm truncate">{t.basket.length ? t.basket.join(" + ") : "No basket"}</span>
               </Link>
             ))}
           </div>

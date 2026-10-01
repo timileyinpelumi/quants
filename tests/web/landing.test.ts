@@ -1,7 +1,8 @@
 import { test, expect } from "bun:test";
 import type { SQL } from "bun";
 import { freshDb } from "../helpers/db";
-import { landing } from "../../src/web/server/landing";
+import { landing, exploreTokens } from "../../src/web/server/landing";
+import { defaultSettings, saveSettings } from "../../src/domain/settings";
 
 const NOW = Date.parse("2026-10-01T12:00:00Z");
 let n = 0;
@@ -9,50 +10,85 @@ let n = 0;
 async function launch(sql: SQL, symbol: string, hoursAgo: number, status = "live") {
   const [r] = await sql`insert into launches (mint, pool, quote_mint, fee_tier_bps, config_key, creator, status, settings_version, symbol, name, image, created_at)
     values (${`mint-${symbol}`}, ${`pool-${symbol}`}, 'So11111111111111111111111111111111111111112', 200, 'c', 'cr', ${status}, 1, ${symbol}, ${symbol + " coin"}, 'https://img', ${new Date(NOW - hoursAgo * 3_600_000)}) returning id`;
+  await sql`insert into baskets (launch_id, reward_mint, weight_bps, symbol) values (${r.id}, 'zec', 6000, 'ZEC'), (${r.id}, 'jup', 4000, 'JUP')`;
   return Number(r.id);
 }
 async function trade(sql: SQL, id: number, minutesAgo: number, price: number, o: Partial<{ trader: string; value: number; usd: number | null; reserve: number; side: string }> = {}) {
+  const value = o.value ?? 1;
   await sql`insert into trades (signature, event_index, launch_id, venue, side, trader, base_amount, quote_amount, fee_amount, quote_value, price, quote_usd, curve_reserve, curve_threshold, block_time, slot)
-    values (${`s${n++}`}, 0, ${id}, 'curve', ${o.side ?? "buy"}, ${o.trader ?? "w1"}, 1, 1, 0, ${o.value ?? 1}, ${price}, ${o.usd === undefined ? 100 : o.usd},
+    values (${`s${n++}`}, 0, ${id}, 'curve', ${o.side ?? "buy"}, ${o.trader ?? "w1"}, 1, ${value * 1e9}, 0, ${value}, ${price}, ${o.usd === undefined ? 100 : o.usd},
             ${o.reserve ?? null}, ${o.reserve === undefined ? null : 10}, ${new Date(NOW - minutesAgo * 60_000)}, ${Math.floor((NOW - minutesAgo * 60_000) / 400)})`;
 }
 
-test("stats count launches, graduations, volume and traders", async () => {
+test("stats count launches, graduations, volume, traders and what stakers earned", async () => {
   const sql = await freshDb();
+  const v = await saveSettings(sql, defaultSettings("OURS"), "test");
   const a = await launch(sql, "AAA", 48);
   const b = await launch(sql, "BBB", 2, "graduated");
   await launch(sql, "CCC", 1);
   await trade(sql, a, 60 * 30, 0.001, { value: 10 });
   await trade(sql, a, 30, 0.002, { value: 2, trader: "w2" });
-  await trade(sql, b, 10, 0.01, { value: 3, trader: "w2" });
+  await trade(sql, b, 10, 0.01, { value: 3, trader: "w2", usd: 200 });
+  // 0.5 SOL of fees split for AAA: 60% to the basket at $100
+  await sql`insert into distributions (launch_id, idem_key, step_key, kind, status, detail, settings_version)
+    values (${a}, 'split:1', 'split:1', 'split', 'confirmed', ${JSON.stringify({ amount: "500000000" })}::text::jsonb, ${v}),
+           (${a}, 'split:2', 'split:2', 'split', 'failed', ${JSON.stringify({ amount: "900000000" })}::text::jsonb, ${v})`;
   const { stats } = await landing(sql, NOW);
-  expect(stats).toEqual({ launches: 3, graduated: 1, volume24hUsd: 500, volumeAllUsd: 1500, traders24h: 1 });
+  expect({ ...stats, stakersUsd: Math.round(stats.stakersUsd * 1e6) / 1e6 }).toEqual({ launches: 3, graduated: 1, volume24hUsd: 800, volumeAllUsd: 1800, traders24h: 1, stakersUsd: 30 });
 });
 
-test("lists rank by market cap, gain, age and graduation progress", async () => {
+test("home lists trending, new, about to graduate, graduated and recent trades", async () => {
   const sql = await freshDb();
   const a = await launch(sql, "AAA", 48);
   const b = await launch(sql, "BBB", 30);
-  const c = await launch(sql, "CCC", 1);
+  await launch(sql, "CCC", 1);
+  const g = await launch(sql, "GGG", 5, "graduated");
   await trade(sql, a, 60 * 30, 0.001, { reserve: 2 });
-  await trade(sql, a, 60, 0.003, { reserve: 9 });
+  await trade(sql, a, 60, 0.003, { reserve: 9, value: 5 });
   await trade(sql, b, 60 * 40, 0.02, { reserve: 5 });
-  await trade(sql, b, 30, 0.01, { reserve: 4 });
+  await trade(sql, b, 30, 0.01, { reserve: 4, value: 1 });
+  await trade(sql, g, 10, 0.1, { value: 2 });
   const d = await landing(sql, NOW);
-  expect(d.biggest.map((t) => t.symbol)).toEqual(["BBB", "AAA"]);
-  expect(d.biggest[0]!.mcapUsd).toBeCloseTo(0.01 * 100 * 1e9, 0);
-  expect(d.gainers.map((t) => [t.symbol, Math.round(t.change24h)])).toEqual([["AAA", 200]]);
-  expect(d.newest.map((t) => t.symbol)).toEqual(["CCC", "BBB", "AAA"]);
-  expect(d.closest.map((t) => [t.symbol, t.progress])).toEqual([["AAA", 90], ["BBB", 40]]);
-  expect(d.recent.map((t) => [t.symbol, t.side, t.valueUsd])).toEqual([["BBB", "buy", 100], ["AAA", "buy", 100], ["AAA", "buy", 100], ["BBB", "buy", 100]]);
-  expect(d.recent[0]!.trader).toBe("w1");
-  expect(c).toBeGreaterThan(0);
+  expect(d.trending.map((t) => t.symbol)).toEqual(["AAA", "GGG", "BBB"]);
+  expect(d.trending[0]!.basket).toEqual(["ZEC", "JUP"]);
+  expect(d.newest.map((t) => t.symbol)).toEqual(["CCC", "GGG", "BBB", "AAA"]);
+  expect(d.soon.map((t) => [t.symbol, t.progress])).toEqual([["AAA", 90], ["BBB", 40]]);
+  expect(d.graduated.map((t) => t.symbol)).toEqual(["GGG"]);
+  expect(d.recent.map((t) => t.symbol)).toEqual(["GGG", "BBB", "AAA", "AAA", "BBB"]);
 });
 
-test("graduated tokens are left out of the graduation list and empty data gives empty lists", async () => {
+test("explore sorts, filters and searches", async () => {
   const sql = await freshDb();
-  expect(await landing(sql, NOW)).toMatchObject({ stats: { launches: 0, volume24hUsd: 0 }, biggest: [], gainers: [], newest: [], closest: [], recent: [] });
+  const a = await launch(sql, "AAA", 48);
+  const b = await launch(sql, "BBB", 30);
   const g = await launch(sql, "GGG", 5, "graduated");
-  await trade(sql, g, 10, 0.1, { reserve: 10 });
-  expect((await landing(sql, NOW)).closest).toEqual([]);
+  await trade(sql, a, 60 * 30, 0.001, { reserve: 2 });
+  await trade(sql, a, 60, 0.003, { reserve: 9 });
+  await trade(sql, b, 30, 0.01, { reserve: 4, value: 9 });
+  await trade(sql, g, 10, 0.05, { value: 2 });
+  const sym = async (o: Parameters<typeof exploreTokens>[1]) => (await exploreTokens(sql, o, NOW)).map((t) => t.symbol);
+  expect(await sym({ sort: "trending" })).toEqual(["BBB", "GGG", "AAA"]);
+  expect(await sym({ sort: "mcap" })).toEqual(["GGG", "BBB", "AAA"]);
+  expect(await sym({ sort: "new" })).toEqual(["GGG", "BBB", "AAA"]);
+  expect(await sym({ sort: "gainers" })).toEqual(["AAA", "BBB", "GGG"]);
+  expect(await sym({ sort: "graduating" })).toEqual(["AAA", "BBB"]);
+  expect(await sym({ sort: "trending", filter: "graduated" })).toEqual(["GGG"]);
+  expect(await sym({ sort: "trending", filter: "live" })).toEqual(["BBB", "AAA"]);
+  expect(await sym({ sort: "new", q: "bb" })).toEqual(["BBB"]);
+  expect(await sym({ sort: "new", q: "mint-GGG" })).toEqual(["GGG"]);
+});
+
+test("token trades route lists the newest trades for one token", async () => {
+  const { makeWebContext } = await import("../helpers/web-context");
+  const { GET } = await import("../../src/app/api/trades/[mint]/route");
+  const { sql } = await makeWebContext();
+  const a = await launch(sql, "AAA", 2);
+  const b = await launch(sql, "BBB", 2);
+  await trade(sql, a, 30, 0.001, { side: "sell", trader: "seller" });
+  await trade(sql, a, 10, 0.002, { value: 3 });
+  await trade(sql, b, 5, 0.1);
+  const r = await (await GET(new Request("http://x"), { params: Promise.resolve({ mint: "mint-AAA" }) })).json();
+  expect(r.trades.map((t: any) => [t.side, t.valueUsd, t.trader])).toEqual([["buy", 300, "w1"], ["sell", 100, "seller"]]);
+  expect(r.trades[0].amount).toBeCloseTo(0.000001, 12);
+  expect((await GET(new Request("http://x"), { params: Promise.resolve({ mint: "nope" }) })).status).toBe(404);
 });

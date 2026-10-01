@@ -8,6 +8,7 @@ import { fmtAmount, fmtCompact, shortAddr } from "@/web/ui/format";
 import { getContext } from "@/web/server/context";
 import { launchDetail } from "@/web/server/reads";
 import { Chart } from "@/web/token/Chart";
+import { TokenTrades } from "@/web/token/TokenTrades";
 import { TradePanel } from "@/web/token/TradePanel";
 import { MarketStats } from "@/web/token/MarketStats";
 
@@ -71,6 +72,8 @@ export default async function TokenPage({ params }: { params: Promise<{ mint: st
           <Chart mint={mint} quoteSymbol={pairSymbol} />
           <TradePanel mint={mint} symbol={symbol} quoteMint={launch.quoteMint} quoteSymbol={pairSymbol} quoteDecimals={quoteDecimals} />
         </section>
+
+        <TokenTrades mint={mint} symbol={symbol} quoteSymbol={pairSymbol} />
 
         <section className="grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-8">
           <div className="flex flex-col gap-2">

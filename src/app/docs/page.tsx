@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 
 const SOL = "So11111111111111111111111111111111111111112";
 const sections = [
-  ["how", "How it works"], ["launch", "Launching a token"], ["fees", "Where fees go"], ["basket", "The reward basket"],
+  ["glance", "At a glance"], ["how", "How it works"], ["launch", "Launching a token"], ["fees", "Where fees go"], ["basket", "The reward basket"],
   ["staking", "Staking and lock tiers"], ["early", "Leaving early"], ["graduation", "Graduation"], ["risks", "Risks"], ["faq", "Questions"],
 ] as const;
 
@@ -18,6 +18,23 @@ function H2({ id, children }: { id: string; children: React.ReactNode }) {
   return <h2 id={id} className="m-0 pt-4 scroll-mt-28 font-display font-black text-2xl md:text-[32px] tracking-tight">{children}</h2>;
 }
 const P = ({ children }: { children: React.ReactNode }) => <p className="m-0 text-[17px] leading-relaxed text-[#C9C5D6]">{children}</p>;
+
+function Table({ head, rows }: { head: string[]; rows: React.ReactNode[][] }) {
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-[15px] border-collapse">
+        <thead>
+          <tr>{head.map((h, i) => <th key={h} className={`py-2.5 pr-4 font-normal text-[13px] text-muted border-b line ${i ? "text-right" : "text-left"}`}>{h}</th>)}</tr>
+        </thead>
+        <tbody>
+          {rows.map((r, i) => (
+            <tr key={i}>{r.map((c, j) => <td key={j} className={`py-3 pr-4 border-b line ${j ? "text-right font-mono" : "text-left"}`}>{c}</td>)}</tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
 
 export default async function DocsPage() {
   const s = await loadLatestSettings(getContext().sql);
@@ -39,7 +56,20 @@ export default async function DocsPage() {
         </aside>
 
         <article className="flex flex-col gap-6 max-w-3xl">
-          <h1 className="m-0 font-display font-black text-[40px] md:text-[64px] leading-[1.02] tracking-[-0.03em]">How quants<br /><span className="text-lime">works.</span></h1>
+          <h1 className="m-0 font-display font-black text-[40px] md:text-[56px] leading-[1.02] tracking-[-0.03em]">How quants works</h1>
+          <P>quants launches tokens whose trading fees pay the people who stake them. This page covers what it costs, where every fee goes, and how staking and early exits work.</P>
+
+          <H2 id="glance">At a glance</H2>
+          <Table head={["", "Value"]} rows={[
+            ["Launch fee", `${fmtAmount(s.launchFeeLamports, 9)} SOL`],
+            ["Trading fee, set by the creator", "1%, 2%, 3% or 5%"],
+            ["Share of fees that buys staker rewards", `${pct(s.split.basketBps)} after Meteora's 20%`],
+            ["Reward tokens per launch", "Up to 3"],
+            ["Supply of every token", "1,000,000,000"],
+            ["Graduates to Meteora DAMM v2 at", `${solGrad} SOL raised`],
+            ["Lock tiers", s.tiers.map((t) => `${Math.round(t.lockSeconds / 86_400)}d ${t.multiplierBps / 10_000}x`).join(", ")],
+            ["Most an early exit can burn", pct(s.maxPenaltyBps)],
+          ]} />
 
           <H2 id="how">How it works</H2>
           <P>Anyone can launch a token on quants. Every trade of that token pays a small fee. Most of that fee buys up to three tokens the creator picked, and those tokens are paid out to people who stake the launched token. Stake for longer and you earn a bigger share.</P>
@@ -56,6 +86,18 @@ export default async function DocsPage() {
               <span key={l as string} className="flex justify-between py-3 border-b line"><span>{l}</span><span className="font-mono">{pct(v as number)}</span></span>
             ))}
           </div>
+          <P>For example, a 1 SOL buy of a token with a 2% trading fee:</P>
+          <Table head={["Where it goes", "SOL"]} rows={(() => {
+            const fee = 0.02, kept = fee * 0.8;
+            const f = (n: number) => n.toFixed(4);
+            return [
+              ["Trading fee", f(fee)],
+              ["Meteora", f(fee * 0.2)],
+              ["Buys rewards for stakers", f(kept * s.split.basketBps / 10_000)],
+              ["Platform", f(kept * s.split.platformBps / 10_000)],
+              ["Creator", f(kept * s.split.creatorBps / 10_000)],
+            ];
+          })()} />
           <P>Fees are collected every few minutes. The creator share is sent to the creator once it passes {fmtAmount(s.creatorPayoutMin[SOL] ?? 0n, 9)} SOL.</P>
 
           <H2 id="basket">The reward basket</H2>
@@ -63,14 +105,10 @@ export default async function DocsPage() {
 
           <H2 id="staking">Staking and lock tiers</H2>
           <P>Stake a launched token into one of these locks. A bigger multiplier means a bigger share of the rewards for the same amount staked.</P>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5">
-            {s.tiers.map((t) => (
-              <span key={t.id} className="flex flex-col items-center gap-1 py-5 rounded-3xl bg-violet/[0.08] border border-violet/20">
-                <span className="font-display font-black text-3xl text-violet-light">{t.multiplierBps / 10_000}x</span>
-                <span className="text-sm text-muted">{Math.round(t.lockSeconds / 86_400)} days</span>
-              </span>
-            ))}
-          </div>
+          <Table head={["Lock", "Multiplier", "Share of 1,000 staked, against 1,000 at 1x"]} rows={s.tiers.map((t) => {
+            const m = t.multiplierBps / 10_000;
+            return [`${Math.round(t.lockSeconds / 86_400)} days`, `${m}x`, `${Math.round((m / (m + 1)) * 100)}%`];
+          })} />
           <P>Claim rewards whenever you like. Adding more to a stake that is still locked starts its lock again for the whole amount. When the lock ends you can withdraw everything with no penalty.</P>
 
           <H2 id="early">Leaving early</H2>

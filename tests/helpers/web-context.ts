@@ -25,11 +25,13 @@ export class FakePinata implements PinataPort {
 export class FakeTrade {
   calls: any[] = [];
   built: any[] = [];
+  fail: string | null = null;
   async quote(target: any, side: any, amountIn: bigint, slippageBps: number) {
     this.calls.push({ target, side, amountIn, slippageBps });
+    if (this.fail) throw new Error(this.fail);
     return { amountIn, filledIn: amountIn, amountOut: 1000n, minOut: 990n, fee: 20n, venue: target.dammPool ? "damm" as const : "curve" as const };
   }
-  async buildSwapTx(target: any, side: any, amountIn: bigint, minOut: bigint, owner: string) { this.built.push({ target, side, amountIn, minOut, owner }); return "c3dhcA=="; }
+  async buildSwapTx(target: any, side: any, amountIn: bigint, minOut: bigint, owner: string) { if (this.fail) throw new Error(this.fail); this.built.push({ target, side, amountIn, minOut, owner }); return "c3dhcA=="; }
 }
 
 export async function makeWebContext(over: Partial<WebContext> = {}) {

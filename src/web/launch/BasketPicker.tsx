@@ -29,7 +29,7 @@ export function BasketPicker({ value, onChange }: { value: BasketItem[]; onChang
     <div className="flex flex-col gap-3.5">
       <div className="flex justify-between items-baseline gap-4">
         <span className="font-display font-bold text-xl">Reward basket</span>
-        <span className="text-[13px] text-muted text-right">Up to 3 tokens. Stakers earn these.</span>
+        <span className="text-[13px] text-muted text-right">Up to 3 tokens. Trading fees buy these for your stakers.</span>
       </div>
 
       <div className="flex flex-col">

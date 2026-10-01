@@ -6,7 +6,7 @@ export function Footer() {
       <div className="wrap py-10 flex flex-col md:flex-row gap-6 md:items-center justify-between">
       <div className="flex items-center gap-3">
         <img src="/brand/quants-mark.svg" alt="" width={28} height={28} />
-        <span className="text-sm text-muted">Launch a token. Stakers earn three.</span>
+        <span className="text-sm text-muted">Trading fees, paid to stakers.</span>
       </div>
       <nav aria-label="Footer" className="flex flex-wrap gap-x-6 gap-y-2 text-sm">
         <Link href="/docs" className="text-muted hover:text-ink min-h-11 flex items-center">Docs</Link>
