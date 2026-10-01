@@ -25,17 +25,23 @@ export async function POST(req: Request) {
     for (const t of b.basket) {
       if ((await c.tokenProgramOf(t.mint)) !== CLASSIC) throw new LaunchError("basket_unsupported", `${t.mint} is not a classic SPL token`);
     }
-    // A delete and insert of the same key cannot share one statement, so this rare admin write uses a transaction.
-    await c.sql.begin(async (tx) => {
-      // Any farm or swap already carries the old reward mints, so the basket is frozen from then on.
-      const [started] = await tx`select exists(select 1 from stake_tiers where launch_id = ${l.id} and farm is not null)
-        or exists(select 1 from distributions where launch_id = ${l.id} and kind in ('create_farm', 'configure_farm', 'swap')) as yes`;
-      if (started.yes) throw new LaunchError("invalid_input", "Farms already exist for this launch");
-      await tx`delete from baskets where launch_id = ${l.id}`;
-      await tx`insert into baskets (launch_id, reward_mint, weight_bps, symbol, decimals)
-        select ${l.id}, x.mint, x."weightBps", x.symbol, x.decimals
-        from jsonb_to_recordset(${JSON.stringify(b.basket)}::text::jsonb) as x(mint text, "weightBps" int, symbol text, decimals int)`;
-    });
+    // One statement, not sql.begin (pooled queries queued behind it can get another caller's rows); a farm or swap freezes the basket.
+    const [r] = await c.sql`
+      with started as (
+        select exists(select 1 from stake_tiers where launch_id = ${l.id} and farm is not null)
+          or exists(select 1 from distributions where launch_id = ${l.id} and kind in ('create_farm', 'configure_farm', 'swap')) as yes
+      ), next as (
+        select x.mint, x."weightBps" as weight_bps, x.symbol, x.decimals
+        from jsonb_to_recordset(${JSON.stringify(b.basket)}::text::jsonb) as x(mint text, "weightBps" int, symbol text, decimals int)
+      ), del as (
+        delete from baskets where launch_id = ${l.id} and not (select yes from started) and reward_mint not in (select mint from next)
+      ), ins as (
+        insert into baskets (launch_id, reward_mint, weight_bps, symbol, decimals)
+        select ${l.id}, mint, weight_bps, symbol, decimals from next where not (select yes from started)
+        on conflict (launch_id, reward_mint) do update set weight_bps = excluded.weight_bps, symbol = excluded.symbol, decimals = excluded.decimals
+      )
+      select yes from started`;
+    if (r.yes) throw new LaunchError("invalid_input", "Farms already exist for this launch");
     return json({ ok: true });
   } catch (e) {
     return jsonError(e);

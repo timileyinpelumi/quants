@@ -136,6 +136,11 @@ test("basket override can keep a token that was already in the basket", async ()
     { mint: "Zec1111111111111111111111111111111111111111", weightBps: 5000 }, { mint: "Cate111111111111111111111111111111111111111", weightBps: 5000 }] }) }));
   expect(r.status).toBe(200);
   expect((await c.sql`select count(*)::int n from baskets where launch_id = ${l.id}`)[0].n).toBe(2);
+  const r2 = await basketRoute(withCookie(cookie, { method: "POST", body: JSON.stringify({ mint: "M2", basket: [
+    { mint: "Cate111111111111111111111111111111111111111", weightBps: 10000, symbol: "CATE", decimals: 6 }] }) }));
+  expect(r2.status).toBe(200);
+  const rows = await c.sql`select reward_mint, weight_bps, symbol, decimals from baskets where launch_id = ${l.id}`;
+  expect(rows.map((x: any) => [x.reward_mint, x.weight_bps, x.symbol, x.decimals])).toEqual([["Cate111111111111111111111111111111111111111", 10000, "CATE", 6]]);
 });
 
 test("basket override is refused once any farm or swap exists", async () => {
