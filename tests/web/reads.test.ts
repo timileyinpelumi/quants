@@ -2,7 +2,7 @@ import { test, expect } from "bun:test";
 import { makeWebContext } from "../helpers/web-context";
 import { prepareLaunch } from "../../src/launch/prepare";
 import { confirmLaunch } from "../../src/launch/confirm";
-import { listLaunches, launchDetail } from "../../src/web/server/reads";
+import { listLaunches, launchDetail, feeSummary } from "../../src/web/server/reads";
 import { beginStep, confirmStep } from "../../src/ledger/ledger";
 import { GET as detailRoute } from "../../src/app/api/launches/[mint]/route";
 import { NATIVE_MINT } from "../../src/domain/types";
@@ -74,6 +74,23 @@ test("launchDetail sums paid out and burned, and weights tier shares by multipli
   expect(d.tiers[2]!.staked).toBe("100");
   expect(d.curve).toEqual({ quoteReserve: "40", threshold: "80", migrated: false });
   expect(await launchDetail(c, "unknown")).toBeNull();
+});
+
+test("feeSummary totals every split by its settings, plus what is held for stakers and when they were last paid", async () => {
+  const c = await makeWebContext();
+  const a = await launch(c, "CAT");
+  expect(await feeSummary(c.sql, a.id)).toEqual({ earned: "0", stakers: "0", creator: "0", platform: "0", meteora: "0", held: "0", lastPaidAt: null });
+  await step(c, a.id, "s1", "split", { amount: "1000" });
+  await step(c, a.id, "s2", "split", { amount: "2000" });
+  const held = await beginStep(c.sql, { launchId: a.id, idemKey: "h", kind: "split", settingsVersion: 1, detail: { amount: "0" } });
+  await confirmStep(c.sql, held, [{ bucket: "basket", mint: NATIVE_MINT, amount: 700n }]);
+  const unsplit = await beginStep(c.sql, { launchId: a.id, idemKey: "u", kind: "claim", settingsVersion: 1, detail: {} });
+  await confirmStep(c.sql, unsplit, [{ bucket: "unsplit", mint: NATIVE_MINT, amount: 400n }]);
+  await step(c, a.id, "f1", "fund", { farm: "farm-7d", rewardMint: ZEC, amount: "10" });
+  const f = await feeSummary(c.sql, a.id);
+  // default split is 60% stakers, 25% platform, 15% creator; Meteora keeps 20% before it
+  expect(f).toMatchObject({ earned: "3400", stakers: "1800", platform: "750", creator: "450", meteora: "850", held: "700" });
+  expect(typeof f.lastPaidAt).toBe("string");
 });
 
 test("detail route returns 404 json for an unknown mint", async () => {

@@ -21,11 +21,11 @@ test("buckets trades into candles oldest first, in USD when every trade has a US
   await trade(sql, id, 44, 0.002);
   await trade(sql, id, 10, 0.004);
   await trade(sql, id, 60 * 30, 0.0001);
-  const r = await candles(sql, id, "1D", NOW);
+  const r = await candles(sql, id, "5M", NOW);
   expect(r.unit).toBe("usd");
   expect(r.candles).toHaveLength(3);
   const [a, b, c] = r.candles;
-  expect(a!.time).toBe((NOW - 60 * 60_000) / 1000);
+  expect(a!.time).toBe((NOW - 50 * 60_000) / 1000);
   expect([a!.open, a!.high, a!.low, a!.close].map((x) => +x.toFixed(6))).toEqual([0.1, 0.3, 0.1, 0.3]);
   expect([b!.open, b!.close].map((x) => +x.toFixed(6))).toEqual([0.2, 0.2]);
   expect(c!.close).toBeCloseTo(0.4, 6);
@@ -36,7 +36,7 @@ test("falls back to quote token prices when any trade lacks a USD price", async 
   const id = await insertLaunch(sql);
   await trade(sql, id, 30, 0.001, { quote_usd: null });
   await trade(sql, id, 20, 0.002);
-  const r = await candles(sql, id, "1H", NOW);
+  const r = await candles(sql, id, "1M", NOW);
   expect(r.unit).toBe("quote");
   expect(r.candles.map((c) => c.close)).toEqual([0.001, 0.002]);
 });
@@ -45,9 +45,26 @@ test("a quiet token still shows its last price", async () => {
   const { sql } = await makeWebContext();
   const id = await insertLaunch(sql);
   await trade(sql, id, 60 * 24 * 3, 0.002);
-  const r = await candles(sql, id, "1H", NOW);
+  const r = await candles(sql, id, "1M", NOW);
   expect(r.candles).toHaveLength(1);
   expect(r.candles[0]!.close).toBeCloseTo(0.2, 6);
+});
+
+test("timeframes are candle sizes: hourly and daily buckets reach back further", async () => {
+  const { sql } = await makeWebContext();
+  const id = await insertLaunch(sql);
+  await trade(sql, id, 60 * 24 * 5, 0.001);
+  await trade(sql, id, 90, 0.002);
+  await trade(sql, id, 70, 0.003);
+  await trade(sql, id, 5, 0.004);
+  const hourly = await candles(sql, id, "1H", NOW);
+  expect(hourly.candles.map((c) => +c.close.toFixed(6))).toEqual([0.1, 0.3, 0.4]);
+  expect(hourly.candles[2]!.time - hourly.candles[1]!.time).toBe(3_600);
+  const daily = await candles(sql, id, "1D", NOW);
+  expect(daily.candles).toHaveLength(2);
+  expect(daily.candles[1]!.time - daily.candles[0]!.time).toBe(5 * 86_400);
+  expect(+daily.candles[1]!.open.toFixed(6)).toBe(0.2);
+  expect(+daily.candles[1]!.close.toFixed(6)).toBe(0.4);
 });
 
 test("market gives price, change, market cap and volume over 24 hours", async () => {
@@ -82,9 +99,11 @@ test("chart route returns candles and market for a mint, and 404 for an unknown 
   const { sql } = await makeWebContext();
   const id = await insertLaunch(sql, { mint: "M1" });
   await trade(sql, id, 1, 0.001, { quote_usd: 100 });
-  const r = await (await GET(new Request("http://x/api/chart/M1?tf=1D"), { params: Promise.resolve({ mint: "M1" }) })).json();
+  const r = await (await GET(new Request("http://x/api/chart/M1?tf=1H"), { params: Promise.resolve({ mint: "M1" }) })).json();
   expect(r.candles.length).toBeGreaterThan(0);
   expect(r.unit).toBe("usd");
   expect(r.market.price).toBe(0.001);
-  expect((await GET(new Request("http://x/api/chart/NOPE"), { params: Promise.resolve({ mint: "NOPE" }) })).status).toBe(404);
+  expect((await GET(new Request("http://x/api/chart/M1?tf=1W"), { params: Promise.resolve({ mint: "M1" }) })).status).toBe(400);
+  expect((await (await GET(new Request("http://x/api/chart/M1"), { params: Promise.resolve({ mint: "M1" }) })).json()).candles.length).toBeGreaterThan(0);
+  expect((await GET(new Request("http://x/api/chart/NOPE"),{ params: Promise.resolve({ mint: "NOPE" }) })).status).toBe(404);
 });

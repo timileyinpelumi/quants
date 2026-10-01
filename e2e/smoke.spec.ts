@@ -37,7 +37,7 @@ test("launch, trade until staking opens, stake, exit early and see the burn", as
   const mint = page.url().split("/t/")[1]!;
 
   await expect(page.getByRole("heading", { name: symbol, level: 1 })).toBeVisible();
-  await expect(page.getByText(`Stake ${symbol}, earn`)).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Rewards and staking" })).toBeVisible();
   await expect(page.getByText("30 days").first()).toBeVisible();
 
   // The first buy's fees alone do not cover the farms, so staking stays closed and shows its progress.

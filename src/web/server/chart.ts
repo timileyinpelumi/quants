@@ -1,7 +1,8 @@
 import type { SQL } from "bun";
 
 export type Candle = { time: number; open: number; high: number; low: number; close: number };
-export type Timeframe = "1H" | "1D" | "1W";
+export const TIMEFRAMES = ["1M", "5M", "1H", "1D"] as const;
+export type Timeframe = (typeof TIMEFRAMES)[number];
 export type Market = {
   price: number;
   priceUsd: number | null;
@@ -14,10 +15,12 @@ export type Market = {
 
 const SUPPLY = 1_000_000_000;
 const DAY = 86_400_000;
+// Each timeframe is a candle size; the range keeps a few hundred candles at most.
 const TF: Record<Timeframe, { bucket: string; bucketMs: number; rangeMs: number }> = {
-  "1H": { bucket: "1 minute", bucketMs: 60_000, rangeMs: 3_600_000 },
-  "1D": { bucket: "15 minutes", bucketMs: 900_000, rangeMs: DAY },
-  "1W": { bucket: "4 hours", bucketMs: 14_400_000, rangeMs: 7 * DAY },
+  "1M": { bucket: "1 minute", bucketMs: 60_000, rangeMs: 4 * 3_600_000 },
+  "5M": { bucket: "5 minutes", bucketMs: 300_000, rangeMs: DAY },
+  "1H": { bucket: "1 hour", bucketMs: 3_600_000, rangeMs: 14 * DAY },
+  "1D": { bucket: "1 day", bucketMs: DAY, rangeMs: 365 * DAY },
 };
 
 export async function candles(sql: SQL, launchId: number, tf: Timeframe, now = Date.now()): Promise<{ unit: "usd" | "quote"; candles: Candle[] }> {

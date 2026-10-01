@@ -1,6 +1,7 @@
 import type { SQL } from "bun";
 import type { WebContext } from "./context";
 import { opensAt } from "@/domain/launch-cost";
+import { splitFees } from "@/domain/weights";
 
 export type StakingOpens = { percent: number; rentLamports: string; neededLamports: string | null };
 type PoolRow = { status: string; rent_lamports: string | number | bigint | null; basket_value_lamports: string | number | bigint } | undefined;
@@ -39,7 +40,7 @@ export async function listLaunches(sql: SQL, opts: { graduated?: boolean; limit?
 }
 
 export interface LaunchDetail {
-  launch: LaunchListItem & { creator: string; dammPool: string | null };
+  launch: LaunchListItem & { id: number; creator: string; dammPool: string | null };
   basket: { mint: string; symbol: string | null; decimals: number | null; weightBps: number; paidOut: string }[];
   tiers: { tierId: string; lockSeconds: number; multiplierBps: number; farm: string | null; staked: string | null; sharePct: number }[];
   burned: string;
@@ -65,7 +66,7 @@ export async function launchDetail(ctx: WebContext, mint: string): Promise<Launc
   const total = weights.reduce((a: bigint, b: bigint) => a + b, 0n);
   const progress = await ctx.meteora.curveProgress(item!.pool).catch(() => ({ quoteReserve: 0n, threshold: 0n, migrated: item!.status === "graduated" }));
   return {
-    launch: { ...item!, creator: row.creator, dammPool: row.damm_pool },
+    launch: { ...item!, id: Number(row.id), creator: row.creator, dammPool: row.damm_pool },
     basket: basket.map((b: any) => ({ mint: b.reward_mint, symbol: b.symbol, decimals: b.decimals, weightBps: b.weight_bps, paidOut: b.paid })),
     tiers: tierRows.map((t: any, i: number) => ({
       tierId: t.tier_id, lockSeconds: t.lock_seconds, multiplierBps: t.multiplier_bps, farm: t.farm, staked: staked[i] === null ? null : staked[i]!.toString(),
@@ -76,5 +77,31 @@ export async function launchDetail(ctx: WebContext, mint: string): Promise<Launc
     stakeReady: pool?.status === "ready",
     stakingOpens: stakingOpens(pool),
     curve: { quoteReserve: progress.quoteReserve.toString(), threshold: progress.threshold.toString(), migrated: progress.migrated },
+  };
+}
+
+/** All in the launch's quote token, base units. `earned` is what reached quants after Meteora's cut, including fees not yet split. */
+export type FeeSummary = { earned: string; stakers: string; creator: string; platform: string; meteora: string; held: string; lastPaidAt: string | null };
+
+export async function feeSummary(sql: SQL, launchId: number): Promise<FeeSummary> {
+  const splits = await sql`
+    select d.detail->>'amount' as amount, s.data->'split' as split
+    from distributions d join settings s on s.version = d.settings_version
+    where d.launch_id = ${launchId} and d.kind = 'split' and d.status = 'confirmed'`;
+  let stakers = 0n, creator = 0n, platform = 0n;
+  for (const r of splits) {
+    const split = typeof r.split === "string" ? JSON.parse(r.split) : r.split;
+    const f = splitFees(BigInt(r.amount ?? "0"), split);
+    stakers += f.basket; creator += f.creator; platform += f.platform;
+  }
+  const [e] = await sql`
+    select coalesce(sum(e.amount) filter (where e.bucket = 'unsplit'), 0)::text as unsplit,
+      coalesce(sum(e.amount) filter (where e.bucket = 'basket'), 0)::text as held,
+      (select max(updated_at) from distributions where launch_id = ${launchId} and kind = 'fund' and status = 'confirmed') as last_paid
+    from escrow e join launches l on l.id = e.launch_id and e.mint = l.quote_mint where e.launch_id = ${launchId}`;
+  const earned = stakers + creator + platform + BigInt(e?.unsplit ?? "0");
+  return {
+    earned: earned.toString(), stakers: stakers.toString(), creator: creator.toString(), platform: platform.toString(),
+    meteora: ((earned * 20n) / 80n).toString(), held: e?.held ?? "0", lastPaidAt: e?.last_paid ? new Date(e.last_paid).toISOString() : null,
   };
 }

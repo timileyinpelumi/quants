@@ -1,26 +1,22 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Header } from "@/web/ui/Header";
 import { Avatar } from "@/web/ui/Avatar";
 import { CopyButton } from "@/web/ui/CopyButton";
-import { Flame } from "@/web/ui/Flame";
-import { fmtAmount, fmtCompact, shortAddr, lockLabel } from "@/web/ui/format";
+import { shortAddr } from "@/web/ui/format";
 import { getContext } from "@/web/server/context";
-import { launchDetail } from "@/web/server/reads";
+import { feeSummary, launchDetail } from "@/web/server/reads";
+import { RewardsStaking } from "@/web/token/RewardsStaking";
 import { Chart } from "@/web/token/Chart";
 import { TradePanel } from "@/web/token/TradePanel";
 import { MarketStats, GraduationBar } from "@/web/token/MarketStats";
 import { TokenLiveProvider } from "@/web/token/TokenLive";
 import { TokenInsights } from "@/web/token/TokenInsights";
-import { StakingOpens } from "@/web/stake/StakingOpens";
 import { tokenLive } from "@/web/server/token-live";
 import { iconsFor } from "@/web/server/icons";
 import { quoteCoin, quoteCoins } from "@/domain/quotes";
 import { usdPrices } from "@/web/server/prices";
 
 export const dynamic = "force-dynamic";
-
-const tokens = (base: string | null) => (base === null ? "Unknown" : fmtCompact(Number(BigInt(base) / 10_000n) / 100));
 
 export default async function TokenPage({ params }: { params: Promise<{ mint: string }> }) {
   const { mint } = await params;
@@ -35,9 +31,11 @@ export default async function TokenPage({ params }: { params: Promise<{ mint: st
   const icons = await iconsFor(ctx.icons, [launch.quoteMint, ...d.basket.map((b) => b.mint)], quoteCoins());
   const progress = d.curve.migrated || BigInt(d.curve.threshold) === 0n ? 100 : Math.min(100, Number((BigInt(d.curve.quoteReserve) * 100n) / BigInt(d.curve.threshold)));
   const earns = d.basket.map((b) => b.symbol ?? shortAddr(b.mint)).join(", ");
-  const px = await usdPrices(ctx, d.basket.map((b) => b.mint)).catch(() => ({} as Record<string, number | null>));
+  const [px, fees] = await Promise.all([
+    usdPrices(ctx, [launch.quoteMint, ...d.basket.map((b) => b.mint)]).catch(() => ({} as Record<string, number | null>)),
+    feeSummary(ctx.sql, d.launch.id),
+  ]);
   const tokenUsd = live?.market?.priceUsd ?? null;
-  const usd = (whole: number, price: number | null | undefined) => (price == null ? null : `$${fmtCompact(whole * price)}`);
 
   return (
     <TokenLiveProvider mint={mint} initial={live}>
@@ -56,8 +54,12 @@ export default async function TokenPage({ params }: { params: Promise<{ mint: st
               </div>
               <div className="flex gap-2.5 text-[13px] flex-wrap">
                 <span className="flex items-center gap-1.5 pl-1.5 pr-3 py-1 rounded-full bg-raised-2 border border-white/[0.08]"><Avatar seed={launch.quoteMint} label={pairSymbol} image={icons[launch.quoteMint]} size={20} />{symbol} / {pairSymbol}</span>
-                <span className="px-3 py-1.5 rounded-full bg-raised-2 border border-white/[0.08]">{launch.feeTierBps / 100}% fee</span>
+                <span className="px-3 py-1.5 rounded-full bg-raised-2 border border-white/[0.08]">{launch.feeTierBps / 100}% trading fee</span>
                 <CopyButton value={mint} label={shortAddr(mint)} />
+                <a href={`https://dexscreener.com/solana/${mint}`} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-raised-2 border border-white/[0.08] text-muted hover:text-ink">
+                  DexScreener
+                  <svg aria-hidden width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M7 17 17 7" /><path d="M8 7h9v9" /></svg>
+                </a>
               </div>
             </div>
           </div>
@@ -76,55 +78,10 @@ export default async function TokenPage({ params }: { params: Promise<{ mint: st
             stake={{ tiers: d.tiers.map((t) => ({ id: t.tierId, lockSeconds: t.lockSeconds, multiplierBps: t.multiplierBps })), maxPenaltyBps: d.maxPenaltyBps, ready: d.stakeReady, earns, opens: d.stakingOpens }} />
         </section>
 
+        <RewardsStaking mint={mint} symbol={symbol} d={d} fees={fees} icons={icons} px={px} tokenUsd={tokenUsd}
+          quote={{ symbol: pairSymbol, decimals: quoteDecimals, usd: live?.quoteUsd ?? px[launch.quoteMint] ?? null }} />
+
         <TokenInsights mint={mint} symbol={symbol} quoteSymbol={pairSymbol} />
-
-        <section className="grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-8">
-          <div className="flex flex-col gap-2">
-            <div className="flex justify-between items-baseline pb-3 gap-4">
-              <h2 className="m-0 font-display font-black text-2xl md:text-[28px] tracking-tight">Stake {symbol}, earn</h2>
-              <Link href={`/t/${mint}/stake`} className="font-semibold text-[15px] text-accent min-h-11 flex items-center">Stake now</Link>
-            </div>
-            {d.basket.map((b) => (
-              <div key={b.mint} className="grid grid-cols-[44px_minmax(0,1fr)_auto] gap-4 items-center py-3.5 border-t line">
-                <Avatar seed={b.mint} label={b.symbol ?? "?"} image={icons[b.mint]} />
-                <span className="flex flex-col gap-0.5 min-w-0">
-                  <span className="font-semibold">{b.symbol ?? shortAddr(b.mint)}</span>
-                  <span className="text-[13px] text-muted">{b.weightBps / 100}% of the basket</span>
-                </span>
-                <span className="flex flex-col items-end gap-0.5">
-                  <span className="font-mono text-[15px]">{fmtAmount(b.paidOut, b.decimals ?? 0, 3)} {b.symbol ?? ""}</span>
-                  <span className="text-[13px] text-muted">paid to stakers{b.decimals !== null && usd(Number(BigInt(b.paidOut)) / 10 ** b.decimals, px[b.mint]) ? `, ${usd(Number(BigInt(b.paidOut)) / 10 ** b.decimals, px[b.mint])}` : ""}</span>
-                </span>
-              </div>
-            ))}
-            <div className="flex items-center gap-3.5 mt-3 px-5 py-4 rounded-[22px] bg-burn/[0.08] border border-burn/25">
-              <Flame />
-              <span className="flex flex-col gap-0.5">
-                <span className="font-display font-bold text-lg">{fmtAmount(d.burned, 6, 0)} {symbol} burned{usd(Number(BigInt(d.burned)) / 1e6, tokenUsd) && d.burned !== "0" ? `, about ${usd(Number(BigInt(d.burned)) / 1e6, tokenUsd)}` : ""}</span>
-                <span className="text-[13px] text-muted">From early exits. Burned tokens are gone for good.</span>
-              </span>
-            </div>
-          </div>
-
-          <div className="flex flex-col gap-2">
-            <div className="flex justify-between items-baseline pb-3 gap-4">
-              <h2 className="m-0 font-display font-black text-2xl md:text-[28px] tracking-tight">Lock tiers</h2>
-              <span className="text-[13px] text-muted text-right">Share of rewards now</span>
-            </div>
-            {d.tiers.map((t) => (
-              <div key={t.tierId} className="grid grid-cols-[72px_minmax(0,1fr)_64px] md:grid-cols-[88px_minmax(0,1fr)_140px_64px] gap-4 items-center py-4 border-t line">
-                <span className="font-display font-black text-2xl text-stake-light">{t.multiplierBps / 10_000}x</span>
-                <span className="flex flex-col gap-0.5">
-                  <span className="font-semibold">{lockLabel(t.lockSeconds)}</span>
-                  <span className="font-mono text-[13px] text-muted">{tokens(t.staked)} {symbol} staked{t.staked !== null && usd(Number(BigInt(t.staked)) / 1e6, tokenUsd) ? `, ${usd(Number(BigInt(t.staked)) / 1e6, tokenUsd)}` : ""}</span>
-                </span>
-                <span className="hidden md:flex h-2 rounded-full bg-white/[0.07] overflow-hidden"><span className="bg-stake rounded-full" style={{ width: `${t.sharePct}%` }} /></span>
-                <span className="font-mono text-[15px] text-right">{t.sharePct}%</span>
-              </div>
-            ))}
-            {!d.stakeReady && <div className="pt-3"><StakingOpens initial={d.stakingOpens} /></div>}
-          </div>
-        </section>
       </main>
     </div>
     </TokenLiveProvider>
