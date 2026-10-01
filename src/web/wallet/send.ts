@@ -7,7 +7,7 @@ export class SendError extends Error {
 export type UnsignedTx = { base64: string; versioned: boolean };
 
 export async function signAndSendAll(wallet: Pick<WalletContextState, "publicKey" | "signAllTransactions">, conn: Connection, txs: UnsignedTx[]): Promise<string[]> {
-  if (!wallet.publicKey || !wallet.signAllTransactions) throw new SendError("Connect a wallet first");
+  if (!wallet.publicKey || !wallet.signAllTransactions) throw new SendError("Connect a wallet first.");
   const decoded = txs.map((t) => {
     const bytes = Buffer.from(t.base64, "base64");
     return t.versioned ? VersionedTransaction.deserialize(bytes) : Transaction.from(bytes);
@@ -16,7 +16,7 @@ export async function signAndSendAll(wallet: Pick<WalletContextState, "publicKey
   try {
     signed = await wallet.signAllTransactions(decoded);
   } catch {
-    throw new SendError("You cancelled in your wallet");
+    throw new SendError("Transaction cancelled in your wallet.");
   }
   const sigs: string[] = [];
   for (const tx of signed) {
@@ -31,9 +31,9 @@ export async function signAndSendAll(wallet: Pick<WalletContextState, "publicKey
       const { blockhash, lastValidBlockHeight } = await conn.getLatestBlockhash("confirmed");
       res = await conn.confirmTransaction({ signature: sig, blockhash, lastValidBlockHeight }, "confirmed");
     } catch {
-      throw new SendError("We could not confirm the transaction yet", [...sigs], sig);
+      throw new SendError("Transaction not confirmed yet. Check your wallet before trying again.", [...sigs], sig);
     }
-    if (res.value.err) throw new SendError(`The transaction failed: ${JSON.stringify(res.value.err)}`, [...sigs]);
+    if (res.value.err) throw new SendError(`Transaction failed: ${JSON.stringify(res.value.err)}`, [...sigs]);
     sigs.push(sig);
   }
   return sigs;

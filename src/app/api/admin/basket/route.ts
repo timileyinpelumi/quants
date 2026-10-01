@@ -21,7 +21,7 @@ export async function POST(req: Request) {
     await requireAdmin(c, req);
     const b = Body.parse(await readJson(req));
     const [l] = await c.sql`select l.id from launches l where l.mint = ${b.mint}`;
-    if (!l) throw new LaunchError("invalid_input", "No token here");
+    if (!l) throw new LaunchError("invalid_input", "Token not found");
     for (const t of b.basket) {
       if ((await c.tokenProgramOf(t.mint)) !== CLASSIC) throw new LaunchError("basket_unsupported", `${t.mint} is not a classic SPL token`);
     }

@@ -31,7 +31,7 @@ export function BasketPicker({ value, onChange }: { value: BasketItem[]; onChang
     <div className="flex flex-col gap-3.5">
       <div className="flex justify-between items-baseline gap-4">
         <span className="font-display font-bold text-xl">Reward basket</span>
-        <span className="text-[13px] text-muted text-right">Up to 10 tokens. Trading fees buy these for your stakers.</span>
+        <span className="text-[13px] text-muted text-right">Up to 10 tokens. Trading fees buy them for your stakers.</span>
       </div>
 
       <div className="flex flex-col">
@@ -69,7 +69,7 @@ export function BasketPicker({ value, onChange }: { value: BasketItem[]; onChang
 
       {value.length > 0 && (
         <div className="flex justify-between text-[13px]">
-          <span className={total === 100 ? "text-muted" : "text-burn"}>{total === 100 ? "Weights add up to 100" : `Weights add up to ${total}. They need to add up to 100.`}</span>
+          <span className={total === 100 ? "text-muted" : "text-burn"}>{total === 100 ? "Weights add up to 100" : `Weights add up to ${total}. They must add up to 100.`}</span>
           {value.length > 1 && <button type="button" onClick={() => onChange(evenly(value))} className="text-lime cursor-pointer min-h-11 -my-3">Split evenly</button>}
         </div>
       )}

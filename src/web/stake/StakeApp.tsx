@@ -73,7 +73,7 @@ export function StakeApp({ mint, symbol, tiers, maxPenaltyBps, ready }: { mint: 
           <span className="flex justify-between py-2.5"><span className="text-muted">Leave early</span><span className="font-mono">up to {maxPenaltyBps / 100}% burned</span></span>
         </div>
 
-        {lockedHere && <p className="m-0 text-sm text-burn">Adding to this stake restarts its {lockLabel(selected.lockSeconds)} lock for the whole position.</p>}
+        {lockedHere && <p className="m-0 text-sm text-burn">Adding to this stake restarts the {lockLabel(selected.lockSeconds)} lock for the whole position.</p>}
         {tooMuch && <p className="m-0 text-sm text-burn">You hold less {symbol} than that.</p>}
         {!ready && <p className="m-0 text-sm text-muted">Staking opens a few minutes after launch.</p>}
         {error && <p role="alert" className="m-0 text-sm text-burn">{error}</p>}
@@ -95,7 +95,7 @@ export function StakeApp({ mint, symbol, tiers, maxPenaltyBps, ready }: { mint: 
         {!owner ? (
           <p className="m-0 text-muted py-8 border-t line">Connect a wallet to see your stakes.</p>
         ) : positions.length === 0 ? (
-          <p className="m-0 text-muted py-8 border-t line">No stakes yet. Pick a lock and stake some {symbol}.</p>
+          <p className="m-0 text-muted py-8 border-t line">No stakes yet. Pick a lock and stake {symbol}.</p>
         ) : (
           <div className="flex flex-col">
             {positions.map((p) => (
@@ -129,7 +129,7 @@ export function StakeApp({ mint, symbol, tiers, maxPenaltyBps, ready }: { mint: 
                       <div className="flex flex-col gap-1.5 px-5 py-4 rounded-[22px] bg-surface"><span className="text-[13px] text-muted">Burned</span><span className="font-display font-bold text-2xl text-burn">{fmtAmount(p.exitPreview.burned, DECIMALS, 2)} {symbol}</span>{usd(p.exitPreview.burned) && <span className="font-mono text-[13px] text-faint">≈ {usd(p.exitPreview.burned)}</span>}</div>
                     </div>
                     <p className="m-0 text-sm text-[#C9C5D6] leading-relaxed">
-                      The penalty is {(p.exitPreview.penaltyBps / 100).toFixed(p.exitPreview.penaltyBps % 100 ? 1 : 0)}% because {lockLabel(Math.max(0, p.unlocksAt - Math.floor(Date.now() / 1000)))} of your {lockLabel(p.lockSeconds)} lock is left. It shrinks the longer you stay. Rewards you already earned are yours to keep. Burned tokens are gone for good, and quants never receives them.
+                      The penalty is {(p.exitPreview.penaltyBps / 100).toFixed(p.exitPreview.penaltyBps % 100 ? 1 : 0)}% because {lockLabel(Math.max(0, p.unlocksAt - Math.floor(Date.now() / 1000)))} of your {lockLabel(p.lockSeconds)} lock is left. It shrinks every day you stay. Rewards already earned stay yours. Burned tokens are destroyed and quants never receives them.
                     </p>
                     <div className="flex flex-wrap gap-2.5">
                       <Button variant="burn" disabled={busy !== null} onClick={() => act("exit", p.tierId)}>{busy === `exit:${p.tierId}` ? "Approve in your wallet" : `Exit and burn ${fmtAmount(p.exitPreview.burned, DECIMALS, 0)} ${symbol}`}</Button>

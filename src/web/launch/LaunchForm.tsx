@@ -30,7 +30,7 @@ async function imageProblem(file: File): Promise<string | null> {
     const bmp = await createImageBitmap(file);
     if (bmp.width !== bmp.height) return "Image must be square";
   } catch {
-    return "We could not read that image";
+    return "Image could not be read. Try another file.";
   }
   return null;
 }
@@ -38,7 +38,7 @@ async function imageProblem(file: File): Promise<string | null> {
 async function postJson<T>(url: string, body: unknown): Promise<T> {
   const r = await fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
   const j = await r.json();
-  if (!r.ok) throw new Error(j.error?.message ?? "Something went wrong");
+  if (!r.ok) throw new Error(j.error?.message ?? "Something went wrong. Try again.");
   return j as T;
 }
 
@@ -92,7 +92,7 @@ export function LaunchForm({ split, tiers, launchFeeLamports, maxPenaltyBps, quo
     !name.trim() && "Add a name",
     !/^[A-Za-z0-9]{1,10}$/.test(symbol) && "Symbol is 1 to 10 letters or numbers",
     basket.length === 0 && "Pick at least one reward token",
-    basket.length > 0 && basketTotal(basket) !== 100 && "Basket weights need to add up to 100",
+    basket.length > 0 && basketTotal(basket) !== 100 && "Basket weights must add up to 100",
     devBuyLamports === null && "First buy must be a number",
   ].filter(Boolean) as string[];
 
@@ -109,7 +109,7 @@ export function LaunchForm({ split, tiers, launchFeeLamports, maxPenaltyBps, quo
     for (let i = 0; i < 20; i++) {
       const { value } = await connection.getSignatureStatuses([p.sig], { searchTransactionHistory: true });
       const st = value[0];
-      if (st?.err) { setPending(null); setError("The launch transaction failed on chain. Nothing was created, so you can try again."); setStatus("idle"); return; }
+      if (st?.err) { setPending(null); setError("The launch transaction failed on chain. Nothing was created. Try again."); setStatus("idle"); return; }
       if (st && (st.confirmationStatus === "confirmed" || st.confirmationStatus === "finalized")) {
         try {
           await postJson("/api/launch/confirm", { signature: p.sig, mint: p.mint });
@@ -122,7 +122,7 @@ export function LaunchForm({ split, tiers, launchFeeLamports, maxPenaltyBps, quo
       await new Promise((r) => setTimeout(r, 3000));
     }
     setPending(p);
-    setError("We could not confirm your launch yet. Do not launch again. If it went through it will show on Explore within a few minutes.");
+    setError("Launch not confirmed yet. Don't launch again. If it landed, it shows on Explore within a few minutes.");
     setStatus("idle");
   }
 
@@ -141,7 +141,7 @@ export function LaunchForm({ split, tiers, launchFeeLamports, maxPenaltyBps, quo
       for (const [k, v] of Object.entries({ description, website, x, telegram })) if (v.trim()) form.set(k, v.trim());
       const metaRes = await fetch("/api/metadata", { method: "POST", body: form });
       const meta = await metaRes.json();
-      if (!metaRes.ok) throw new Error(meta.error?.message ?? "Upload failed");
+      if (!metaRes.ok) throw new Error(meta.error?.message ?? "Image upload failed. Try again.");
 
       setStatus("preparing");
       prepared = await postJson<{ mint: string; transactions: UnsignedTx[] }>("/api/launch/prepare", {
@@ -161,9 +161,9 @@ export function LaunchForm({ split, tiers, launchFeeLamports, maxPenaltyBps, quo
         return;
       }
       if (e instanceof SendError && count === 2 && e.confirmed.length === 1) {
-        setError(`The swap to ${pairLabel} went through but the launch did not. The ${pairLabel} is in your wallet. Try again with no first buy, or a smaller one.`);
+        setError(`The swap to ${pairLabel} went through but the launch did not. The ${pairLabel} is in your wallet. Try again with a smaller first buy, or none.`);
       } else {
-        setError(e instanceof Error ? e.message : "Something went wrong");
+        setError(e instanceof Error ? e.message : "Something went wrong. Try again.");
       }
       setStatus("idle");
     }
@@ -177,7 +177,7 @@ export function LaunchForm({ split, tiers, launchFeeLamports, maxPenaltyBps, quo
       <section className="flex flex-col gap-10 min-w-0">
         <div className="flex flex-col gap-3.5">
           <h1 className="m-0 font-display font-black text-[40px] md:text-[56px] leading-[1.02] tracking-[-0.03em]">Launch a token</h1>
-          <p className="m-0 text-lg text-muted max-w-[560px] leading-normal">Pick up to ten reward tokens. Trading fees on your token buy them and pay them to the people who stake it. Longer locks earn a bigger share.</p>
+          <p className="m-0 text-lg text-muted max-w-[560px] leading-normal">Pick up to ten reward tokens. Trading fees on your token buy them and pay them to its stakers. Longer locks earn a bigger share.</p>
         </div>
 
         <div className="flex flex-col">
@@ -218,7 +218,7 @@ export function LaunchForm({ split, tiers, launchFeeLamports, maxPenaltyBps, quo
                     </button>
                   ))}
                 </div>
-                <span className="text-[13px] text-muted">Traders buy and sell your token with {pairLabel}. Fees are earned in {pairLabel}.</span>
+                <span className="text-[13px] text-muted">Your token trades against {pairLabel}. Fees are earned in {pairLabel}.</span>
               </div>
               <div className="flex flex-col gap-3">
                 <span className="text-[13px] text-muted">Trading fee</span>
@@ -242,7 +242,7 @@ export function LaunchForm({ split, tiers, launchFeeLamports, maxPenaltyBps, quo
               </Field>
               <p className="m-0 text-sm text-muted md:pb-[18px]">
                 {devBuyLamports && devBuyLamports > 0n && usdOf(devBuyLamports) ? `About ${usdOf(devBuyLamports)}. ` : ""}
-                {pair === SOL ? "Bought on the curve in the same approval as the launch." : `Swapped to ${pairLabel} first, then bought on the curve. One approval.`}
+                {pair === SOL ? "Bought on the curve in the same approval as the launch." : `Swapped to ${pairLabel}, then bought on the curve, in one approval.`}
               </p>
             </div>
           </div>
@@ -301,7 +301,7 @@ export function LaunchForm({ split, tiers, launchFeeLamports, maxPenaltyBps, quo
               </span>
             ))}
           </div>
-          <span className="text-[13px] text-muted leading-normal">Leave early and up to {maxPenaltyBps / 100}% of your stake is burned. Quants never keeps it.</span>
+          <span className="text-[13px] text-muted leading-normal">Leaving early burns up to {maxPenaltyBps / 100}% of the stake. quants never keeps it.</span>
         </div>
 
         <div className="flex flex-col text-sm border-t line pt-3">
@@ -314,7 +314,7 @@ export function LaunchForm({ split, tiers, launchFeeLamports, maxPenaltyBps, quo
 
         {error && <p role="alert" className="m-0 text-sm text-burn">{error}</p>}
         <Button size="lg" onClick={launch} disabled={busy}>
-          {busy ? LABELS[status] : pending ? "Check my launch" : wallet.publicKey ? `Launch ${symbol || "token"}` : "Connect wallet"}
+          {busy ? LABELS[status] : pending ? "Check launch status" : wallet.publicKey ? `Launch ${symbol || "token"}` : "Connect wallet"}
         </Button>
       </aside>
     </main>

@@ -102,9 +102,9 @@ function AccountModal({ owner, onClose }: { owner: string; onClose: () => void }
 
         <div className="flex-1 overflow-y-auto px-3 py-4 min-h-32">
           <p className="m-0 px-3 pb-2 text-[13px] text-muted">Tokens</p>
-          {error && <p className="m-0 px-3 py-3 text-sm text-burn">Balances could not load. Try Refresh.</p>}
+          {error && <p className="m-0 px-3 py-3 text-sm text-burn">Balances could not load. Refresh to try again.</p>}
           {!data && !error && [0, 1, 2].map((i) => <div key={i} className="mx-3 my-1.5 h-12 rounded-2xl bg-white/[0.04] animate-pulse" />)}
-          {data && data.tokens.length === 0 && <p className="m-0 px-3 py-3 text-sm text-muted">No tokens in this wallet yet.</p>}
+          {data && data.tokens.length === 0 && <p className="m-0 px-3 py-3 text-sm text-muted">No tokens in this wallet.</p>}
           {data?.tokens.map((t) => {
             const row = (
               <>

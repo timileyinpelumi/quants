@@ -40,7 +40,7 @@ export function PaymentsList({ initial, next }: { initial: PricedPayment[]; next
     const r = await getJson<{ payments: PricedPayment[]; next: string | null }>(`/api/rewards/payments?before=${before}&limit=${PAGE}`);
     return { items: r.payments, next: r.next };
   }, (p) => String(p.id));
-  if (paged.items.length === 0) return <p className="m-0 py-6 border-t line text-muted text-sm">No rewards paid yet. They start once someone stakes.</p>;
+  if (paged.items.length === 0) return <p className="m-0 py-6 border-t line text-muted text-sm">No rewards paid yet. Payments start once someone stakes.</p>;
   return (
     <>
       {paged.items.map((p) => (

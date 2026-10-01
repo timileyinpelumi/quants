@@ -181,7 +181,7 @@ export function TokenInsights({ mint, symbol, quoteSymbol }: { mint: string; sym
       )}
 
       {tab === "Holders" && (
-        !live?.holders ? <p className="m-0 py-6 border-t line text-muted text-sm">Holder data is not available right now.</p> : (
+        !live?.holders ? <p className="m-0 py-6 border-t line text-muted text-sm">Holder data is unavailable. Try again later.</p> : (
           <div className="flex flex-col gap-5">
             <div className="grid grid-cols-3 gap-6">
               <div className="flex flex-col gap-1"><span className="text-[13px] text-muted">Holders</span><span className="font-display font-bold text-2xl">{live.holders.count === null ? "Unknown" : fmtCompact(live.holders.count)}</span></div>

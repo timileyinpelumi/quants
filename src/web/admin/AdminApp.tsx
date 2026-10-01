@@ -154,7 +154,7 @@ export function AdminApp({ pairs }: { pairs: Pair[] }) {
               <Num label="Platform" suffix="%" value={pct(settings.split.platformBps)} onChange={(v) => set({ split: { ...settings.split, platformBps: toBps(v) } })} />
               <Num label="Creator" suffix="%" value={pct(settings.split.creatorBps)} onChange={(v) => set({ split: { ...settings.split, creatorBps: toBps(v) } })} />
             </div>
-            {splitTotal !== 10_000 && <span className="text-sm text-burn">These add up to {splitTotal / 100}%. They need to add up to 100%.</span>}
+            {splitTotal !== 10_000 && <span className="text-sm text-burn">These add up to {splitTotal / 100}%. They must add up to 100%.</span>}
           </div>
 
           <div className="flex flex-col gap-3">
@@ -223,7 +223,7 @@ export function AdminApp({ pairs }: { pairs: Pair[] }) {
 
       {tab === "pairs" && (
         <section className="flex flex-col gap-5 max-w-3xl">
-          <p className="m-0 text-sm text-muted">Each pair graduates once this much has been raised on its curve. The target is fixed into the config keys when they are created, so changing QUOTE_GRADUATIONS only applies to config keys created after the change. These are the targets the server is set to now.</p>
+          <p className="m-0 text-sm text-muted">Each pair graduates once this much has been raised on its curve. The target is fixed into the config keys when they are created, so changing QUOTE_GRADUATIONS only applies to config keys created after the change. Current server targets:</p>
           <div className="flex flex-col">
             {pairs.map((p) => (
               <div key={p.mint} className="grid grid-cols-[minmax(0,1fr)_auto] gap-4 py-3 border-t line text-sm">

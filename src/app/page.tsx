@@ -61,7 +61,7 @@ export default async function HomePage() {
               Launch a token that <span className="text-lime">pays its stakers.</span>
             </h1>
             <p className="m-0 text-[17px] md:text-lg text-muted leading-relaxed max-w-xl">
-              Most of every trading fee buys up to ten tokens the creator picks, and pays them to the people who stake the launched token.
+              Most of every trading fee buys up to ten tokens the creator picks and pays them to the token's stakers.
               Lock longer for a bigger share.
             </p>
             <div className="flex flex-wrap gap-3">
@@ -93,7 +93,7 @@ export default async function HomePage() {
           <div className="hidden md:grid grid-cols-[28px_minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,0.8fr)_minmax(0,1fr)_minmax(0,1.2fr)] gap-6 pb-2 text-[12px] text-faint">
             <span>#</span><span>Token</span><span className="text-right">Market cap</span><span className="text-right">24h</span><span className="text-right">Volume 24h</span><span>Stakers earn</span>
           </div>
-          {d.trending.length === 0 ? <p className="m-0 py-6 border-t line text-muted text-sm">No trades today yet.</p> : d.trending.map((t, i) => (
+          {d.trending.length === 0 ? <p className="m-0 py-6 border-t line text-muted text-sm">No trades today.</p> : d.trending.map((t, i) => (
             <Link key={t.mint} href={`/t/${t.mint}`} className="grid grid-cols-[28px_minmax(0,1fr)_auto] md:grid-cols-[28px_minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,0.8fr)_minmax(0,1fr)_minmax(0,1.2fr)] gap-3 md:gap-6 items-center py-3 border-t line hover:bg-white/[0.02]">
               <span className="font-mono text-sm text-faint">{i + 1}</span>
               <span className="flex items-center gap-3 min-w-0">

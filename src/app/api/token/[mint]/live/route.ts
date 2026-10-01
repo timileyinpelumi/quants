@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 export async function GET(_req: Request, { params }: { params: Promise<{ mint: string }> }) {
   try {
     const live = await tokenLive(getContext(), (await params).mint);
-    if (!live) return json({ error: { code: "not_found", message: "No token here" } }, 404);
+    if (!live) return json({ error: { code: "not_found", message: "Token not found" } }, 404);
     return json(live);
   } catch (e) {
     return jsonError(e);

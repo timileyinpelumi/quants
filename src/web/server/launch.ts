@@ -28,7 +28,7 @@ export async function prepareWithSwap(ctx: WebContext, raw: unknown) {
   if (rest.quoteMint !== NATIVE_MINT && sol > 0n) {
     const { slippageBps } = await loadLatestSettings(ctx.sql);
     const q = await ctx.jupiter.quote(NATIVE_MINT, rest.quoteMint, sol, slippageBps);
-    if (!q) throw new LaunchError("invalid_input", "There is no route to buy the pair token right now. Try again or launch without a first buy.");
+    if (!q) throw new LaunchError("invalid_input", "No route to buy the pair token right now. Try again, or launch without a first buy.");
     devBuyQuoteAmount = (q.outAmount * BigInt(10_000 - slippageBps)) / 10_000n;
     transactions.push({ base64: (await ctx.jupiter.buildUnsignedSwap(q, rest.creator)).base64, versioned: true });
   }

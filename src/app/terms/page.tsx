@@ -4,12 +4,12 @@ import { Header } from "@/web/ui/Header";
 export const metadata: Metadata = { title: "Terms and risks" };
 
 const items: [string, string][] = [
-  ["What quants is", "quants is software that helps you launch tokens on Meteora and stake them on Kamino Farms. You interact with those programs directly from your own wallet. quants never holds your stake."],
+  ["What quants is", "quants is software for launching tokens on Meteora and staking them on Kamino Farms. You interact with those programs directly from your own wallet. quants never holds your stake."],
   ["No advice", "Nothing on quants is financial, investment or legal advice. Tokens launched here are created by their launchers, not by quants, and quants does not vouch for any of them."],
   ["Your responsibility", "You are responsible for what you launch, buy, stake and sign, for keeping your wallet safe, and for following the laws where you live. Launchers must have the right to use the names, symbols, images and links they submit."],
   ["Risks", "Token prices can fall to zero. Reward tokens can lose value. Programs and this site can have bugs. Networks can be slow or fail. Leaving a stake early burns part of it. Transactions on Solana cannot be reversed."],
   ["Fees", "Trading fees, the launch fee and early exit penalties work as described in the docs. Settings can change for new launches and future fees. Existing stakes keep the lock tiers and penalty they started with."],
-  ["Availability", "quants is provided as is. We can change or pause the site at any time. Your tokens and stakes stay on chain and can be reached through Meteora and Kamino without this site."],
+  ["Availability", "quants is provided as is. The site can change or pause at any time. Your tokens and stakes stay on chain and can be reached through Meteora and Kamino without this site."],
 ];
 
 export default function TermsPage() {

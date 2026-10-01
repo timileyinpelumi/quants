@@ -8,7 +8,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ mint: st
   try {
     const { sql } = getContext();
     const [l] = await sql`select id from launches where mint = ${(await params).mint}`;
-    if (!l) return json({ error: { code: "not_found", message: "No token here" } }, 404);
+    if (!l) return json({ error: { code: "not_found", message: "Token not found" } }, 404);
     const tfRaw = new URL(req.url).searchParams.get("tf");
     const tf: Timeframe = tfRaw === "1H" || tfRaw === "1W" ? tfRaw : "1D";
     const [c, m] = await Promise.all([candles(sql, Number(l.id), tf), market(sql, Number(l.id))]);

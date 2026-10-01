@@ -49,7 +49,7 @@ test("exit and withdraw refuse the wrong state with plain messages", async () =>
   await setup();
   const e = await post("exit", { mint: "CATmint", tierId: "30d", owner: OWNER });
   expect(e.status).toBe(400);
-  expect((await e.json()).error.message).toBe("This stake is unlocked, withdraw it instead");
+  expect((await e.json()).error.message).toBe("This stake is unlocked. Withdraw it instead.");
   const w = await post("withdraw", { mint: "CATmint", tierId: "7d", owner: OWNER });
   expect(w.status).toBe(400);
   expect((await w.json()).error.message).toBe("This stake is still locked");

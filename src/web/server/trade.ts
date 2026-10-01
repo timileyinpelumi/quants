@@ -11,7 +11,7 @@ const slippage = z.coerce.number().int().min(1, "Slippage is at least 0.01%").ma
 
 async function target(ctx: WebContext, mint: string): Promise<TradeTarget> {
   const [l] = await ctx.sql`select mint, pool, damm_pool, status, quote_mint from launches where mint = ${mint}`;
-  if (!l) throw new LaunchError("invalid_input", "No token here");
+  if (!l) throw new LaunchError("invalid_input", "Token not found");
   return {
     pool: l.pool, dammPool: l.status === "graduated" ? l.damm_pool : null, baseMint: l.mint, quoteMint: l.quote_mint,
     baseDecimals: 6, quoteDecimals: quoteCoin(l.quote_mint)?.decimals ?? 6,

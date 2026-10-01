@@ -14,7 +14,7 @@ export interface PositionView {
 
 async function launchStake(ctx: WebContext, mint: string) {
   const [l] = await ctx.sql`select l.id, l.mint, sp.status, sp.max_penalty_bps from launches l left join stake_pools sp on sp.launch_id = l.id where l.mint = ${mint}`;
-  if (!l) throw new LaunchError("invalid_input", "No token here");
+  if (!l) throw new LaunchError("invalid_input", "Token not found");
   const tiers = await ctx.sql`select tier_id, farm, multiplier_bps, lock_seconds from stake_tiers where launch_id = ${l.id} order by lock_seconds`;
   const basket = await ctx.sql`select reward_mint, symbol, decimals from baskets where launch_id = ${l.id}`;
   return { launch: l, tiers, basket };
@@ -66,7 +66,7 @@ export async function buildStakeAction(ctx: WebContext, actionRaw: string, raw: 
   if (p.staked === 0n) throw new LaunchError("invalid_input", "Nothing is staked in this tier");
   const locked = p.lastStakeTs + p.lockSeconds > Math.floor(Date.now() / 1000);
   if (action === "exit") {
-    if (!locked) throw new LaunchError("invalid_input", "This stake is unlocked, withdraw it instead");
+    if (!locked) throw new LaunchError("invalid_input", "This stake is unlocked. Withdraw it instead.");
     return ctx.staking.buildExitTx(b.owner, tier.farm, b.mint);
   }
   if (locked) throw new LaunchError("invalid_input", "This stake is still locked");

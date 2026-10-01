@@ -26,7 +26,7 @@ test("signs once and sends in order", async () => {
   expect(await signAndSendAll(wallet(), conn(), [legacy(), legacy()])).toEqual(["sig0", "sig1"]);
 });
 test("a rejection becomes a readable error", async () => {
-  await expect(signAndSendAll(wallet(true), conn(), [legacy()])).rejects.toThrow(new SendError("You cancelled in your wallet"));
+  await expect(signAndSendAll(wallet(true), conn(), [legacy()])).rejects.toThrow(new SendError("Transaction cancelled in your wallet."));
 });
 test("an on-chain failure stops the sequence", async () => {
   const c = conn(true);
@@ -34,7 +34,7 @@ test("an on-chain failure stops the sequence", async () => {
   expect(c.sent.length).toBe(1);
 });
 test("no wallet is a readable error", async () => {
-  await expect(signAndSendAll({ publicKey: null } as any, conn(), [legacy()])).rejects.toThrow(new SendError("Connect a wallet first"));
+  await expect(signAndSendAll({ publicKey: null } as any, conn(), [legacy()])).rejects.toThrow(new SendError("Connect a wallet first."));
 });
 
 test("a confirmation that errors reports which signature is still unconfirmed", async () => {

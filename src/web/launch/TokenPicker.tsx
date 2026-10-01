@@ -75,10 +75,10 @@ export function TokenPicker({ open, onClose, onPick, taken, max }: {
           </label>
         </div>
         <div className="flex-1 overflow-y-auto px-3 pb-4 min-h-48">
-          {browsing && <p className="m-0 px-3 pt-1 pb-2 text-[13px] text-muted">{popular === null ? "Loading popular tokens" : popular.length ? "Popular" : "Search for a verified token. Stakers of your token will earn it."}</p>}
+          {browsing && <p className="m-0 px-3 pt-1 pb-2 text-[13px] text-muted">{popular === null ? "Loading popular tokens" : popular.length ? "Popular" : "Search for a verified token. Your stakers earn it."}</p>}
           {!browsing && state === "searching" && found.length === 0 && <p className="m-0 px-3 py-6 text-sm text-muted">Searching</p>}
-          {!browsing && state === "error" && <p className="m-0 px-3 py-6 text-sm text-burn">Search is not answering right now. Try again in a moment.</p>}
-          {!browsing && state === "done" && found.length === 0 && <p className="m-0 px-3 py-6 text-sm text-muted">No verified token matches that.</p>}
+          {!browsing && state === "error" && <p className="m-0 px-3 py-6 text-sm text-burn">Search is unavailable. Try again in a moment.</p>}
+          {!browsing && state === "done" && found.length === 0 && <p className="m-0 px-3 py-6 text-sm text-muted">No verified token matches.</p>}
           {list.map((t) => {
             const added = taken.includes(t.mint);
             const on = selected.some((x) => x.mint === t.mint);

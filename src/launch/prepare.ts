@@ -12,20 +12,20 @@ export class LaunchError extends Error {
 
 // ALLOW_LOCAL_URIS is set only by scripts/dev-seed.ts so local uploads served over http work.
 const publicUri = (u: string) => u.startsWith("https://") || (process.env.ALLOW_LOCAL_URIS === "1" && u.startsWith("http://localhost"));
-const addr = z.string().regex(/^[1-9A-HJ-NP-Za-km-z]{32,44}$/);
+const addr = z.string().regex(/^[1-9A-HJ-NP-Za-km-z]{32,44}$/, "Address is not valid");
 const uint = z.string().regex(/^\d+$/).default("0").transform((v) => BigInt(v));
 
 const launchInput = (quoteMints: string[]) => z.object({
-  name: z.string().trim().min(1).max(32),
-  symbol: z.string().regex(/^[A-Za-z0-9]{1,10}$/),
+  name: z.string().trim().min(1, "Add a name").max(32, "Name is 32 characters at most"),
+  symbol: z.string().regex(/^[A-Za-z0-9]{1,10}$/, "Symbol is 1 to 10 letters or numbers"),
   uri: z.string().url().refine(publicUri, "Metadata link must be HTTPS"),
   image: z.string().url().refine(publicUri, "Image link must be HTTPS").optional(),
   creator: addr,
   quoteMint: z.string().refine((m) => quoteMints.includes(m), "That pair token is not supported"),
-  feeTierBps: z.number().refine((v) => (FEE_TIERS_BPS as readonly number[]).includes(v)),
-  basket: z.array(z.object({ mint: addr, weightBps: z.number().int().positive(), symbol: z.string().max(20).optional(), decimals: z.number().int().min(0).max(18).optional() })).min(1).max(10)
-    .refine((b) => new Set(b.map((x) => x.mint)).size === b.length, "duplicate basket token")
-    .refine((b) => b.reduce((a, x) => a + x.weightBps, 0) === 10_000, "weights must sum to 10000"),
+  feeTierBps: z.number().refine((v) => (FEE_TIERS_BPS as readonly number[]).includes(v), "Trading fee must be 1%, 2%, 3% or 5%"),
+  basket: z.array(z.object({ mint: addr, weightBps: z.number().int().positive(), symbol: z.string().max(20).optional(), decimals: z.number().int().min(0).max(18).optional() })).min(1, "Pick at least one reward token").max(10, "Pick at most 10 reward tokens")
+    .refine((b) => new Set(b.map((x) => x.mint)).size === b.length, "Each reward token can be picked once")
+    .refine((b) => b.reduce((a, x) => a + x.weightBps, 0) === 10_000, "Basket weights must add up to 100"),
   devBuyQuoteAmount: uint,
   devBuyMinOut: uint,
 });
@@ -44,17 +44,17 @@ export async function prepareLaunch(
   if (!parsed.success) throw new LaunchError("invalid_input", parsed.error.issues.map((i) => i.message).join("; "));
   const input = parsed.data;
   for (const b of input.basket) {
-    if (!(await deps.isVerified(b.mint))) throw new LaunchError("basket_not_verified", `${b.mint} is not on the Jupiter verified list`);
+    if (!(await deps.isVerified(b.mint))) throw new LaunchError("basket_not_verified", `${b.symbol ?? b.mint} is not on the Jupiter verified list. Pick another reward token.`);
     if ((await deps.tokenProgramOf(b.mint)) !== CLASSIC_TOKEN_PROGRAM) {
-      throw new LaunchError("basket_unsupported", `${b.mint} is not a classic SPL token`);
+      throw new LaunchError("basket_unsupported", `${b.symbol ?? b.mint} is not a classic SPL token, which Kamino farms require. Pick another reward token.`);
     }
   }
   const settings = await loadLatestSettings(deps.sql);
   if (input.devBuyMinOut * 10_000n > SUPPLY_BASE_UNITS * BigInt(settings.devBuyCapBps)) {
-    throw new LaunchError("dev_buy_too_large", `dev buy is capped at ${settings.devBuyCapBps / 100}% of supply`);
+    throw new LaunchError("dev_buy_too_large", `First buy is capped at ${settings.devBuyCapBps / 100}% of supply. Lower the first buy.`);
   }
   const configKey = deps.configKeys[configKeyName(input.quoteMint, input.feeTierBps)];
-  if (!configKey) throw new LaunchError("invalid_input", "no config key for this quote and fee tier");
+  if (!configKey) throw new LaunchError("invalid_input", "This pair and trading fee are not available. Pick another pair or fee.");
   const { tx, baseMint, pool } = await deps.meteora.buildLaunchTx({
     name: input.name, symbol: input.symbol, uri: input.uri, creator: input.creator, configKey, quoteMint: input.quoteMint,
     launchFeeLamports: launchCost(settings, input.basket.length).total, feeReceiver: deps.keeperAddress,

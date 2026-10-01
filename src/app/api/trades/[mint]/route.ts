@@ -21,7 +21,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ mint: st
     const o = Query.parse(queryOf(req));
     const { sql } = getContext();
     const [l] = await sql`select id from launches where mint = ${(await params).mint}`;
-    if (!l) return json({ error: { code: "not_found", message: "No token here" } }, 404);
+    if (!l) return json({ error: { code: "not_found", message: "Token not found" } }, 404);
     const r = page(await recentTrades(sql, Number(l.id), o.limit + 1, o.before), o.limit);
     return json({ trades: r.rows, next: r.more ? tradeCursor(r.rows.at(-1)!) : null });
   } catch (e) {

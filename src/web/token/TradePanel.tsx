@@ -63,10 +63,10 @@ export function TradePanel({ mint, symbol, quoteMint, quoteSymbol, quoteDecimals
       try {
         const r = await fetch(`/api/trade/quote?mint=${mint}&side=${side}&amount=${amountBase}&slippageBps=${slippageBps}`);
         const j = await r.json();
-        if (!r.ok) throw new Error(j.error?.message ?? "No quote right now");
+        if (!r.ok) throw new Error(j.error?.message ?? "No quote available. Try again in a moment.");
         setQuote(j);
       } catch (e) {
-        setQuoteError(e instanceof Error ? e.message : "No quote right now");
+        setQuoteError(e instanceof Error ? e.message : "No quote available. Try again in a moment.");
       }
     }, 300);
     return () => clearTimeout(t);
@@ -97,13 +97,13 @@ export function TradePanel({ mint, symbol, quoteMint, quoteSymbol, quoteDecimals
         body: JSON.stringify({ mint, side, amount: amountBase.toString(), minOut: quote.minOut, owner }),
       });
       const j = await r.json();
-      if (!r.ok) throw new Error(j.error?.message ?? "Something went wrong");
+      if (!r.ok) throw new Error(j.error?.message ?? "Something went wrong. Try again.");
       await signAndSendAll(wallet, connection, [j.transaction]);
       setMsg({ ok: true, text: `${side === "buy" ? "Bought" : "Sold"}. Balances updated.` });
       setAmount("");
       await loadBalances();
     } catch (e) {
-      setMsg({ ok: false, text: e instanceof Error ? e.message : "Something went wrong" });
+      setMsg({ ok: false, text: e instanceof Error ? e.message : "Something went wrong. Try again." });
     } finally {
       setBusy(false);
     }
@@ -157,7 +157,7 @@ export function TradePanel({ mint, symbol, quoteMint, quoteSymbol, quoteDecimals
       </div>
 
       {partial && <p className="m-0 text-sm text-violet-light">Only {fmtAmount(quote!.filledIn, inDecimals, 4)} {inSymbol} fills before this token graduates. The rest stays in your wallet.</p>}
-      {tooMuch && <p className="m-0 text-sm text-burn">You do not have that much {inSymbol}{side === "buy" && quoteMint === SOL ? " after keeping a little for fees" : ""}.</p>}
+      {tooMuch && <p className="m-0 text-sm text-burn">Not enough {inSymbol}{side === "buy" && quoteMint === SOL ? " after the 0.01 SOL kept for fees" : ""}.</p>}
       {quoteError && <p className="m-0 text-sm text-burn">{quoteError}</p>}
       {msg && <p role="status" className={`m-0 text-sm ${msg.ok ? "text-lime" : "text-burn"}`}>{msg.text}</p>}
 

@@ -63,7 +63,7 @@ export default async function DocsPage() {
 
         <article className="flex flex-col gap-6 max-w-3xl">
           <h1 className="m-0 font-display font-black text-[40px] md:text-[56px] leading-[1.02] tracking-[-0.03em]">How quants works</h1>
-          <P>quants launches tokens whose trading fees pay the people who stake them. This page covers what it costs, where every fee goes, and how staking and early exits work.</P>
+          <P>quants launches tokens whose trading fees pay the people who stake them. This page covers launch costs, where every fee goes, and how staking and early exits work.</P>
 
           <H2 id="glance">At a glance</H2>
           <Table head={["", "Value"]} rows={[
@@ -81,11 +81,11 @@ export default async function DocsPage() {
           ]} />
 
           <H2 id="how">How it works</H2>
-          <P>Anyone can launch a token on quants. Every trade of that token pays a small fee. Most of that fee buys up to ten tokens the creator picked, and those tokens are paid out to people who stake the launched token. Stake for longer and you earn a bigger share.</P>
-          <P>Launches run on Meteora, the same pools that power much of Solana trading. Staking runs on Kamino Farms. quants itself holds no one&apos;s stake.</P>
+          <P>Anyone can launch a token on quants. Every trade of that token pays a small fee. Most of that fee buys up to ten tokens the creator picked, and those tokens are paid to people who stake the launched token. Longer locks earn a bigger share.</P>
+          <P>Launches and trading run on Meteora. Staking runs on Kamino Farms. quants never holds anyone&apos;s stake.</P>
 
           <H2 id="launch">Launching a token</H2>
-          <P>Pick a name, a symbol and a square image, then choose what your token trades against: {quoteCoins().map((c) => c.symbol).join(", ")}. Choose a trading fee of 1%, 2%, 3% or 5% and pick your reward basket. You can buy some of your own token in the same approval, paid in SOL and swapped to the pair token if needed.</P>
+          <P>Pick a name, a symbol and a square image, then pick the pair token: {quoteCoins().map((c) => c.symbol).join(", ")}. Choose a trading fee of 1%, 2%, 3% or 5% and pick your reward basket. An optional first buy of your own token goes in the same approval. It is paid in SOL and swapped to the pair token if needed.</P>
           <P>Every token has a supply of 1,000,000,000. Launching costs a platform fee of {sol(s.launchFeeLamports)} plus the cost of setting up the staking farms: rent for one Kamino farm per lock tier with accounts for each reward token, and the transaction fees to create them. That comes to {sol(three.total)} in all for a three token basket, plus the network fee for your own transaction. A first buy is capped at {pct(s.devBuyCapBps)} of supply.</P>
 
           <H2 id="fees">Where fees go</H2>
@@ -118,21 +118,21 @@ export default async function DocsPage() {
             const m = t.multiplierBps / 10_000;
             return [lockLabel(t.lockSeconds), `${m}x`, `${Math.round((m / (m + 1)) * 100)}%`];
           })} />
-          <P>Claim rewards whenever you like. Adding more to a stake that is still locked starts its lock again for the whole amount. When the lock ends you can withdraw everything with no penalty.</P>
+          <P>Claim rewards at any time. Adding more to a stake that is still locked starts its lock again for the whole amount. When the lock ends you can withdraw everything with no penalty.</P>
 
           <H2 id="early">Leaving early</H2>
-          <P>You can always leave before your lock ends. Up to {pct(s.maxPenaltyBps)} of your stake is burned, and the penalty shrinks every day you stay: leave with half your lock left and you lose half of {pct(s.maxPenaltyBps)}. The stake page shows the exact amount before you sign.</P>
-          <P>Rewards you already earned are yours to keep. 100% of every penalty is burned. quants never receives any of it.</P>
+          <P>You can leave before your lock ends. Up to {pct(s.maxPenaltyBps)} of your stake is burned, and the penalty shrinks every day you stay: leave with half your lock left and you lose half of {pct(s.maxPenaltyBps)}. The stake page shows the exact amount before you sign.</P>
+          <P>Rewards already earned stay yours. 100% of every penalty is burned. quants never receives any of it.</P>
 
           <H2 id="graduation">Graduation</H2>
-          <P>New tokens trade on a bonding curve. When the curve has raised the amount below in its pair token, the token graduates to a Meteora DAMM v2 pool with permanently locked liquidity. Trading, fees, rewards and staking carry on as before.</P>
+          <P>New tokens trade on a bonding curve. When the curve has raised the amount below in its pair token, the token graduates to a Meteora DAMM v2 pool with permanently locked liquidity. Trading, fees, rewards and staking continue as before.</P>
           <Table head={["Paired with", "Graduates at"]} rows={quoteCoins().filter((c) => c.graduation > 0).map((c) => [c.name === "quants" ? `${c.symbol} (platform token)` : `${c.symbol} (${c.name})`, `${c.graduation.toLocaleString("en-US")} ${c.symbol}`])} />
 
           <H2 id="risks">Risks</H2>
-          <P>Launched tokens are highly volatile and most lose value. Reward tokens can lose value too. Smart contracts can have bugs. Only use money you can afford to lose. Read the <Link href="/terms" className="text-lime">terms and risks</Link>.</P>
+          <P>Launched tokens are volatile and most lose value. Reward tokens can lose value too. Smart contracts can have bugs. Only use money you can afford to lose. Read the <Link href="/terms" className="text-lime">terms and risks</Link>.</P>
 
           <H2 id="wallets">Wallets and programs</H2>
-          <P>Every fee quants collects moves through these wallets, and every launch, trade and stake runs on these programs. Open any of them to check the record yourself.</P>
+          <P>Every fee quants collects moves through these wallets, and every launch, trade and stake runs on these programs. Each links to its record on Solscan.</P>
           <Table text head={["Address", "What it does"]} rows={[
             ...([
               [ctx.keeperAddress, "Keeper. Collects trading fees, buys reward tokens, funds the farms and pays creators"],

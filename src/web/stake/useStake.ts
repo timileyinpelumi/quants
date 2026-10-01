@@ -53,12 +53,12 @@ export function useStake(mint: string) {
     try {
       const r = await fetch(`/api/stake/${action}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ mint, tierId, owner, ...body }) });
       const j = await r.json();
-      if (!r.ok) throw new Error(j.error?.message ?? "Something went wrong");
+      if (!r.ok) throw new Error(j.error?.message ?? "Something went wrong. Try again.");
       await signAndSendAll(wallet, connection, [j.transaction]);
       await refresh();
       return true;
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Something went wrong");
+      setError(e instanceof Error ? e.message : "Something went wrong. Try again.");
       return false;
     } finally {
       setBusy(null);

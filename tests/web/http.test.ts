@@ -25,6 +25,6 @@ test("jsonError maps known errors", async () => {
 test("500 responses do not leak the message", async () => {
   const orig = console.error;
   console.error = () => {};
-  expect((await jsonError(new Error("db password xyz")).json()).error.message).toBe("Something went wrong");
+  expect((await jsonError(new Error("db password xyz")).json()).error.message).toBe("Something went wrong. Try again.");
   console.error = orig;
 });

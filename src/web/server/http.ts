@@ -15,12 +15,12 @@ export function rateLimit(req: Request, bucket: string, limit: number, windowMs 
   const now = Date.now();
   const h = hits.get(key);
   if (!h || h.resetAt < now) { hits.set(key, { count: 1, resetAt: now + windowMs }); return; }
-  if (++h.count > limit) throw new LimitError(429, "Too many requests, wait a minute and try again");
+  if (++h.count > limit) throw new LimitError(429, "Too many requests. Wait a minute and try again.");
 }
 
 export function limitBody(req: Request, maxBytes: number) {
   const len = Number(req.headers.get("content-length") ?? "0");
-  if (len > maxBytes) throw new LimitError(413, "That upload is too large");
+  if (len > maxBytes) throw new LimitError(413, "Upload is too large");
 }
 
 export class AuthError extends Error {
@@ -38,13 +38,13 @@ export function jsonError(e: unknown): Response {
   if (e instanceof AuthError) return json({ error: { code: e.status === 401 ? "unauthorized" : "forbidden", message: e.message } }, e.status);
   if (e instanceof ZodError) return json({ error: { code: "invalid_input", message: e.issues.map((i) => i.message).join("; ") } }, 400);
   console.error(e);
-  return json({ error: { code: "internal", message: "Something went wrong" } }, 500);
+  return json({ error: { code: "internal", message: "Something went wrong. Try again." } }, 500);
 }
 
 export async function readJson<T>(req: Request): Promise<T> {
   try {
     return (await req.json()) as T;
   } catch {
-    throw new LaunchError("invalid_input", "Body must be JSON");
+    throw new LaunchError("invalid_input", "Request body must be JSON");
   }
 }

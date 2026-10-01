@@ -13,7 +13,7 @@ export async function validateImage(file: File | string | null): Promise<File> {
   try {
     dims = imageSize(new Uint8Array(await file.arrayBuffer()));
   } catch {
-    throw new LaunchError("invalid_input", "We could not read that image");
+    throw new LaunchError("invalid_input", "Image could not be read. Try another file.");
   }
   // The declared type is client supplied; the bytes must actually be that format (an SVG labelled PNG would otherwise pass).
   if (!dims.type || SNIFFED[dims.type] !== file.type) throw new LaunchError("invalid_input", "Image must be PNG, JPEG or WebP");

@@ -12,14 +12,14 @@ export async function confirmLaunch(
   const [existing] = await deps.sql`select id from launches where mint = ${i.mint}`;
   if (existing) return Number(existing.id);
   const [prep] = await deps.sql`select * from prepared_launches where mint = ${i.mint}`;
-  if (!prep) throw new LaunchError("not_found_on_chain", "launch was not prepared here");
+  if (!prep) throw new LaunchError("not_found_on_chain", "This launch was not prepared on quants");
   const { value } = await deps.conn.getSignatureStatuses([i.signature], { searchTransactionHistory: true });
   const status = value[0];
-  if (!status || status.err) throw new LaunchError("not_found_on_chain", "launch transaction not found");
+  if (!status || status.err) throw new LaunchError("not_found_on_chain", "Launch transaction not found");
   const pool = await deps.meteora.poolInfo(prep.pool);
-  if (!pool) throw new LaunchError("not_found_on_chain", "pool not found");
+  if (!pool) throw new LaunchError("not_found_on_chain", "Launch pool not found");
   if (pool.baseMint !== i.mint || pool.config !== prep.config_key || pool.creator !== prep.creator) {
-    throw new LaunchError("pool_mismatch", "on-chain pool does not match the prepared launch");
+    throw new LaunchError("pool_mismatch", "The on-chain pool does not match the prepared launch");
   }
   return recordLaunch(deps.sql, prep, deps.spillWallet);
 }

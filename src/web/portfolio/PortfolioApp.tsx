@@ -135,7 +135,7 @@ export function PortfolioApp() {
       <Section title="Stakes" count={stakeCount}>
         {stakes === null ? !error && skeleton : stakes.length === 0 ? (
           <div className="flex flex-col items-start gap-4 py-8 border-t line">
-            <p className="m-0 text-muted">No stakes yet. Find a token you like and lock it to earn its basket.</p>
+            <p className="m-0 text-muted">No stakes yet. Stake a token to earn its reward basket.</p>
             <Link href="/explore" className="font-display font-bold text-ground bg-lime glow-lime rounded-full px-6 min-h-12 flex items-center">Explore tokens</Link>
           </div>
         ) : (

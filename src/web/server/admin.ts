@@ -41,7 +41,7 @@ export async function openSession(ctx: WebContext, req: Request, raw: unknown): 
     message = payload.message as string;
     jti = payload.jti;
   } catch {
-    throw new AuthError(401, "Sign in expired, start again");
+    throw new AuthError(401, "Sign in expired. Start again.");
   }
   let ok = false;
   try {
@@ -52,7 +52,7 @@ export async function openSession(ctx: WebContext, req: Request, raw: unknown): 
   if (!ok) throw new AuthError(401, "Signature does not match");
   if (!ctx.adminWallets.has(wallet)) throw new AuthError(403, "This wallet is not an admin");
   const used = await ctx.sql`insert into admin_nonces (jti) values (${jti}) on conflict do nothing returning jti`;
-  if (used.length === 0) throw new AuthError(401, "That sign in was already used, start again");
+  if (used.length === 0) throw new AuthError(401, "That sign in was already used. Start again.");
   const session = await new SignJWT({ wallet, typ: "session" }).setProtectedHeader({ alg: "HS256" }).setIssuedAt().setExpirationTime("8h").sign(ctx.sessionSecret);
   return [cookie(SESSION, session, 8 * 3600), cookie(NONCE, "", 0)];
 }
@@ -66,7 +66,7 @@ export async function requireAdmin(ctx: WebContext, req: Request): Promise<strin
     if (payload.typ !== "session") throw new Error("not a session");
     wallet = payload.wallet as string;
   } catch {
-    throw new AuthError(401, "Session expired, sign in again");
+    throw new AuthError(401, "Session expired. Sign in again.");
   }
   if (!ctx.adminWallets.has(wallet)) throw new AuthError(403, "This wallet is no longer an admin");
   return wallet;
