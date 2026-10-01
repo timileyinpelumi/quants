@@ -20,10 +20,18 @@ function readCookie(req: Request, name: string): string | null {
   return null;
 }
 
-export async function issueNonce(ctx: WebContext): Promise<{ message: string; setCookie: string }> {
+// SITE_URL pins the origin; without it the request's own origin is used (local dev, previews).
+function siteOrigin(req: Request): URL {
+  if (process.env.SITE_URL) return new URL(process.env.SITE_URL);
+  const u = new URL(req.url);
+  return new URL(`${u.protocol}//${req.headers.get("host") ?? u.host}`);
+}
+
+export async function issueNonce(ctx: WebContext, req: Request): Promise<{ message: string; setCookie: string }> {
   const nonce = Buffer.from(crypto.getRandomValues(new Uint8Array(16))).toString("hex");
-  const message = `Sign in to quants admin\nNonce: ${nonce}\nIssued: ${new Date().toISOString()}`;
-  const token = await new SignJWT({ message, typ: "nonce" }).setProtectedHeader({ alg: "HS256" }).setJti(nonce).setIssuedAt().setExpirationTime("5m").sign(ctx.sessionSecret);
+  const site = siteOrigin(req);
+  const message = `${site.host} wants you to sign in to quants admin\n\nURI: ${site.origin}\nNonce: ${nonce}\nIssued At: ${new Date().toISOString()}`;
+  const token = await new SignJWT({ message, domain: site.host, typ: "nonce" }).setProtectedHeader({ alg: "HS256" }).setJti(nonce).setIssuedAt().setExpirationTime("5m").sign(ctx.sessionSecret);
   return { message, setCookie: cookie(NONCE, token, 300) };
 }
 
@@ -34,15 +42,18 @@ export async function openSession(ctx: WebContext, req: Request, raw: unknown): 
   const token = readCookie(req, NONCE);
   if (!token) throw new AuthError(401, "Start sign in again");
   let message: string;
+  let domain: string;
   let jti: string;
   try {
     const { payload } = await jwtVerify(token, ctx.sessionSecret);
     if (payload.typ !== "nonce" || !payload.jti) throw new Error("not a nonce");
     message = payload.message as string;
+    domain = payload.domain as string;
     jti = payload.jti;
   } catch {
     throw new AuthError(401, "Sign in expired, start again");
   }
+  if (domain !== siteOrigin(req).host || !message.startsWith(`${domain} wants you`)) throw new AuthError(401, "Sign in from the site itself");
   let ok = false;
   try {
     ok = nacl.sign.detached.verify(new TextEncoder().encode(message), bs58.decode(signature), new PublicKey(wallet).toBytes());

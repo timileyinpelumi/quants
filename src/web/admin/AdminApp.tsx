@@ -72,6 +72,7 @@ export function AdminApp() {
     if (!wallet.signMessage) { setMsg({ ok: false, text: "This wallet cannot sign messages" }); return; }
     try {
       const { message } = await call<{ message: string }>("/api/admin/nonce", { method: "POST" });
+      if (!message.startsWith(`${window.location.host} wants you`)) throw new Error("The sign in message is for a different site");
       const sig = await wallet.signMessage(new TextEncoder().encode(message));
       await call("/api/admin/session", { method: "POST", body: JSON.stringify({ wallet: wallet.publicKey.toBase58(), signature: bs58.encode(sig) }) });
       setMsg(null);
