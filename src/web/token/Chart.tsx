@@ -8,23 +8,6 @@ type Candle = { time: number; open: number; high: number; low: number; close: nu
 const TFS = ["1M", "5M", "1H", "1D"] as const;
 const LABELS: Record<(typeof TFS)[number], string> = { "1M": "1 minute", "5M": "5 minute", "1H": "1 hour", "1D": "1 day" };
 
-function PriceChanges() {
-  const activity = useTokenLive()?.activity ?? [];
-  if (!activity.length) return null;
-  return (
-    <div className="flex gap-1.5 flex-wrap" aria-label="Price change">
-      {activity.map((a) => (
-        <span key={a.window} className="flex items-baseline gap-1.5 px-3 py-1.5 rounded-full bg-raised-2 border border-white/[0.06] font-mono text-[13px]">
-          <span className="text-muted">{a.window}</span>
-          <span className={a.change === null ? "text-faint" : a.change >= 0 ? "text-accent" : "text-burn"}>
-            {a.change === null ? "0%" : `${a.change >= 0 ? "+" : ""}${a.change.toFixed(1)}%`}
-          </span>
-        </span>
-      ))}
-    </div>
-  );
-}
-
 export function Chart({ mint, quoteSymbol }: { mint: string; quoteSymbol: string }) {
   const el = useRef<HTMLDivElement>(null);
   const [tf, setTf] = useState<(typeof TFS)[number]>("5M");
@@ -81,7 +64,6 @@ export function Chart({ mint, quoteSymbol }: { mint: string; quoteSymbol: string
           ))}
         </div>
       </div>
-      <PriceChanges />
       {candles === null ? (
         <div className="h-[280px] md:h-[340px] rounded-2xl bg-white/[0.02] animate-pulse" />
       ) : candles.length === 0 ? (

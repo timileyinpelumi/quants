@@ -47,7 +47,7 @@ export default async function TokenPage({ params }: { params: Promise<{ mint: st
     <div className="flex-1 bg-token">
       <Header active="token" />
       <main className="flex flex-col gap-10 wrap pt-8 md:pt-12 pb-16">
-        <section className="grid grid-cols-1 2xl:grid-cols-[minmax(0,1fr)_auto] gap-8 items-end">
+        <section className="flex flex-col gap-8">
           <div className="flex items-center gap-4 md:gap-6 min-w-0">
             <span className="shrink-0" style={{ filter: "drop-shadow(0 20px 40px rgba(255,122,89,0.25))" }}>
               <Avatar seed={mint} label={symbol} image={launch.image} size={96} />
@@ -55,14 +55,14 @@ export default async function TokenPage({ params }: { params: Promise<{ mint: st
             <div className="flex flex-1 flex-col gap-2 min-w-0">
               <div className="flex items-baseline gap-3.5 flex-wrap">
                 <h1 className="m-0 font-display font-black text-[40px] md:text-[56px] tracking-[-0.03em] leading-none">{symbol}</h1>
-                {launch.name && <span className="text-lg text-muted">{launch.name}</span>}
+                {launch.name && <span className="text-lg text-muted whitespace-nowrap">{launch.name}</span>}
               </div>
               <div className="flex gap-2.5 text-[13px] flex-wrap">
-                <span className="flex items-center gap-1.5 pl-1.5 pr-3 py-1 rounded-full bg-raised-2 border border-white/[0.08]"><Avatar seed={launch.quoteMint} label={pairSymbol} image={icons[launch.quoteMint]} size={20} />{symbol} / {pairSymbol}</span>
-                <span className="px-3 py-1.5 rounded-full bg-raised-2 border border-white/[0.08]">{launch.feeTierBps / 100}% trading fee</span>
+                <span className="flex items-center gap-1.5 whitespace-nowrap pl-1.5 pr-3 py-1 rounded-full bg-raised-2 border border-white/[0.08]"><Avatar seed={launch.quoteMint} label={pairSymbol} image={icons[launch.quoteMint]} size={20} />{symbol} / {pairSymbol}</span>
+                <span className="px-3 py-1.5 whitespace-nowrap rounded-full bg-raised-2 border border-white/[0.08]">{launch.feeTierBps / 100}% trading fee</span>
                 {tradingOnly && <span className="flex items-center"><TradingOnly /></span>}
                 <CopyButton value={mint} label={shortAddr(mint)} />
-                <a href={`https://dexscreener.com/solana/${mint}`} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-raised-2 border border-white/[0.08] text-muted hover:text-ink">
+                <a href={`https://dexscreener.com/solana/${mint}`} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 whitespace-nowrap px-3 py-1.5 rounded-full bg-raised-2 border border-white/[0.08] text-muted hover:text-ink">
                   DexScreener
                   <svg aria-hidden width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M7 17 17 7" /><path d="M8 7h9v9" /></svg>
                 </a>
