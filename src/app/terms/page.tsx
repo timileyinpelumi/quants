@@ -16,7 +16,8 @@ export default function TermsPage() {
   return (
     <div className="bg-launch flex-1">
       <Header active="other" />
-      <main className="flex flex-col gap-6 px-4 md:px-16 pt-10 md:pt-14 pb-20 max-w-3xl">
+      <main className="wrap pt-10 md:pt-14 pb-20">
+        <div className="mx-auto max-w-3xl flex flex-col gap-6">
         <h1 className="m-0 font-display font-black text-[40px] md:text-[56px] tracking-[-0.03em] leading-none">Terms and risks</h1>
         <p className="m-0 text-muted">By using quants you accept the following.</p>
         {items.map(([h, t]) => (
@@ -25,6 +26,7 @@ export default function TermsPage() {
             <p className="m-0 text-[17px] leading-relaxed text-[#C9C5D6]">{t}</p>
           </section>
         ))}
+        </div>
       </main>
     </div>
   );

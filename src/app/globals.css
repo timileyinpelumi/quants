@@ -34,3 +34,11 @@ input::placeholder, textarea::placeholder { color: var(--color-faint); }
 .wallet-adapter-modal-wrapper { background: #111018 !important; border-radius: 32px !important; border: 1px solid rgba(255,255,255,0.08); }
 .wallet-adapter-modal-title { font-family: var(--font-unbounded) !important; font-weight: 900 !important; }
 .wallet-adapter-dropdown-list { background: #16151E !important; border-radius: 20px !important; }
+
+@utility wrap {
+  width: 100%;
+  max-width: 1280px;
+  margin-inline: auto;
+  padding-inline: 1rem;
+  @variant md { padding-inline: 4rem; }
+}

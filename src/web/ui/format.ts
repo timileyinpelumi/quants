@@ -26,3 +26,18 @@ export function avatarGradient(seed: string): [string, string] {
   for (const c of seed) h = (h * 31 + c.charCodeAt(0)) >>> 0;
   return PAIRS[h % PAIRS.length]!;
 }
+
+export function fmtPrice(n: number, sig = 3): string {
+  if (n === 0) return "0";
+  if (Math.abs(n) >= 1) return n.toFixed(2);
+  const decimals = Math.min(12, -Math.floor(Math.log10(Math.abs(n))) + sig - 1);
+  return n.toFixed(decimals).replace(/0+$/, "").replace(/\.$/, "");
+}
+
+export function fmtAgo(iso: string, now = Date.now()): string {
+  const s = Math.max(0, (now - Date.parse(iso)) / 1000);
+  if (s < 60) return "just now";
+  if (s < 3600) return `${Math.floor(s / 60)}m ago`;
+  if (s < 86_400) return `${Math.floor(s / 3600)}h ago`;
+  return `${Math.floor(s / 86_400)}d ago`;
+}

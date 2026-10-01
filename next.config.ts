@@ -7,5 +7,9 @@ if (process.env.NEXT_PUBLIC_TEST_WALLET_SECRET && !/^https?:\/\/(127\.0\.0\.1|lo
 
 const config: NextConfig = {
   serverExternalPackages: ["@kamino-finance/farms-sdk", "@meteora-ag/dynamic-bonding-curve-sdk", "@meteora-ag/cp-amm-sdk", "@coral-xyz/anchor"],
+  // keep every compiled route in dev; recompiling a disposed one reloads open pages
+  // launches seeded before uploads moved out of public/ still point at /dev-uploads
+  async rewrites() { return [{ source: "/dev-uploads/:cid", destination: "/api/dev-uploads/:cid" }]; },
+  onDemandEntries: { maxInactiveAge: 24 * 60 * 60 * 1000, pagesBufferLength: 100 },
 };
 export default config;

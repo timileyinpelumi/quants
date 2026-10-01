@@ -30,7 +30,7 @@ export default async function TokenPage({ params }: { params: Promise<{ mint: st
   return (
     <div className="flex-1 bg-token">
       <Header active="token" />
-      <main className="flex flex-col gap-10 px-4 md:px-16 pt-8 md:pt-12 pb-16">
+      <main className="flex flex-col gap-10 wrap pt-8 md:pt-12 pb-16">
         <section className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_auto] gap-8 items-end">
           <div className="flex items-center gap-4 md:gap-6 min-w-0">
             <span className="shrink-0" style={{ filter: "drop-shadow(0 20px 40px rgba(255,122,89,0.25))" }}>
@@ -49,7 +49,7 @@ export default async function TokenPage({ params }: { params: Promise<{ mint: st
             </div>
           </div>
           <div className="grid grid-cols-2 md:flex gap-6 md:gap-12 items-start">
-            <MarketStats mint={mint} />
+            <MarketStats mint={mint} quoteSymbol={pairSymbol} />
             <div className="col-span-2 flex flex-col gap-2 md:w-60">
               {d.curve.migrated ? (
                 <>
@@ -68,7 +68,7 @@ export default async function TokenPage({ params }: { params: Promise<{ mint: st
         </section>
 
         <section className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_400px] gap-8">
-          <Chart mint={mint} />
+          <Chart mint={mint} quoteSymbol={pairSymbol} />
           <TradePanel mint={mint} symbol={symbol} quoteMint={launch.quoteMint} quoteSymbol={pairSymbol} quoteDecimals={quoteDecimals} />
         </section>
 

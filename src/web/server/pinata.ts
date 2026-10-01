@@ -9,12 +9,12 @@ export const gatewayUrl = (cid: string) =>
   process.env.DEV_UPLOADS_BASE ? `${process.env.DEV_UPLOADS_BASE}/${cid}`
   : process.env.PINATA_GATEWAY ? `https://${process.env.PINATA_GATEWAY}/ipfs/${cid}` : `https://ipfs.io/ipfs/${cid}`;
 
-// Local development only (PINATA_JWT=stub): files land in public/dev-uploads and are served by Next.
+// Local development only (PINATA_JWT=stub): files land in .dev-uploads, outside public/ because writes there reload every open page in dev.
 export class DevPinata implements PinataPort {
   async uploadFile(file: File): Promise<string> {
     const bytes = new Uint8Array(await file.arrayBuffer());
     const cid = new Bun.CryptoHasher("sha256").update(bytes).digest("hex").slice(0, 32);
-    await Bun.write(`public/dev-uploads/${cid}`, bytes);
+    await Bun.write(`.dev-uploads/${cid}`, bytes);
     return cid;
   }
   uploadJson(data: object): Promise<string> {

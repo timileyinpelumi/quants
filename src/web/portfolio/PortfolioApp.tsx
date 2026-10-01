@@ -56,7 +56,7 @@ export function PortfolioApp() {
 
   if (!owner) {
     return (
-      <main className="flex flex-col gap-8 px-4 md:px-16 pt-10 md:pt-14 pb-16">
+      <main className="flex flex-col gap-8 wrap pt-10 md:pt-14 pb-16">
         <h1 className="m-0 font-display font-black text-[40px] md:text-[56px] tracking-[-0.03em] leading-none">Portfolio</h1>
         <div className="flex flex-col items-start gap-4 py-10 border-t line">
           <p className="m-0 text-lg text-muted">Connect a wallet to see your balances, tokens and stakes.</p>
@@ -70,7 +70,7 @@ export function PortfolioApp() {
   const stakeCount = stakes?.reduce((a, l) => a + l.positions.length, 0);
 
   return (
-    <main className="flex flex-col gap-12 px-4 md:px-16 pt-10 md:pt-14 pb-16">
+    <main className="flex flex-col gap-12 wrap pt-10 md:pt-14 pb-16">
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
         <div className="flex items-center gap-4">
           <Jazzicon address={owner} size={64} />

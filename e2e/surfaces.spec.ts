@@ -1,4 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
+import { execSync } from "node:child_process";
 
 const CAT = process.env.SEED_CAT_MINT!;
 
@@ -23,6 +24,19 @@ test("trade widget buys and sells on the curve", async ({ page }) => {
   await page.getByRole("button", { name: "25%" }).click();
   await page.getByRole("button", { name: "Sell CAT" }).click();
   await expect(page.getByText("Sold. Balances updated.")).toBeVisible();
+});
+
+test("indexed trades fill the home page and the token chart", async ({ page }) => {
+  execSync("bun --env-file=.env.local scripts/index-once.ts", { stdio: "pipe", timeout: 120_000 });
+  await page.goto("/");
+  await expect(page.getByRole("heading", { name: /Launch a token/, level: 1 })).toBeVisible();
+  await expect(page.getByText("Tokens launched")).toBeVisible();
+  const biggest = page.locator("section", { has: page.getByRole("heading", { name: "Biggest" }) });
+  await expect(biggest.getByRole("link", { name: /CAT/ }).first()).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Recent trades" })).toBeVisible();
+  await page.goto(`/t/${CAT}`);
+  await expect(page.getByRole("img", { name: "Price chart" })).toBeVisible();
+  await expect(page.getByText("Volume today")).toBeVisible();
 });
 
 test("wallet modal shows SOL and token balances and links to stakes", async ({ page }) => {

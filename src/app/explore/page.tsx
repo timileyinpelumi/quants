@@ -17,7 +17,7 @@ export default async function ExplorePage({ searchParams }: { searchParams: Prom
   return (
     <div className="flex-1 bg-launch">
       <Header active="explore" />
-      <main className="flex flex-col gap-8 px-4 md:px-16 pt-10 md:pt-14 pb-16">
+      <main className="flex flex-col gap-8 wrap pt-10 md:pt-14 pb-16">
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
           <h1 className="m-0 font-display font-black text-[40px] md:text-[56px] tracking-[-0.03em] leading-none">Explore</h1>
           <nav className="flex gap-2" aria-label="Filter">
@@ -28,7 +28,7 @@ export default async function ExplorePage({ searchParams }: { searchParams: Prom
         {launches.length === 0 ? (
           <div className="flex flex-col items-start gap-4 py-16 border-t line">
             <p className="m-0 text-lg text-muted">Nothing launched yet.</p>
-            <Link href="/" className="font-display font-bold text-ground bg-lime glow-lime rounded-full px-6 min-h-12 flex items-center">Launch the first one</Link>
+            <Link href="/launch" className="font-display font-bold text-ground bg-lime glow-lime rounded-full px-6 min-h-12 flex items-center">Launch the first one</Link>
           </div>
         ) : (
           <div className="flex flex-col">

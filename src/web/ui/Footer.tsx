@@ -2,7 +2,8 @@ import Link from "next/link";
 
 export function Footer() {
   return (
-    <footer className="mt-auto border-t line px-4 md:px-16 py-10 flex flex-col md:flex-row gap-6 md:items-center justify-between">
+    <footer className="mt-auto border-t line">
+      <div className="wrap py-10 flex flex-col md:flex-row gap-6 md:items-center justify-between">
       <div className="flex items-center gap-3">
         <img src="/brand/quants-mark.svg" alt="" width={28} height={28} />
         <span className="text-sm text-muted">Launch a token. Stakers earn three.</span>
@@ -13,6 +14,7 @@ export function Footer() {
         <Link href="/portfolio" className="text-muted hover:text-ink min-h-11 flex items-center">Portfolio</Link>
         <Link href="/terms" className="text-muted hover:text-ink min-h-11 flex items-center">Terms and risks</Link>
       </nav>
+      </div>
     </footer>
   );
 }

@@ -78,7 +78,7 @@ export function StakeApp({ mint, symbol, tiers, maxPenaltyBps, ready }: { mint: 
   const unlockPreview = dateOf(Math.floor(Date.now() / 1000) + selected.lockSeconds);
 
   return (
-    <main className="grid grid-cols-1 lg:grid-cols-[560px_minmax(0,1fr)] gap-12 lg:gap-16 px-4 md:px-16 pt-10 md:pt-14 pb-16">
+    <main className="grid grid-cols-1 lg:grid-cols-[560px_minmax(0,1fr)] gap-12 lg:gap-16 wrap pt-10 md:pt-14 pb-16">
       <section className="flex flex-col gap-7 min-w-0">
         <h1 className="m-0 font-display font-black text-[40px] md:text-[52px] leading-[1.02] tracking-[-0.03em]">
           Lock longer.<br /><span className="text-violet-light">Earn more.</span>

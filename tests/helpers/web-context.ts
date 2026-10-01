@@ -7,7 +7,6 @@ import { FakeJupiter } from "./fake-jupiter";
 import { setContextForTests, type WebContext } from "../../src/web/server/context";
 import { resetRateLimits } from "../../src/web/server/http";
 import type { PinataPort } from "../../src/web/server/pinata";
-import type { Candle, ChartSource, Market } from "../../src/web/server/chart";
 import { defaultSettings, saveSettings } from "../../src/domain/settings";
 import { NATIVE_MINT } from "../../src/domain/types";
 
@@ -21,14 +20,6 @@ export class FakePinata implements PinataPort {
   private n = 0;
   async uploadFile(_f: File, name: string) { this.files.push(name); return `cid-${++this.n}`; }
   async uploadJson(data: object) { this.json.push(data); return `cid-${++this.n}`; }
-}
-
-export class FakeChart implements ChartSource {
-  fail = false;
-  data: Candle[] = [{ time: 100, open: 1, high: 2, low: 0.5, close: 1.5 }];
-  market_: Market = { priceUsd: 0.0004, fdvUsd: 410_000, change24h: 38.2 };
-  async candles() { if (this.fail) return []; return this.data; }
-  async market() { return this.fail ? null : this.market_; }
 }
 
 export class FakeTrade {
@@ -52,7 +43,6 @@ export async function makeWebContext(over: Partial<WebContext> = {}) {
     staking: new FakeStaking(chain),
     jupiter: new FakeJupiter(chain),
     pinata: new FakePinata(),
-    chart: new FakeChart(),
     trade: new FakeTrade(),
     configKeys: { [`${NATIVE_MINT}:200`]: "CfgSol200", [`${OURS}:200`]: "CfgOurs200" },
     keeperAddress: "Keeper1111111111111111111111111111111111111",

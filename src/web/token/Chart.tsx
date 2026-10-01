@@ -1,23 +1,27 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { createChart, AreaSeries, ColorType, type UTCTimestamp } from "lightweight-charts";
+import { fmtPrice } from "@/web/ui/format";
 
 type Candle = { time: number; open: number; high: number; low: number; close: number };
 const TFS = ["1H", "1D", "1W"] as const;
 
-export function Chart({ mint }: { mint: string }) {
+export function Chart({ mint, quoteSymbol }: { mint: string; quoteSymbol: string }) {
   const el = useRef<HTMLDivElement>(null);
   const [tf, setTf] = useState<(typeof TFS)[number]>("1D");
   const [candles, setCandles] = useState<Candle[] | null>(null);
+  const [unit, setUnit] = useState<"usd" | "quote">("usd");
 
   useEffect(() => {
     let live = true;
     setCandles(null);
-    fetch(`/api/chart/${mint}?tf=${tf}`)
+    const load = () => fetch(`/api/chart/${mint}?tf=${tf}`)
       .then((r) => r.json())
-      .then((j) => live && setCandles(j.candles ?? []))
-      .catch(() => live && setCandles([]));
-    return () => { live = false; };
+      .then((j) => { if (!live) return; setUnit(j.unit ?? "usd"); const next: Candle[] = j.candles ?? []; setCandles((prev) => (JSON.stringify(prev) === JSON.stringify(next) ? prev : next)); })
+      .catch(() => live && setCandles((c) => c ?? []));
+    load();
+    const t = setInterval(load, 15_000);
+    return () => { live = false; clearInterval(t); };
   }, [mint, tf]);
 
   useEffect(() => {
@@ -32,17 +36,17 @@ export function Chart({ mint }: { mint: string }) {
     });
     const s = chart.addSeries(AreaSeries, {
       lineColor: "#C8FF3D", lineWidth: 3, topColor: "rgba(200,255,61,0.28)", bottomColor: "rgba(200,255,61,0)",
-      priceFormat: { type: "price", precision: 8, minMove: 0.00000001 },
+      priceFormat: { type: "custom", minMove: 1e-12, formatter: (p: number) => (unit === "usd" ? `$${fmtPrice(p, 5)}` : fmtPrice(p, 5)) },
     });
     s.setData(candles.map((c) => ({ time: c.time as UTCTimestamp, value: c.close })));
     chart.timeScale().fitContent();
     return () => chart.remove();
-  }, [candles, tf]);
+  }, [candles, tf, unit]);
 
   return (
     <div className="flex flex-col gap-4 bg-surface border line rounded-[32px] px-5 md:px-7 py-6 min-w-0">
       <div className="flex justify-between items-center">
-        <span className="font-display font-bold">Price</span>
+        <span className="font-display font-bold">Price{unit === "quote" && <span className="font-sans font-normal text-sm text-muted"> in {quoteSymbol}</span>}</span>
         <div className="flex gap-1.5 font-mono text-[13px]">
           {TFS.map((t) => (
             <button

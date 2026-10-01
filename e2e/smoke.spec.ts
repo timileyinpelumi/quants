@@ -14,7 +14,7 @@ async function connect(page: Page) {
 }
 
 test("launch, see the token, stake, exit early and see the burn", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/launch");
   await connect(page);
 
   await page.locator('input[type="file"]').setInputFiles("e2e/fixtures/cat.png");
@@ -53,7 +53,7 @@ test("launch, see the token, stake, exit early and see the burn", async ({ page 
 
 test("pages fit a phone screen", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  for (const path of ["/", "/explore", `/t/${process.env.SEED_CAT_MINT ?? ""}`, `/t/${process.env.SEED_CAT_MINT ?? ""}/stake`, "/admin"]) {
+  for (const path of ["/", "/launch", "/explore", `/t/${process.env.SEED_CAT_MINT ?? ""}`, `/t/${process.env.SEED_CAT_MINT ?? ""}/stake`, "/admin"]) {
     await page.goto(path);
     await page.waitForLoadState("networkidle");
     expect(await page.evaluate(() => document.documentElement.scrollWidth), path).toBeLessThanOrEqual(390);

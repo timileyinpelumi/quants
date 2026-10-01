@@ -170,7 +170,7 @@ export function LaunchForm({ split, tiers, launchFeeLamports, maxPenaltyBps }: {
   const num = "hidden md:block font-display font-bold text-[15px] text-faint";
 
   return (
-    <main className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_440px] gap-10 lg:gap-16 px-4 md:px-16 pt-10 md:pt-14 pb-16">
+    <main className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_440px] gap-10 lg:gap-16 wrap pt-10 md:pt-14 pb-16">
       <section className="flex flex-col gap-10 min-w-0">
         <div className="flex flex-col gap-3.5">
           <h1 className="m-0 font-display font-black text-[40px] md:text-[64px] leading-[1.02] tracking-[-0.03em]">

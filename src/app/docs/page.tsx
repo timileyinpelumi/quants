@@ -29,7 +29,7 @@ export default async function DocsPage() {
   return (
     <div className="bg-launch flex-1">
       <Header active="docs" />
-      <div className="grid grid-cols-1 lg:grid-cols-[240px_minmax(0,1fr)] gap-10 lg:gap-16 px-4 md:px-16 pt-10 md:pt-14 pb-20">
+      <div className="grid grid-cols-1 lg:grid-cols-[240px_minmax(0,1fr)] gap-10 lg:gap-16 wrap pt-10 md:pt-14 pb-20">
         <aside className="lg:sticky lg:top-8 self-start">
           <nav aria-label="On this page" className="flex lg:flex-col gap-x-5 gap-y-1 overflow-x-auto lg:overflow-visible text-sm">
             {sections.map(([id, label]) => (

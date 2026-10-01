@@ -9,7 +9,6 @@ import type { StakingAdapter } from "@/staking/adapter";
 import { TradeLive, type TradePort } from "@/meteora/trade";
 import { JupiterLive, type JupiterPort } from "@/jupiter/port";
 import { DevPinata, PinataRest, type PinataPort } from "./pinata";
-import { GeckoChart, type ChartSource } from "./chart";
 
 export interface WebContext {
   sql: SQL;
@@ -18,7 +17,6 @@ export interface WebContext {
   staking: StakingAdapter;
   jupiter: JupiterPort;
   pinata: PinataPort;
-  chart: ChartSource;
   trade: TradePort;
   configKeys: Record<string, string>;
   keeperAddress: string;
@@ -58,7 +56,6 @@ export function getContext(): WebContext {
     jupiter: withLocalTokens(new JupiterLive(e.JUPITER_BASE_URL ?? "https://api.jup.ag/swap/v1", chain, fetch, e.JUPITER_API_KEY), e.LOCAL_TOKEN_LIST),
     pinata: e.PINATA_JWT === "stub" ? new DevPinata() : new PinataRest(e.PINATA_JWT!),
     trade: new TradeLive(conn),
-    chart: new GeckoChart(e.GECKO_BASE ?? "https://api.geckoterminal.com/api/v2"),
     configKeys: JSON.parse(readFileSync(e.CONFIG_KEYS_PATH ?? "config-keys.json", "utf8")),
     keeperAddress: e.KEEPER_ADDRESS!,
     spillWallet: new PublicKey(e.SPILL_ADDRESS!),

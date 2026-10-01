@@ -6,12 +6,14 @@
     "test": "bun test --timeout 60000",
     "migrate": "bun src/db/migrate.ts",
     "keeper": "bun src/keeper/main.ts",
+    "indexer": "bun src/indexer/main.ts",
     "typecheck": "bunx tsc --noEmit",
     "dev": "bun --bun next dev --webpack",
     "build": "node node_modules/next/dist/bin/next build",
     "start": "bun --bun next start",
     "e2e": "bunx playwright test",
-    "seed": "bun scripts/dev-seed.ts"
+    "seed": "bun scripts/dev-seed.ts",
+    "warm": "bun scripts/warm.ts"
   },
   "dependencies": {
     "@kamino-finance/farms-sdk": "4.0.1",

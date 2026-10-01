@@ -103,11 +103,13 @@ export function AdminApp() {
 
   if (!signedIn) {
     return (
-      <main className="flex flex-col items-start gap-6 px-4 md:px-16 pt-14 pb-16 max-w-2xl">
+      <main className="wrap pt-14 pb-16">
+        <div className="flex flex-col items-start gap-6 max-w-2xl">
         <h1 className="m-0 font-display font-black text-[40px] md:text-[56px] tracking-[-0.03em] leading-none">Admin</h1>
         <p className="m-0 text-muted">Sign a message with an admin wallet to continue. Signing costs nothing.</p>
         <Button onClick={signIn}>{wallet.publicKey ? "Sign in" : "Connect wallet"}</Button>
         {msg && <p role="alert" className={`m-0 text-sm ${msg.ok ? "text-lime" : "text-burn"}`}>{msg.text}</p>}
+        </div>
       </main>
     );
   }
@@ -118,7 +120,7 @@ export function AdminApp() {
   const splitTotal = settings ? settings.split.basketBps + settings.split.platformBps + settings.split.creatorBps : 0;
 
   return (
-    <main className="flex flex-col gap-8 px-4 md:px-16 pt-10 md:pt-14 pb-16">
+    <main className="flex flex-col gap-8 wrap pt-10 md:pt-14 pb-16">
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
         <h1 className="m-0 font-display font-black text-[40px] md:text-[56px] tracking-[-0.03em] leading-none">Admin</h1>
         <Segmented label="Section" value={tab} onChange={setTab} options={[{ value: "settings", label: "Settings" }, { value: "keeper", label: "Keeper" }, { value: "baskets", label: "Baskets" }]} />

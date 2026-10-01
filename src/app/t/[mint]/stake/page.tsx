@@ -17,7 +17,7 @@ export default async function StakePage({ params }: { params: Promise<{ mint: st
   return (
     <div className="flex-1 bg-stake">
       <Header active="token" />
-      <div className="px-4 md:px-16 pt-8">
+      <div className="wrap pt-8">
         <Link href={`/t/${mint}`} className="inline-flex items-center gap-3 min-h-11 text-muted hover:text-ink">
           <Avatar seed={mint} label={symbol} image={d.launch.image} size={32} />
           <span className="font-semibold">{symbol}</span>

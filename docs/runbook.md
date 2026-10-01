@@ -42,6 +42,16 @@ bun run keeper
 
 It runs every `keeperIntervalSeconds` (default 600) and logs one JSON line per run with `runId`, `launches` and per-launch `errors`.
 
+## Running the trade indexer
+
+```bash
+bun run indexer
+```
+
+It reads every swap on every quants pool (the curve, then DAMM v2 after graduation) into `trades`. Charts, market stats, volume and the home page come from that table, so they lag the chain by one pass (`INDEXER_INTERVAL_SECONDS`, default 5). It logs a JSON line only when it wrote trades, skipped any, or an address failed. A transaction the RPC lists but will not return is waited on for 10 minutes, then skipped and counted in `skipped` (pruned RPC history causes this). A failing address is skipped for that pass and retried on the next one; one that fails every pass shows in every line. Only one indexer runs at a time (Postgres advisory lock); a second one exits.
+
+Each trade stores the quote token's USD price from Jupiter (`JUPITER_API_KEY`) at the time it was indexed. With no price the trade is stored without one and pages show values in the quote token.
+
 ## When something goes wrong
 
 - **`ReconcileError`, process exits.** The ledger says the keeper or spill wallet should hold more of a mint than it does. Nothing is sent until this is fixed. Compare `select bucket, mint, sum(amount) from escrow group by 1, 2` with the wallet balances. Causes seen so far: the keeper's SOL float ran out (top it up), or someone moved funds out of a keeper wallet by hand.
@@ -75,7 +85,6 @@ On top of the keeper variables above, the web app needs:
 | `ADMIN_WALLETS` | Comma separated wallet addresses allowed into `/admin` |
 | `ADMIN_SESSION_SECRET` | At least 32 random bytes, hex |
 | `CONFIG_KEYS_PATH` | Path to `config-keys.json` |
-| `GECKO_BASE` | `https://api.geckoterminal.com/api/v2` |
 | `NEXT_PUBLIC_RPC_URL` | RPC the browser uses |
 | `NEXT_PUBLIC_OURTOKEN_MINT`, `NEXT_PUBLIC_OURTOKEN_SYMBOL` | The platform token |
 | `NEXT_PUBLIC_SOL_GRADUATION`, `NEXT_PUBLIC_OURTOKEN_GRADUATION` | Shown on the launch form; must match what the config keys were created with |
@@ -87,7 +96,7 @@ Never set these in production: `NEXT_PUBLIC_TEST_WALLET_SECRET`, `PINATA_JWT=stu
 1. Install Bun, Node 22 or newer (for the build), Postgres 16 and Caddy. Create a `quants` user.
 2. Clone the repo to `/opt/quants`, write `/opt/quants/.env` with every variable from `.env.example` and put `config-keys.json` next to it.
 3. `bun install`, `bun run migrate`, `bun run build`.
-4. Copy `deploy/quants-web.service` and `deploy/quants-keeper.service` to `/etc/systemd/system/`, then `systemctl enable --now quants-web quants-keeper`.
+4. Copy `deploy/quants-web.service`, `deploy/quants-keeper.service` and `deploy/quants-indexer.service` to `/etc/systemd/system/`, then `systemctl enable --now quants-web quants-keeper quants-indexer`.
 5. Point your domain at the server, set `QUANTS_DOMAIN` for Caddy, copy `deploy/Caddyfile` to `/etc/caddy/Caddyfile` and reload Caddy. It gets a certificate on its own.
 6. Watch the keeper with `journalctl -u quants-keeper -f`. A `ReconcileError` exits the keeper; systemd restarts it after 30 seconds and it exits again until the ledger and wallets agree.
 
@@ -100,7 +109,10 @@ docker compose up -d
 solana-test-validator ... (flags in "Local end-to-end run" above)
 bun run seed                                  # writes .env.local and config-keys.json, launches CAT and DOG
 bun --env-file=.env.local scripts/keeper-once.ts
+bun --env-file=.env.local run indexer         # keep running; fills charts and the home page
 bun run dev                                   # http://localhost:3000 (webpack dev server), connect "Test Wallet"
+bun run warm                                  # compiles every route once; a first compile reloads open pages
+# Editing any .ts file reloads every open page in dev, so do not edit while the browser tests run.
 # Do not run `bun run build` while the dev server is running: both write to .next.
 set -a; source .env.local; set +a; bun run e2e
 ```
