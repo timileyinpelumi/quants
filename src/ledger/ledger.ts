@@ -30,9 +30,29 @@ export async function beginStep(sql: SQL, a: StepInput): Promise<StepRow> {
   return toRow(r);
 }
 
+// detail.signatures keeps every signature ever sent for the row; the signature column only holds the one in flight.
 export async function markSent(sql: SQL, id: number, signature: string, lastValidBlockHeight: bigint) {
+  const entry = json([{ signature, lastValidBlockHeight: lastValidBlockHeight.toString() }]);
   await sql`update distributions set status = 'sent', signature = ${signature}, last_valid_block_height = ${lastValidBlockHeight.toString()},
+    detail = jsonb_set(detail, '{signatures}', coalesce(detail->'signatures', '[]'::jsonb) || ${entry}::text::jsonb),
     attempts = attempts + 1, updated_at = now() where id = ${id} and status = 'pending'`;
+}
+
+export interface SentSignature { signature: string; lastValidBlockHeight: bigint }
+export function sentSignatures(row: StepRow): SentSignature[] {
+  const list: SentSignature[] = (row.detail.signatures ?? []).map((s: any) => ({ signature: s.signature, lastValidBlockHeight: BigInt(s.lastValidBlockHeight) }));
+  if (row.signature && row.lastValidBlockHeight != null && !list.some((s) => s.signature === row.signature)) {
+    list.push({ signature: row.signature, lastValidBlockHeight: row.lastValidBlockHeight });
+  }
+  return list;
+}
+
+// Unconfirmed rows of a logical step that were sent at least once since the step last confirmed.
+export async function sentSinceConfirmed(sql: SQL, stepKey: string): Promise<StepRow[]> {
+  return (await sql`select * from distributions
+    where step_key = ${stepKey} and status <> 'confirmed' and (signature is not null or detail->'signatures' is not null)
+      and id > coalesce((select max(id) from distributions where step_key = ${stepKey} and status = 'confirmed'), 0)
+    order by id`).map(toRow);
 }
 
 export async function resetToPending(sql: SQL, id: number) {
@@ -64,12 +84,13 @@ export async function launchesWithSentSteps(sql: SQL): Promise<Set<number>> {
 }
 
 // CHECK (amount >= 0) is evaluated on the proposed row before ON CONFLICT, so debits must go through a plain UPDATE.
-export async function confirmStep(sql: SQL, row: StepRow, deltas: Delta[], detail: Record<string, any> = {}): Promise<boolean> {
+// fromFailed lets a row that was given up on be confirmed when one of its signatures turns out to have landed.
+export async function confirmStep(sql: SQL, row: StepRow, deltas: Delta[], detail: Record<string, any> = {}, fromFailed = false): Promise<boolean> {
   const payload = json(deltas.map((d) => ({ bucket: d.bucket, mint: d.mint, amount: d.amount.toString() })));
   const [r] = await sql`
     with s as (
       update distributions set status = 'confirmed', detail = detail || ${json(detail)}::text::jsonb, updated_at = now()
-      where id = ${row.id} and status in ('pending', 'sent') returning launch_id
+      where id = ${row.id} and (status in ('pending', 'sent') or (${fromFailed} and status = 'failed')) returning launch_id
     ), d as (
       select x.bucket, x.mint, sum(x.amount::numeric) as amount
       from jsonb_to_recordset(${payload}::text::jsonb) as x(bucket text, mint text, amount text)
@@ -98,7 +119,8 @@ export async function openSentSteps(sql: SQL): Promise<StepRow[]> {
 }
 
 export async function abandonUnsent(sql: SQL): Promise<number> {
-  const rows = await sql`update distributions set status = 'failed', error = 'abandoned before send', updated_at = now()
+  const rows = await sql`update distributions set status = 'failed', updated_at = now(),
+      error = case when detail->'signatures' is null then 'abandoned before send' else 'expired' end
     where status = 'pending' and signature is null returning id`;
   return rows.length;
 }

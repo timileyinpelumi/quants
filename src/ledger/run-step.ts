@@ -1,22 +1,42 @@
 import type { SQL } from "bun";
 import type { ChainPort, SignedTx } from "../chain/port";
-import { beginStep, confirmStep, failStep, failuresSinceConfirmed, markSent, resetToPending, retryFailed, type Delta, type DeltaResolver, type StepInput, type StepRow } from "./ledger";
+import {
+  beginStep, confirmStep, failStep, failuresSinceConfirmed, markSent, resetToPending, retryFailed, sentSignatures, sentSinceConfirmed,
+  type Delta, type DeltaResolver, type StepInput, type StepRow,
+} from "./ledger";
 
 export const MAX_ATTEMPTS = 5;
 export type Outcome = "confirmed" | "failed" | "pending";
 
+interface Survey { landed?: { row: StepRow; signature: string }; failed: Set<string>; live: boolean }
+
+// Height is read before any status, so an unknown status for a signature whose blockhash expired by that height is final.
+async function survey(chain: ChainPort, rows: StepRow[]): Promise<Survey> {
+  const height = await chain.blockHeight();
+  const failed = new Set<string>();
+  let live = false;
+  for (const row of rows) {
+    for (const s of sentSignatures(row)) {
+      const st = await chain.status(s.signature);
+      if (st === "confirmed") return { landed: { row, signature: s.signature }, failed, live };
+      if (st === "failed") failed.add(s.signature);
+      else if (height <= s.lastValidBlockHeight) live = true;
+    }
+  }
+  return { failed, live };
+}
+
 export async function resolveSent(sql: SQL, chain: ChainPort, row: StepRow, resolve: DeltaResolver): Promise<Outcome | "expired"> {
-  const sig = row.signature!;
-  const st = await chain.status(sig);
-  if (st === "confirmed") {
-    await confirmStep(sql, row, await resolve(row, sig), { signature: sig });
+  const sv = await survey(chain, [row]);
+  if (sv.landed) {
+    await confirmStep(sql, row, await resolve(row, sv.landed.signature), { signature: sv.landed.signature });
     return "confirmed";
   }
-  if (st === "failed") {
+  if (sv.failed.has(row.signature!)) {
     await failStep(sql, row.id, "transaction failed on-chain");
     return "failed";
   }
-  if ((await chain.blockHeight()) <= row.lastValidBlockHeight!) return "pending";
+  if (sv.live) return "pending";
   if (row.attempts >= MAX_ATTEMPTS) {
     await failStep(sql, row.id, `not confirmed after ${row.attempts} attempts`);
     return "failed";
@@ -41,6 +61,17 @@ export async function runTxStep(
     const r = await resolveSent(sql, chain, row, spec.resolve);
     if (r !== "expired") return r;
     row = { ...row, status: "pending", signature: null, lastValidBlockHeight: null };
+  }
+  // Every earlier send of this logical step must be provably dead before a new one is built.
+  const prior = await sentSinceConfirmed(sql, spec.stepKey ?? spec.idemKey);
+  if (prior.length) {
+    const sv = await survey(chain, prior);
+    if (sv.landed) {
+      const { row: r, signature } = sv.landed;
+      await confirmStep(sql, r, await spec.resolve(r, signature), { signature }, true);
+      return r.id === row.id ? "confirmed" : "pending";
+    }
+    if (sv.live) return "pending";
   }
   let tx: SignedTx;
   try {
