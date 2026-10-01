@@ -11,6 +11,7 @@ import { JupiterLive, type JupiterPort } from "@/jupiter/port";
 import { DevPinata, PinataRest, type PinataPort } from "./pinata";
 import { TokenIcons } from "./icons";
 import { JupiterPrices } from "@/indexer/prices";
+import { checkWebEnv } from "@/env";
 
 export interface WebContext {
   sql: SQL;
@@ -49,6 +50,7 @@ export const setContextForTests = (c: WebContext | null) => { g.__quantsCtx = c;
 export function getContext(): WebContext {
   if (g.__quantsCtx) return g.__quantsCtx;
   const e = process.env;
+  checkWebEnv(e);
   const conn = new Connection(e.RPC_URL!, "confirmed");
   // The web server never signs: these throwaway keypairs only satisfy constructors whose signing paths it never calls.
   const chain = new SolanaChain(conn, Keypair.generate(), Keypair.generate());
