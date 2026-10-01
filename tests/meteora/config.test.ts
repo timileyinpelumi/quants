@@ -6,6 +6,10 @@ import { NATIVE_MINT } from "../../src/domain/types";
 
 const SOL = { mint: NATIVE_MINT, decimals: 9, migrationQuoteThreshold: 85 };
 
+test("creators pick a 1%, 2% or 3% trading fee", () => {
+  expect([...FEE_TIERS_BPS]).toEqual([100, 200, 300]);
+});
+
 test("every tier builds a valid config with the fee we asked for", () => {
   for (const bps of FEE_TIERS_BPS) {
     const p = buildQuantsConfig(bps, SOL);

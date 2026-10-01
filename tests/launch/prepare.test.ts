@@ -36,6 +36,7 @@ test("rejects bad input", async () => {
     { ...valid, name: "" },
     { ...valid, symbol: "TOOLONGSYMBOL" },
     { ...valid, feeTierBps: 250 },
+    { ...valid, feeTierBps: 500 },
     { ...valid, quoteMint: "Other11111111111111111111111111111111111111" },
     { ...valid, basket: [] },
     { ...valid, basket: [...valid.basket, valid.basket[0], valid.basket[1]] },

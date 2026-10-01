@@ -11,11 +11,12 @@ import { fmtAmount, lockLabel, lockShort } from "@/web/ui/format";
 import { signAndSendAll, SendError, type UnsignedTx } from "@/web/wallet/send";
 import { BasketPicker, basketTotal, type BasketItem } from "./BasketPicker";
 import { launchCost } from "@/domain/launch-cost";
+import { FEE_TIERS_BPS } from "@/domain/fees";
 import { useUsd, usdText } from "@/web/ui/usd";
 
 const SOL = "So11111111111111111111111111111111111111112";
 export type QuoteOption = { mint: string; symbol: string; name: string; graduation: number; icon: string | null };
-const FEES = [100, 200, 300, 500];
+const FEES: readonly number[] = FEE_TIERS_BPS;
 
 type Tier = { id: string; lockSeconds: number; multiplierBps: number };
 type Status = "idle" | "uploading" | "preparing" | "signing" | "confirming";

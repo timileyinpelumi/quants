@@ -15,7 +15,7 @@ await sql.close();
 
 const trader = Keypair.generate();
 const buy = Math.round(Number(solPerBuy) * LAMPORTS_PER_SOL);
-// Each round loses the fee on both sides; 12% of a buy per round covers the 5% tier.
+// Each round loses the fee on both sides; 12% of a buy per round covers the 3% tier.
 await conn.confirmTransaction(await conn.requestAirdrop(trader.publicKey, Math.ceil(buy * (1 + 0.12 * Number(rounds))) + LAMPORTS_PER_SOL), "confirmed");
 const client = DynamicBondingCurveClient.create(conn, "confirmed");
 const pool = new PublicKey(launch.pool);

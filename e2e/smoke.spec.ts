@@ -2,7 +2,7 @@ import { test, expect, type Page } from "@playwright/test";
 import { execSync } from "node:child_process";
 
 const keeperPass = () => execSync("bun --env-file=.env.local scripts/keeper-once.ts", { stdio: "pipe", timeout: 180_000 }).toString();
-// Buy and sell rounds on the curve; at a 2% fee, 6 rounds of 5 SOL pay the stakers' share past the farm setup of 7 tiers and 2 rewards.
+// Buy and sell rounds on the curve; at a 2% fee, 6 rounds of 5 SOL pay the stakers' share past the farm setup of 4 tiers and 2 rewards.
 const trade = (mint: string, rounds: number) =>
   execSync(`bun --env-file=.env.local scripts/trade-curve.ts ${mint} ${rounds} 5`, { stdio: "pipe", timeout: 180_000 }).toString();
 const symbol = `E${Math.random().toString(36).slice(2, 8).toUpperCase().replace(/[^A-Z0-9]/g, "X")}`;
@@ -38,7 +38,7 @@ test("launch, trade until staking opens, stake, exit early and see the burn", as
 
   await expect(page.getByRole("heading", { name: symbol, level: 1 })).toBeVisible();
   await expect(page.getByText(`Stake ${symbol}, earn`)).toBeVisible();
-  await expect(page.getByText("180 days")).toBeVisible();
+  await expect(page.getByText("30 days").first()).toBeVisible();
 
   // The first buy's fees alone do not cover the farms, so staking stays closed and shows its progress.
   keeperPass();

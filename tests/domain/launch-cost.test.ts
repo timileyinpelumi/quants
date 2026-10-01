@@ -17,8 +17,8 @@ test("ten rewards take two reward batches per farm", () => {
   expect(launchCost(s, 10).rent).toBe(FARM_RENT + TOKEN_ACCOUNT_RENT * 11n + 2n * TX_FEE * 5n + TOKEN_ACCOUNT_RENT * 11n);
 });
 
-test("default lock tiers start at 12 hours", () => {
-  expect(defaultSettings("OURS").tiers.map((t) => t.lockSeconds / 3600)).toEqual([12, 24, 72, 168, 720, 2160, 4320]);
+test("default lock tiers run from 24 hours to 30 days", () => {
+  expect(defaultSettings("OURS").tiers.map((t) => t.lockSeconds / 3600)).toEqual([24, 72, 168, 720]);
 });
 
 test("opensAt is the stakers' share as a percent of the rent, floored and capped at 100", () => {

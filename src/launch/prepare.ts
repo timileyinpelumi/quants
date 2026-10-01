@@ -21,7 +21,7 @@ const launchInput = (quoteMints: string[]) => z.object({
   image: z.string().url().refine(publicUri, "Image link must be HTTPS").optional(),
   creator: addr,
   quoteMint: z.string().refine((m) => quoteMints.includes(m), "That pair token is not supported"),
-  feeTierBps: z.number().refine((v) => (FEE_TIERS_BPS as readonly number[]).includes(v), "Trading fee must be 1%, 2%, 3% or 5%"),
+  feeTierBps: z.number().refine((v) => (FEE_TIERS_BPS as readonly number[]).includes(v), "Trading fee must be 1%, 2% or 3%"),
   basket: z.array(z.object({ mint: addr, weightBps: z.number().int().positive(), symbol: z.string().max(20).optional(), decimals: z.number().int().min(0).max(18).optional() })).min(1, "Pick at least one reward token").max(10, "Pick at most 10 reward tokens")
     .refine((b) => new Set(b.map((x) => x.mint)).size === b.length, "Each reward token can be picked once")
     .refine((b) => b.reduce((a, x) => a + x.weightBps, 0) === 10_000, "Basket weights must add up to 100"),

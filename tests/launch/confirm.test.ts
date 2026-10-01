@@ -41,7 +41,7 @@ test("records launch, basket and a pending stake pool from what prepare stored",
   expect(sp.status).toBe("pending");
   expect(sp.max_penalty_bps).toBe(3000);
   expect(sp.spill_account).toBe(getAssociatedTokenAddressSync(new (await import("@solana/web3.js")).PublicKey(p.mint), SPILL).toBase58());
-  expect((await sql`select tier_id from stake_tiers where launch_id = ${id} order by lock_seconds`).map((r: any) => r.tier_id)).toEqual(["12h", "1d", "3d", "7d", "30d", "90d", "180d"]);
+  expect((await sql`select tier_id from stake_tiers where launch_id = ${id} order by lock_seconds`).map((r: any) => r.tier_id)).toEqual(["1d", "3d", "7d", "30d"]);
   expect(BigInt(sp.rent_lamports)).toBe(launchCost(defaultSettings(OURS), 1).rent);
   expect(BigInt(sp.basket_value_lamports)).toBe(0n);
 });

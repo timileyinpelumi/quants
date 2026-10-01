@@ -60,18 +60,18 @@ test("launchDetail sums paid out and burned, and weights tier shares by multipli
   const tiers = await c.sql`select tier_id from stake_tiers where launch_id = ${a.id} order by lock_seconds`;
   for (const t of tiers) await c.sql`update stake_tiers set farm = ${"farm-" + t.tier_id} where launch_id = ${a.id} and tier_id = ${t.tier_id}`;
   const staking = c.staking as any;
-  staking.staked.set("farm-7d", 100n).set("farm-180d", 100n);
+  staking.staked.set("farm-7d", 100n).set("farm-30d", 100n);
   (c.meteora as any).progress.set(a.pool, { quoteReserve: 40n, threshold: 80n, migrated: false });
   await step(c, a.id, "f1", "fund", { farm: "farm-7d", rewardMint: ZEC, amount: "100" });
-  await step(c, a.id, "f2", "fund", { farm: "farm-180d", rewardMint: ZEC, amount: "50" });
+  await step(c, a.id, "f2", "fund", { farm: "farm-30d", rewardMint: ZEC, amount: "50" });
   await step(c, a.id, "b1", "burn", { mint: a.mint, amount: "300" });
   const d = (await launchDetail(c, a.mint))!;
   expect(d.launch.symbol).toBe("CAT");
   expect(d.basket).toEqual([{ mint: ZEC, symbol: "ZEC", decimals: 8, weightBps: 10_000, paidOut: "150" }]);
   expect(d.burned).toBe("300");
-  // 7d is 1.5x and 180d is 3x, so equal stakes split one third to two thirds
-  expect(d.tiers.map((t) => t.sharePct)).toEqual([0, 0, 0, 33, 0, 0, 67]);
-  expect(d.tiers[3]!.staked).toBe("100");
+  // 7d is 1.5x and 30d is 2x, so equal stakes split 3 to 4
+  expect(d.tiers.map((t) => t.sharePct)).toEqual([0, 0, 43, 57]);
+  expect(d.tiers[2]!.staked).toBe("100");
   expect(d.curve).toEqual({ quoteReserve: "40", threshold: "80", migrated: false });
   expect(await launchDetail(c, "unknown")).toBeNull();
 });

@@ -3,7 +3,7 @@ import {
   TokenAuthorityOption, MigratedCollectFeeMode, DammV2DynamicFeeMode, type ConfigParameters,
 } from "@meteora-ag/dynamic-bonding-curve-sdk";
 
-export const FEE_TIERS_BPS = [100, 200, 300, 500] as const;
+export { FEE_TIERS_BPS } from "../domain/fees";
 export interface QuoteSpec { mint: string; decimals: number; migrationQuoteThreshold: number }
 
 export function buildQuantsConfig(feeBps: number, quote: QuoteSpec): ConfigParameters {

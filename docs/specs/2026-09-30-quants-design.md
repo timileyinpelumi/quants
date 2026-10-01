@@ -15,7 +15,7 @@ In scope:
 
 - Launch form and launch transaction (DBC pool with optional first buy).
 - Quote token per launch: SOL or OURTOKEN, chosen by the creator.
-- Fee tiers (default 1%, 2%, 3%, 5%).
+- Creator trading fee tiers: 1%, 2% or 3% (max 3%).
 - Fee claiming, splitting (basket / platform / creator), swapping and reward funding by a keeper.
 - Graduation for OURTOKEN-quoted launches (Meteora's keepers only migrate SOL launches).
 - Staking with lock tiers, multipliers, early exit and penalty burn, on Kamino Farms.
@@ -111,7 +111,7 @@ v1 has one implementation, `KaminoBackend`. The backend name is stored on each s
 ### 6. Kamino setup
 
 - One global config owned by the platform, with treasury fee set to 0.
-- Per launch, one farm per lock tier (default four: 7, 30, 90, 180 days), each with:
+- Per launch, one farm per lock tier (default four: 24 hours, 3 days, 7 days, 30 days), each with:
   - stake mint = launched token,
   - reward mints = the basket,
   - locking mode set so each deposit is locked for the tier duration,
@@ -136,7 +136,7 @@ All editable from the admin page. Changes create a new version.
 |---|---|---|
 | Fee split basket / platform / creator | 60 / 25 / 15 | fees claimed after the change |
 | Creator payout minimum | 0.05 SOL equivalent | next payout |
-| Lock tiers and multipliers | 7d 1x, 30d 1.5x, 90d 2x, 180d 3x | launches created after the change |
+| Lock tiers and multipliers | 24h 1x, 3d 1.25x, 7d 1.5x, 30d 2x | launches created after the change |
 | Max early exit penalty | 30% | launches created after the change |
 | Reward stream period | 24 hours | next funding |
 | Swap slippage cap | 1% | next swap |

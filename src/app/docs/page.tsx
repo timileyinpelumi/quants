@@ -70,7 +70,7 @@ export default async function DocsPage() {
 
           <H2 id="glance">At a glance</H2>
           <Table head={["", "Value"]} rows={[
-            ["Trading fee, set by the creator", "1%, 2%, 3% or 5%"],
+            ["Trading fee, set by the creator", "1%, 2% or 3%"],
             ["Share of fees that buys staker rewards", `${pct(s.split.basketBps)} after Meteora's 20%`],
             ["Reward tokens per launch", "Up to 10"],
             ["Pair tokens", quoteCoins().map((c) => c.symbol).join(", ")],
@@ -86,7 +86,7 @@ export default async function DocsPage() {
           <P>Launches and trading run on Meteora. Staking runs on Kamino Farms. quants never holds anyone&apos;s stake.</P>
 
           <H2 id="launch">Launching a token</H2>
-          <P>Pick a name, a symbol and a square image, then pick the pair token: {quoteCoins().map((c) => c.symbol).join(", ")}. Choose a trading fee of 1%, 2%, 3% or 5% and pick your reward basket. An optional first buy of your own token goes in the same approval. It is paid in SOL and swapped to the pair token if needed.</P>
+          <P>Pick a name, a symbol and a square image, then pick the pair token: {quoteCoins().map((c) => c.symbol).join(", ")}. Choose a trading fee of 1%, 2% or 3% and pick your reward basket. An optional first buy of your own token goes in the same approval. It is paid in SOL and swapped to the pair token if needed.</P>
           <P>Every token has a supply of 1,000,000,000. Launching costs only the network fee for your own transaction and any first buy. A first buy is capped at {pct(s.devBuyCapBps)} of supply.</P>
           <P>Staking does not open at launch. The staking farms are paid for out of the stakers&apos; share of trading fees, so a token can be staked once it has traded enough. See <a href="#opens" className="text-accent">When staking opens</a>.</P>
 
@@ -118,7 +118,7 @@ export default async function DocsPage() {
           <P>Staking a token needs one Kamino farm per lock tier ({s.tiers.length}), with an account for each reward token, plus the transaction fees to set them up. The stakers&apos; share of trading fees is held until it covers that cost, which is then taken from it to create the farms. Staking opens right after, and from then on the whole stakers&apos; share buys rewards.</P>
           <Table head={["Reward tokens", "Farm setup"]} rows={[["1", sol(one)], ["3", sol(three)], ["10", sol(ten)]]} />
           <P>Stakers get {pct(s.split.basketBps)} of each trading fee after Meteora&apos;s 20%. So with 3 reward tokens, staking opens after about this much trading volume:</P>
-          <Table head={["Trading fee", "Volume to open staking"]} rows={[100, 200, 300, 500].map((bps) => [pct(bps), `${volumeToOpen(three, bps).toLocaleString("en-US")} SOL`])} />
+          <Table head={["Trading fee", "Volume to open staking"]} rows={[100, 200, 300].map((bps) => [pct(bps), `${volumeToOpen(three, bps).toLocaleString("en-US")} SOL`])} />
           <P>Tokens paired with something other than SOL count their stakers&apos; share at its value in SOL. Each token page shows how far along it is, as a percent and as the amount still needed.</P>
 
           <H2 id="staking">Staking and lock tiers</H2>
