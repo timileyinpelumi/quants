@@ -55,6 +55,12 @@ export async function prepareLaunch(
   }
   const configKey = deps.configKeys[configKeyName(input.quoteMint, input.feeTierBps)];
   if (!configKey) throw new LaunchError("invalid_input", "no config key for this quote and fee tier");
+  if (input.devBuyQuoteAmount > 0n) {
+    const out = await deps.meteora.firstBuyMaxOut(configKey, input.devBuyQuoteAmount);
+    if (out * 10_000n > SUPPLY_BASE_UNITS * BigInt(settings.devBuyCapBps)) {
+      throw new LaunchError("dev_buy_too_large", `A first buy is capped at ${settings.devBuyCapBps / 100}% of supply`);
+    }
+  }
   const { tx, baseMint, pool } = await deps.meteora.buildLaunchTx({
     name: input.name, symbol: input.symbol, uri: input.uri, creator: input.creator, configKey, quoteMint: input.quoteMint,
     launchFeeLamports: launchCost(settings, input.basket.length).total, feeReceiver: deps.keeperAddress,

@@ -59,6 +59,17 @@ test("rejects a dev buy over the cap", async () => {
     .rejects.toMatchObject({ code: "dev_buy_too_large" });
 });
 
+test("the first buy cap is checked against the curve quote, not the client's min out", async () => {
+  const { deps, meteora } = await setup();
+  const cap = (1_000_000_000n * 1_000_000n * BigInt(defaultSettings(OURS).devBuyCapBps)) / 10_000n;
+  meteora.firstBuyOut = async (_cfg, amount) => amount * 1_000n;
+  await expect(prepareLaunch(deps, { ...valid, devBuyQuoteAmount: (cap / 1_000n + 1n).toString(), devBuyMinOut: "0" }))
+    .rejects.toMatchObject({ code: "dev_buy_too_large" });
+  const ok = await prepareLaunch(deps, { ...valid, devBuyQuoteAmount: (cap / 1_000n).toString(), devBuyMinOut: "0" });
+  expect(ok.mint).toBeDefined();
+  expect(meteora.firstBuyQuotes.at(-1)).toEqual({ configKey: "CfgSol200", amount: cap / 1_000n });
+});
+
 test("rejects basket tokens that are not classic SPL tokens", async () => {
   const { deps } = await setup(true, "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb");
   await expect(prepareLaunch(deps, valid)).rejects.toMatchObject({ code: "basket_unsupported" });

@@ -1,6 +1,6 @@
 import { Keypair, PublicKey, SystemProgram, Transaction } from "@solana/web3.js";
 import BN from "bn.js";
-import { DynamicBondingCurveClient, deriveDbcPoolAddress, deriveDammV2PoolAddress } from "@meteora-ag/dynamic-bonding-curve-sdk";
+import { DynamicBondingCurveClient, calculateQuoteToBaseFromAmountIn, deriveDbcPoolAddress, deriveDammV2PoolAddress } from "@meteora-ag/dynamic-bonding-curve-sdk";
 import { CpAmm, getTokenProgram } from "@meteora-ag/cp-amm-sdk";
 import type { SignedTx } from "../chain/port";
 import type { SolanaChain } from "../chain/solana";
@@ -20,6 +20,8 @@ export interface MeteoraPort {
   buildMigrate(pool: string): Promise<SignedTx>;
   findGraduatedPosition(configKey: string, baseMint: string, quoteMint: string): Promise<GraduatedPosition | null>;
   buildLaunchTx(input: LaunchTxInput): Promise<{ tx: Transaction; baseMint: Keypair; pool: string }>;
+  /** Base units a first buy of `quoteAmount` takes from a fresh curve, before fees (an upper bound on what it receives). */
+  firstBuyMaxOut(configKey: string, quoteAmount: bigint): Promise<bigint>;
 }
 
 const pk = (s: string) => new PublicKey(s);
@@ -91,6 +93,13 @@ export class MeteoraLive implements MeteoraPort {
     const [first] = await this.cp.getUserPositionByPool(dammPool, this.chain.keeper.publicKey);
     if (!first) return null;
     return { dammPool: dammPool.toBase58(), position: first.position.toBase58(), positionNftAccount: first.positionNftAccount.toBase58() };
+  }
+
+  async firstBuyMaxOut(configKey: string, quoteAmount: bigint) {
+    const cfg = await this.dbc.state.getPoolConfig(configKey);
+    if (!cfg) throw new Error(`config ${configKey} not found`);
+    const r = calculateQuoteToBaseFromAmountIn(cfg, cfg.sqrtStartPrice, new BN(quoteAmount.toString()), cfg.migrationSqrtPrice);
+    return BigInt(r.outputAmount.toString());
   }
 
   async buildLaunchTx(input: LaunchTxInput) {

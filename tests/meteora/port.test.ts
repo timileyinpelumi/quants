@@ -1,6 +1,7 @@
 import { test, expect } from "bun:test";
 import { Connection, Keypair, LAMPORTS_PER_SOL, PublicKey, sendAndConfirmTransaction } from "@solana/web3.js";
 import BN from "bn.js";
+import { getAssociatedTokenAddressSync } from "@solana/spl-token";
 import { DynamicBondingCurveClient, SwapMode, deriveDbcPoolAuthority, deriveDammV2PoolAuthority } from "@meteora-ag/dynamic-bonding-curve-sdk";
 import { SolanaChain } from "../../src/chain/solana";
 import { MeteoraLive } from "../../src/meteora/port";
@@ -41,6 +42,11 @@ test.skipIf(!up)("launch, claim partner fee, graduate, find position, claim posi
   tx.partialSign(creator);
   await conn.confirmTransaction(await conn.sendRawTransaction(tx.serialize()));
   expect(await conn.getBalance(keeper.publicKey)).toBe(keeperBefore + 300_000_000);
+  const bought = BigInt((await conn.getTokenAccountBalance(getAssociatedTokenAddressSync(baseMint.publicKey, creator.publicKey))).value.amount);
+  const maxOut = await m.firstBuyMaxOut(config.publicKey.toBase58(), 1_000_000_000n);
+  expect(bought).toBeGreaterThan(0n);
+  expect(maxOut).toBeGreaterThanOrEqual(bought);
+  expect(maxOut * 9n).toBeLessThan(bought * 10n);
   expect(await m.curveState(pool)).toEqual({ migrated: false, complete: false });
   expect(await m.poolInfo(pool)).toEqual({ baseMint: baseMint.publicKey.toBase58(), config: config.publicKey.toBase58(), creator: creator.publicKey.toBase58() });
 
