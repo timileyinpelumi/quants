@@ -6,7 +6,7 @@ export interface LaunchListItem {
   feeTierBps: number; status: "live" | "graduated"; createdAt: string; basket: { mint: string; symbol: string | null }[]; burned: string;
 }
 
-export async function listLaunches(sql: SQL, opts: { graduated?: boolean; limit?: number; mint?: string }): Promise<LaunchListItem[]> {
+export async function listLaunches(sql: SQL, opts: { graduated?: boolean; limit?: number; offset?: number; mint?: string }): Promise<LaunchListItem[]> {
   const graduated = opts.graduated ?? null;
   const mint = opts.mint ?? null;
   const rows = await sql`
@@ -19,7 +19,7 @@ export async function listLaunches(sql: SQL, opts: { graduated?: boolean; limit?
     where (${graduated}::boolean is null or (l.status = 'graduated') = ${graduated}::boolean)
       and (${mint}::text is null or l.mint = ${mint}::text)
     order by l.id desc
-    limit ${opts.limit ?? 100}`;
+    limit ${opts.limit ?? 100} offset ${opts.offset ?? 0}`;
   return rows.map((r: any) => ({
     mint: r.mint, name: r.name, symbol: r.symbol, image: r.image, pool: r.pool, quoteMint: r.quote_mint, feeTierBps: r.fee_tier_bps,
     status: r.status, createdAt: new Date(r.created_at).toISOString(), basket: typeof r.basket === "string" ? JSON.parse(r.basket) : r.basket, burned: r.burned,

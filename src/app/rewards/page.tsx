@@ -1,8 +1,7 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { Header } from "@/web/ui/Header";
-import { Avatar } from "@/web/ui/Avatar";
-import { fmtAgo, fmtCompact, fmtPrice } from "@/web/ui/format";
+import { fmtCompact } from "@/web/ui/format";
+import { PaymentsList, StakerTokensList } from "@/web/rewards/RewardsLists";
 import { getContext } from "@/web/server/context";
 import { rewardsOverview } from "@/web/server/rewards";
 import { usdPrices } from "@/web/server/prices";
@@ -42,33 +41,12 @@ export default async function RewardsPage() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-12 gap-y-12">
           <section className="flex flex-col">
             <h2 className="m-0 pb-3 font-display font-bold text-xl">Top tokens for stakers</h2>
-            {r.top.length === 0 ? <p className="m-0 py-6 border-t line text-muted text-sm">No fees collected yet.</p> : r.top.map((t, i) => (
-              <Link key={t.mint} href={`/t/${t.mint}`} className="grid grid-cols-[28px_40px_minmax(0,1fr)_auto] gap-3 items-center py-3 border-t line hover:bg-white/[0.02]">
-                <span className="font-mono text-sm text-faint">{i + 1}</span>
-                <Avatar seed={t.mint} label={t.symbol} image={t.image} size={40} />
-                <span className="flex flex-col min-w-0">
-                  <span className="font-display font-bold truncate">{t.symbol}</span>
-                  <span className="text-[12px] text-muted truncate">Pays {t.basket.join(", ")}</span>
-                </span>
-                <span className="flex flex-col items-end font-mono text-sm">
-                  <span>${fmtPrice(t.setAsideUsd)}</span>
-                  <span className="text-[12px] text-muted">{t.payments} {t.payments === 1 ? "payment" : "payments"}</span>
-                </span>
-              </Link>
-            ))}
+            <StakerTokensList initial={r.top} nextOffset={r.topNext} />
           </section>
 
           <section className="flex flex-col">
             <h2 className="m-0 pb-3 font-display font-bold text-xl">Latest reward payments</h2>
-            {r.recent.length === 0 ? <p className="m-0 py-6 border-t line text-muted text-sm">No rewards paid yet. They start once someone stakes.</p> : r.recent.map((p) => (
-              <div key={p.signature} className="grid grid-cols-[minmax(0,1fr)_auto] gap-3 items-center py-3 border-t line text-sm">
-                <span className="flex flex-col min-w-0">
-                  <Link href={`/t/${p.mint}`} className="font-display font-bold hover:text-lime truncate">{p.symbol} stakers</Link>
-                  <span className="font-mono text-[12px] text-muted">{fmtCompact(p.amount)} {p.reward}{px[p.rewardMint] != null ? ` ($${fmtPrice(p.amount * px[p.rewardMint]!)})` : ""} added to the farm</span>
-                </span>
-                <a href={`https://solscan.io/tx/${p.signature}`} target="_blank" rel="noreferrer" className="font-mono text-[12px] text-muted hover:text-ink text-right">{fmtAgo(p.at)}</a>
-              </div>
-            ))}
+            <PaymentsList initial={r.recent.map((p) => ({ ...p, priceUsd: px[p.rewardMint] ?? null }))} next={r.recentNext} />
           </section>
         </div>
       </main>

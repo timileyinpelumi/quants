@@ -96,3 +96,79 @@ test("token trades route lists the newest trades for one token", async () => {
   expect(r.trades[0].amount).toBeCloseTo(0.000001, 12);
   expect((await GET(new Request("http://x"), { params: Promise.resolve({ mint: "nope" }) })).status).toBe(404);
 });
+
+test("explore pages continue without overlap or gaps, ties broken by newest then id", async () => {
+  const sql = await freshDb();
+  const ids: number[] = [];
+  for (const s of ["P1", "P2", "P3", "P4", "P5", "P6", "P7"]) ids.push(await launch(sql, s, s === "P7" ? 1 : 3));
+  await trade(sql, ids[0]!, 10, 0.001, { value: 5 });
+  await trade(sql, ids[3]!, 10, 0.001, { value: 2 });
+  for (const sort of ["trending", "mcap", "new", "gainers"] as const) {
+    const all = (await exploreTokens(sql, { sort, limit: 50 }, NOW)).map((t) => t.symbol);
+    expect(all).toHaveLength(7);
+    const pages: string[] = [];
+    for (let offset = 0; offset < 9; offset += 3) pages.push(...(await exploreTokens(sql, { sort, limit: 3, offset }, NOW)).map((t) => t.symbol));
+    expect(pages).toEqual(all);
+  }
+  expect((await exploreTokens(sql, { sort: "trending", limit: 50 }, NOW)).map((t) => t.symbol)).toEqual(["P1", "P4", "P7", "P6", "P5", "P3", "P2"]);
+  expect(await exploreTokens(sql, { sort: "new", limit: 3, offset: 7 }, NOW)).toEqual([]);
+});
+
+test("explore search treats like wildcards as text", async () => {
+  const sql = await freshDb();
+  await launch(sql, "A_B", 1);
+  await launch(sql, "AXB", 1);
+  expect((await exploreTokens(sql, { sort: "new", q: "a_b" }, NOW)).map((t) => t.symbol)).toEqual(["A_B"]);
+  expect(await exploreTokens(sql, { sort: "new", q: "%" }, NOW)).toEqual([]);
+});
+
+test("explore route validates input and returns the next offset", async () => {
+  const { makeWebContext } = await import("../helpers/web-context");
+  const { GET } = await import("../../src/app/api/explore/route");
+  const { sql } = await makeWebContext();
+  for (const [s, h] of [["AAA", 3], ["BBB", 2], ["CCC", 1]] as const) await launch(sql, s, h);
+  const page = (qs: string) => GET(new Request(`http://x/api/explore?${qs}`));
+  const first = await (await page("sort=new&limit=2")).json();
+  expect(first.tokens.map((t: any) => t.symbol)).toEqual(["CCC", "BBB"]);
+  expect(first.nextOffset).toBe(2);
+  const second = await (await page("sort=new&limit=2&offset=2")).json();
+  expect(second.tokens.map((t: any) => t.symbol)).toEqual(["AAA"]);
+  expect(second.nextOffset).toBeNull();
+  expect((await (await page("sort=new&filter=graduated")).json()).tokens).toEqual([]);
+  expect((await page("sort=bogus")).status).toBe(400);
+  expect((await page("sort=new&limit=51")).status).toBe(400);
+  expect((await page("sort=new&offset=-1")).status).toBe(400);
+});
+
+test("token trades route pages back from a cursor", async () => {
+  const { makeWebContext } = await import("../helpers/web-context");
+  const { GET } = await import("../../src/app/api/trades/[mint]/route");
+  const { sql } = await makeWebContext();
+  const a = await launch(sql, "AAA", 2);
+  for (let i = 0; i < 5; i++) await trade(sql, a, 50 - i, 0.001, { value: i + 1 });
+  const get = async (qs: string) => (await GET(new Request(`http://x/api/trades/mint-AAA?${qs}`), { params: Promise.resolve({ mint: "mint-AAA" }) })).json();
+  const p1 = await get("limit=2");
+  expect(p1.trades.map((t: any) => t.quoteValue)).toEqual([5, 4]);
+  const p2 = await get(`limit=2&before=${p1.next}`);
+  expect(p2.trades.map((t: any) => t.quoteValue)).toEqual([3, 2]);
+  const p3 = await get(`limit=2&before=${p2.next}`);
+  expect(p3.trades.map((t: any) => t.quoteValue)).toEqual([1]);
+  expect(p3.next).toBeNull();
+  expect((await GET(new Request("http://x/api/trades/mint-AAA?before=junk"), { params: Promise.resolve({ mint: "mint-AAA" }) })).status).toBe(400);
+});
+
+test("top traders route pages by offset", async () => {
+  const { makeWebContext } = await import("../helpers/web-context");
+  const { GET } = await import("../../src/app/api/token/[mint]/traders/route");
+  const { sql } = await makeWebContext();
+  const a = await launch(sql, "AAA", 2);
+  for (let i = 0; i < 5; i++) await trade(sql, a, 30, 0.001, { trader: `w${i}`, value: i + 1 });
+  const get = async (qs: string) => (await GET(new Request(`http://x?${qs}`), { params: Promise.resolve({ mint: "mint-AAA" }) })).json();
+  const p1 = await get("limit=3");
+  expect(p1.traders.map((t: any) => t.wallet)).toEqual(["w4", "w3", "w2"]);
+  expect(p1.nextOffset).toBe(3);
+  const p2 = await get("limit=3&offset=3");
+  expect(p2.traders.map((t: any) => t.wallet)).toEqual(["w1", "w0"]);
+  expect(p2.nextOffset).toBeNull();
+  expect((await GET(new Request("http://x"), { params: Promise.resolve({ mint: "nope" }) })).status).toBe(404);
+});

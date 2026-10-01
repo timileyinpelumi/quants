@@ -25,14 +25,14 @@ export async function activity(sql: SQL, launchId: number, now = Date.now()): Pr
 }
 
 /** Values are in the quote token. Profit uses average cost: realized on sells, unrealized on what is still held at `price`. */
-export async function topTraders(sql: SQL, launchId: number, price: number, limit: number): Promise<Trader[]> {
+export async function topTraders(sql: SQL, launchId: number, price: number, limit: number, offset = 0): Promise<Trader[]> {
   const rows = await sql`
     select trader, count(*)::int as n,
       coalesce(sum(base_amount::float8) filter (where side = 'buy'), 0) as bought, coalesce(sum(base_amount::float8) filter (where side = 'sell'), 0) as sold,
       coalesce(sum(quote_value) filter (where side = 'buy'), 0) as spent, coalesce(sum(quote_value) filter (where side = 'sell'), 0) as received,
       min(block_time) as first_at, max(block_time) as last_at
     from trades where launch_id = ${launchId}
-    group by trader order by sum(quote_value) desc limit ${limit}`;
+    group by trader order by sum(quote_value) desc, trader limit ${limit} offset ${offset}`;
   return rows.map((r: any) => {
     const bought = r.bought * BASE_UNIT, sold = r.sold * BASE_UNIT;
     const avg = bought > 0 ? r.spent / bought : 0;

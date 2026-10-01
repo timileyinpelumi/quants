@@ -7,6 +7,7 @@ import { Button } from "@/web/ui/Button";
 import { inputClass } from "@/web/ui/Field";
 import { Segmented } from "@/web/ui/Segmented";
 import { shortAddr } from "@/web/ui/format";
+import { LoadMore } from "@/web/ui/LoadMore";
 
 type Tier = { id: string; lockSeconds: number; multiplierBps: number };
 type Settings = {
@@ -16,7 +17,7 @@ type Settings = {
   maxPenaltyBps: number; rewardPeriodSeconds: number; slippageBps: number; launchFeeLamports: string;
   devBuyCapBps: number; keeperIntervalSeconds: number; defaultBackend: "kamino";
 };
-type Status = { lastActivity: string | null; failed: { id: number; mint: string; symbol: string | null; kind: string; error: string; attempts: number; at: string }[]; inFlight: { mint: string; symbol: string | null }[] };
+type Status = { lastActivity: string | null; failed: { id: number; mint: string; symbol: string | null; kind: string; error: string; attempts: number; at: string }[]; failedNext: number | null; inFlight: { mint: string; symbol: string | null }[] };
 
 const SOL = "So11111111111111111111111111111111111111112";
 const small = `${inputClass} text-base py-3 font-mono`;
@@ -50,6 +51,7 @@ export function AdminApp({ pairs }: { pairs: Pair[] }) {
   const [settings, setSettings] = useState<Settings | null>(null);
   const [version, setVersion] = useState<number | null>(null);
   const [status, setStatus] = useState<Status | null>(null);
+  const [failedState, setFailedState] = useState<"idle" | "loading" | "error">("idle");
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [basketMint, setBasketMint] = useState("");
   const [basketJson, setBasketJson] = useState('[{ "mint": "", "weightBps": 10000, "symbol": "", "decimals": 6 }]');
@@ -68,6 +70,18 @@ export function AdminApp({ pairs }: { pairs: Pair[] }) {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  async function loadFailed() {
+    if (!status?.failedNext || failedState === "loading") return;
+    setFailedState("loading");
+    try {
+      const more = await call<Status>(`/api/admin/status?before=${status.failedNext}`);
+      setStatus((s) => (s ? { ...s, failed: [...s.failed, ...more.failed], failedNext: more.failedNext } : s));
+      setFailedState("idle");
+    } catch {
+      setFailedState("error");
+    }
+  }
 
   async function signIn() {
     if (!wallet.publicKey) { modal.setVisible(true); return; }
@@ -192,6 +206,7 @@ export function AdminApp({ pairs }: { pairs: Pair[] }) {
                 <span className="text-muted md:text-right">{new Date(f.at).toLocaleString()}</span>
               </div>
             ))}
+            {status.failed.length > 0 && <LoadMore done={status.failedNext === null} state={failedState} onMore={loadFailed} />}
           </div>
           <Button variant="ghost" className="self-start" onClick={load}>Refresh</Button>
         </section>
