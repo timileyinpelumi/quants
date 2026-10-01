@@ -5,7 +5,7 @@ Wants=network-online.target
 
 [Service]
 WorkingDirectory=/opt/quants
-EnvironmentFile=/opt/quants/.env
+EnvironmentFile=/opt/quants/keeper.env
 ExecStart=/usr/local/bin/bun src/keeper/main.ts
 Restart=on-failure
 RestartSec=30

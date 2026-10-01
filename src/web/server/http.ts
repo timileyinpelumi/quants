@@ -6,15 +6,31 @@ export class LimitError extends Error {
 }
 
 const hits = new Map<string, { count: number; resetAt: number }>();
+const MAX_KEYS = 10_000;
 export const resetRateLimits = () => hits.clear();
+export const limiterSize = () => hits.size;
 
-// In-memory and per process: enough for one web server behind Caddy, which sets x-forwarded-for.
+function evict(now: number) {
+  for (const [k, h] of hits) if (h.resetAt < now) hits.delete(k);
+  for (const k of hits.keys()) {
+    if (hits.size <= MAX_KEYS) break;
+    hits.delete(k);
+  }
+}
+
+// In-memory and per process. x-forwarded-for is only trusted with TRUST_PROXY=1 (behind Caddy or Vercel);
+// otherwise any client could pick its own bucket, so every request shares one.
 export function rateLimit(req: Request, bucket: string, limit: number, windowMs = 60_000) {
-  const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "local";
+  const ip = (process.env.TRUST_PROXY === "1" && req.headers.get("x-forwarded-for")?.split(",")[0]?.trim()) || "local";
   const key = `${bucket}:${ip}`;
   const now = Date.now();
   const h = hits.get(key);
-  if (!h || h.resetAt < now) { hits.set(key, { count: 1, resetAt: now + windowMs }); return; }
+  if (!h || h.resetAt < now) {
+    hits.delete(key);
+    hits.set(key, { count: 1, resetAt: now + windowMs });
+    if (hits.size > MAX_KEYS) evict(now);
+    return;
+  }
   if (++h.count > limit) throw new LimitError(429, "Too many requests, wait a minute and try again");
 }
 
