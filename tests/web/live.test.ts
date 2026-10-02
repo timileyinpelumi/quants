@@ -68,6 +68,19 @@ test("holders lists the largest accounts by owner with labels, concentration and
   expect(h.top10Pct).toBe(15);
 });
 
+test("holders leaves out hidden owners such as the penalty wallet", async () => {
+  const { holders } = await import("../../src/web/server/live");
+  const chain = {
+    async largest() { return [{ address: "acc1", amount: 300_000_000n * 1_000_000n }, { address: "acc2", amount: 100_000_000n * 1_000_000n }]; },
+    async owners(a: string[]) { return a.map((x) => ({ acc1: "spill", acc2: "alice" } as Record<string, string>)[x] ?? null); },
+    async supply() { return 1_000_000_000n * 1_000_000n; },
+    async count() { return 2; },
+  };
+  const h = await holders(chain, "MINT", {}, new Set(["spill"]));
+  expect(h.list.map((x) => x.owner)).toEqual(["alice"]);
+  expect(h.top10Pct).toBe(10);
+});
+
 test("live route returns market, graduation, activity, traders and trades for a mint", async () => {
   const { makeWebContext } = await import("../helpers/web-context");
   const { GET } = await import("../../src/app/api/token/[mint]/live/route");

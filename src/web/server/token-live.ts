@@ -73,13 +73,12 @@ function readHolders(ctx: WebContext, l: { id: number; mint: string; creator: st
     const labels: Record<string, string> = {
       [deriveDbcPoolAuthority().toBase58()]: "Bonding curve",
       [deriveDammV2PoolAuthority().toBase58()]: "Pool",
-      [ctx.spillWallet.toBase58()]: "Early exit penalties",
       [l.creator]: "Creator",
     };
     for (const v of vaults) if (v) labels[v] = "Staked";
     const key = process.env.JUPITER_API_KEY;
     const chain = new RpcHolderChain(ctx.conn, key ? "https://api.jup.ag/tokens/v2" : "https://lite-api.jup.ag/tokens/v2", key);
-    return holders(chain, l.mint, labels).catch(() => null);
+    return holders(chain, l.mint, labels, new Set([ctx.spillWallet.toBase58()])).catch(() => null);
   })();
 }
 

@@ -65,7 +65,7 @@ export interface HolderChain {
 
 const POOL_LABELS = new Set(["Bonding curve", "Pool"]);
 
-export async function holders(chain: HolderChain, mint: string, labels: Record<string, string>): Promise<Holders> {
+export async function holders(chain: HolderChain, mint: string, labels: Record<string, string>, hidden: Set<string> = new Set()): Promise<Holders> {
   const [largest, supply, count] = await Promise.all([chain.largest(mint), chain.supply(mint), chain.count(mint).catch(() => null)]);
   const held = largest.filter((a) => a.amount > 0n);
   const owners = await chain.owners(held.map((a) => a.address));
@@ -73,7 +73,7 @@ export async function holders(chain: HolderChain, mint: string, labels: Record<s
   const list = held.map((a, i) => {
     const owner = owners[i] ?? a.address;
     return { owner, amount: Number(a.amount) * BASE_UNIT, pct: (Number(a.amount) / total) * 100, label: labels[owner] ?? null };
-  });
+  }).filter((h) => !hidden.has(h.owner));
   const people = list.filter((h) => !POOL_LABELS.has(h.label ?? ""));
   return {
     count, list,
