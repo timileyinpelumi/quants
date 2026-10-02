@@ -1,6 +1,6 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
-import type { FeeFlow, Overview, Range, Report, Stat, TopToken } from "@/web/server/analytics";
+import type { FeeFlow, Health, Overview, Range, Report, Stat, TopToken } from "@/web/server/analytics";
 import { Segmented } from "@/web/ui/Segmented";
 import { Button } from "@/web/ui/Button";
 import { fmtChange, fmtCompact, shortAddr } from "@/web/ui/format";
@@ -198,6 +198,60 @@ function Fees({ f }: { f: FeeFlow }) {
   );
 }
 
+const ago = (iso: string | null) => {
+  if (!iso) return "Never";
+  const s = Math.max(0, Math.round((Date.now() - Date.parse(iso)) / 1000));
+  if (s < 90) return `${s}s ago`;
+  if (s < 5400) return `${Math.round(s / 60)}m ago`;
+  if (s < 172_800) return `${Math.round(s / 3600)}h ago`;
+  return `${Math.round(s / 86_400)}d ago`;
+};
+const duration = (s: number) => (s < 90 ? `${s}s` : s < 5400 ? `${Math.round(s / 60)}m` : `${Math.round(s / 3600)}h`);
+
+function Fact({ label, value, bad, sub }: { label: string; value: string; bad?: boolean; sub?: string }) {
+  return (
+    <div className="flex flex-col gap-1 border-t line pt-3 min-w-0">
+      <span className="text-[13px] text-muted">{label}</span>
+      <span className={`font-mono text-lg ${bad ? "text-burn" : ""}`}>{value}</span>
+      {sub && <span className={`text-[12px] break-words ${bad ? "text-burn" : "text-faint"}`}>{sub}</span>}
+    </div>
+  );
+}
+
+function HealthView({ h }: { h: Health }) {
+  const k = h.keeper;
+  const lamports = h.wallet?.lamports;
+  const lagBad = h.indexer.lagSeconds !== null && h.indexer.lagSeconds > 300;
+  return (
+    <div className="flex flex-col gap-6">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-5">
+        <Fact label="Last keeper run" value={ago(k.lastAt)} bad={k.ok === false} sub={k.ok === null ? "No runs recorded yet" : k.ok ? `Clean, ${k.launches} launches` : k.error ?? "Had errors"} />
+        <Fact label="Keeper runs with errors" value={`${fmtCount(k.failedRuns)} of ${fmtCount(k.runs)}`} bad={k.failedRuns > 0} sub={`${fmtCount(k.errors)} errors in this range`} />
+        <Fact label="Keeper balance" value={lamports == null ? "Unavailable" : `${(Number(lamports) / 1e9).toLocaleString("en-US", { maximumFractionDigits: 4 })} SOL`}
+          bad={h.wallet?.low} sub={h.wallet?.low ? "Below 0.01 SOL. Top it up." : h.wallet?.address ? shortAddr(h.wallet.address) : "Set PLATFORM_ADDRESSES"} />
+        <Fact label="Ledger steps" value={`${fmtCount(h.steps.failed)} failed`} bad={h.steps.failed > 0 || h.steps.stuck > 0}
+          sub={h.steps.stuck ? `${h.steps.stuck} waiting over 10 minutes` : "None waiting over 10 minutes"} />
+        <Fact label="Indexer last pass" value={ago(h.indexer.lastPassAt)} sub={`${fmtCount(h.indexer.addresses)} pools followed`} />
+        <Fact label="Indexer lag" value={h.indexer.lagSeconds === null ? "None" : duration(h.indexer.lagSeconds)} bad={lagBad} sub="Since the stalest pool was read" />
+        <Fact label="Newest indexed trade" value={ago(h.indexer.lastTradeAt)} />
+      </div>
+      {h.steps.recent.length > 0 && (
+        <div className="flex flex-col text-sm">
+          <span className="pb-2 text-[13px] text-muted">Latest failed steps</span>
+          {h.steps.recent.map((f, i) => (
+            <div key={i} className="grid grid-cols-1 md:grid-cols-[120px_120px_minmax(0,1fr)_100px] gap-1 md:gap-4 py-3 border-t line">
+              <a href={`/t/${f.mint}`} className="font-mono hover:text-accent">{f.symbol}</a>
+              <span className="font-semibold">{f.kind}</span>
+              <span className="text-burn break-words">{f.error}</span>
+              <span className="text-muted md:text-right">{ago(f.at)}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function Section({ title, note, children }: { title: string; note?: string; children: React.ReactNode }) {
   return (
     <section className="flex flex-col gap-4">
@@ -250,6 +304,9 @@ export function AnalyticsPanel() {
           </Section>
           <Section title="Fee flow" note="Fees split in this range and where they went. Held is the stakers' share not yet spent on rent or rewards in the range.">
             <Fees f={shown.fees} />
+          </Section>
+          <Section title="Keeper and indexer" note="Errors and failed steps count this range. Balances and lag are live.">
+            <HealthView h={shown.health} />
           </Section>
         </>
       )}

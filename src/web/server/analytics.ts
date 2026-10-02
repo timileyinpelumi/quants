@@ -244,12 +244,58 @@ export async function feeFlow(d: AnalyticsDeps, w: Window): Promise<FeeFlow> {
   };
 }
 
-export type Report = { range: Range; from: string; to: string; unit: Unit; overview: Overview; series: Point[]; tokens: TopToken[]; fees: FeeFlow };
+export const STUCK_MINUTES = 10;
+const iso = (v: unknown) => (v ? new Date(v as string).toISOString() : null);
+
+export type Health = {
+  keeper: { lastAt: string | null; ok: boolean | null; error: string | null; launches: number | null; runs: number; failedRuns: number; errors: number };
+  wallet: { address: string | null; lamports: string | null; low: boolean } | null;
+  steps: { failed: number; stuck: number; recent: { kind: string; mint: string; symbol: string; error: string | null; at: string }[] };
+  indexer: { lastPassAt: string | null; stalestAt: string | null; lagSeconds: number | null; addresses: number; lastTradeAt: string | null };
+};
+
+export async function health(d: AnalyticsDeps, w: Window): Promise<Health> {
+  const { sql } = d;
+  const stuckBefore = new Date(w.to.getTime() - STUCK_MINUTES * 60_000);
+  const [[last], [runs], [steps], recent, [ix], wallet] = await Promise.all([
+    sql`select finished_at, fatal, errors, error, launches from keeper_runs order by started_at desc, id desc limit 1`,
+    sql`select count(*)::int as n, count(*) filter (where fatal or errors > 0)::int as bad, coalesce(sum(errors), 0)::int + count(*) filter (where fatal)::int as errors
+        from keeper_runs where started_at >= ${w.from} and started_at < ${w.to}`,
+    sql`select (select count(*)::int from distributions where status = 'failed' and updated_at >= ${w.from} and updated_at < ${w.to}
+                  and coalesce(error, '') <> 'abandoned before send') as failed,
+               (select count(*)::int from distributions where status in ('pending', 'sent') and updated_at < ${stuckBefore}) as stuck`,
+    sql`select d.kind, l.mint, coalesce(l.symbol, left(l.mint, 4)) as symbol, d.error, d.updated_at from distributions d join launches l on l.id = d.launch_id
+        where d.status = 'failed' and d.updated_at >= ${w.from} and d.updated_at < ${w.to} and coalesce(d.error, '') <> 'abandoned before send'
+        order by d.updated_at desc limit 5`,
+    sql`select max(checked_at) as last, min(checked_at) filter (where not finished) as stalest, count(*) filter (where not finished)::int as n,
+          (select max(block_time) from trades) as trade
+        from index_cursors`,
+    d.keeperWallet().catch(() => null),
+  ]);
+  const stalest = ix?.stalest ? new Date(ix.stalest).getTime() : null;
+  return {
+    keeper: {
+      lastAt: iso(last?.finished_at), ok: last ? !last.fatal && last.errors === 0 : null, error: last?.error ?? null, launches: last ? last.launches : null,
+      runs: runs.n, failedRuns: runs.bad, errors: runs.errors,
+    },
+    wallet,
+    steps: {
+      failed: steps.failed, stuck: steps.stuck,
+      recent: recent.map((r: any) => ({ kind: r.kind, mint: r.mint, symbol: r.symbol, error: r.error, at: new Date(r.updated_at).toISOString() })),
+    },
+    indexer: {
+      lastPassAt: iso(ix?.last), stalestAt: iso(ix?.stalest), lagSeconds: stalest === null ? null : Math.max(0, Math.round((w.to.getTime() - stalest) / 1000)),
+      addresses: ix?.n ?? 0, lastTradeAt: iso(ix?.trade),
+    },
+  };
+}
+
+export type Report = { range: Range; from: string; to: string; unit: Unit; overview: Overview; series: Point[]; tokens: TopToken[]; fees: FeeFlow; health: Health };
 
 export async function report(d: AnalyticsDeps, range: Range, now = Date.now()): Promise<Report> {
   const w = windowOf(range, now);
-  const [ov, pts, tokens, fees] = await Promise.all([overview(d, w), series(d.sql, w), topTokens(d.sql, w), feeFlow(d, w)]);
-  return { range, from: w.from.toISOString(), to: w.to.toISOString(), unit: w.unit, overview: ov, series: pts, tokens, fees };
+  const [ov, pts, tokens, fees, h] = await Promise.all([overview(d, w), series(d.sql, w), topTokens(d.sql, w), feeFlow(d, w), health(d, w)]);
+  return { range, from: w.from.toISOString(), to: w.to.toISOString(), unit: w.unit, overview: ov, series: pts, tokens, fees, health: h };
 }
 
 export function contextDeps(ctx: WebContext): AnalyticsDeps {

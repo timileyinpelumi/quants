@@ -8,6 +8,7 @@ import { KaminoBackend } from "../staking/kamino";
 import { loadLatestSettings } from "../domain/settings";
 import { runKeeper, ReconcileError } from "./run";
 import { makeAlerter, sqlThrottle, Streaks, keeperRunAlerts } from "../ops/alerts";
+import { pruneAnalytics, recordKeeperRun } from "../ops/keeper-runs";
 
 const env = loadEnv();
 const sql = db(env.DATABASE_URL);
@@ -34,15 +35,18 @@ while (true) {
     webhook = (await loadLatestSettings(sql)).alertWebhookUrl || undefined;
     const r = await runKeeper(deps);
     console.log(JSON.stringify({ at: new Date().toISOString(), ...r }));
+    await recordKeeperRun(sql, { startedAt: new Date(started), launches: r.launches, errors: r.errors }).catch((e) => console.error("recording the run failed", e));
     keeperRunAlerts(alert, launchStreaks, r);
   } catch (e) {
     console.error(JSON.stringify({ at: new Date().toISOString(), fatal: String(e) }));
+    await recordKeeperRun(sql, { startedAt: new Date(started), fatal: String(e) }).catch(() => {});
     if (e instanceof ReconcileError) {
       await alert("keeper-reconcile", `stopped, nothing is sent until the ledger and wallets agree. ${e.message}`);
       process.exit(1);
     }
     void alert("keeper-fatal", `run failed: ${String(e)}`);
   }
+  await pruneAnalytics(sql).catch((e) => console.error("pruning analytics failed", e));
   const { keeperIntervalSeconds } = await loadLatestSettings(sql).catch(() => ({ keeperIntervalSeconds: 60 }));
   await Bun.sleep(Math.max(0, keeperIntervalSeconds * 1000 - (Date.now() - started)));
 }

@@ -2,7 +2,8 @@ import { test, expect } from "bun:test";
 import type { SQL } from "bun";
 import { freshDb } from "../helpers/db";
 import { defaultSettings, saveSettings } from "../../src/domain/settings";
-import { feeFlow, overview, series, topTokens, windowOf, type AnalyticsDeps } from "../../src/web/server/analytics";
+import { recordKeeperRun, pruneAnalytics } from "../../src/ops/keeper-runs";
+import { feeFlow, health, overview, series, topTokens, windowOf, type AnalyticsDeps } from "../../src/web/server/analytics";
 
 const NOW = Date.parse("2026-10-01T12:00:00Z");
 const H = 3_600_000;
@@ -143,6 +144,44 @@ test("fee flow splits what was collected into rewards bought, rent, creator, tre
   expect(round(f.collectedUsd)).toBe(200);
   expect(r(f.flow)).toEqual({ bought: 35, rent: 10, creator: 87.5, treasury: 52.5, held: 15 });
   expect(r(f.escrow)).toEqual({ unsplit: 10, basket: 0, reward: 2, creator: 20, treasury: 0 });
+});
+
+test("health reads keeper runs, ledger steps and indexer cursors", async () => {
+  const { sql, a } = await seed();
+  await recordKeeperRun(sql, { startedAt: new Date(NOW - 9 * D), launches: 2, errors: [] });
+  await recordKeeperRun(sql, { startedAt: new Date(NOW - 2 * H), launches: 3, errors: [{ error: "boom" }, { error: "bang" }] });
+  await recordKeeperRun(sql, { startedAt: new Date(NOW - H), fatal: "rpc down" });
+  await sql`update keeper_runs set finished_at = started_at + interval '5 seconds'`;
+  await step(sql, a, "claim", 3 * H, {}, { status: "failed", error: "transaction failed on-chain" });
+  await step(sql, a, "claim", 2 * H, {}, { status: "failed", error: "abandoned before send" });
+  await step(sql, a, "fund", 9 * D, {}, { status: "failed", error: "old" });
+  await step(sql, a, "payout", 30 * 60_000, {}, { status: "sent" });
+  await step(sql, a, "swap", 2 * 60_000, {}, { status: "pending" });
+  await sql`insert into index_cursors (address, checked_at, finished) values
+    ('p1', ${new Date(NOW - 5_000)}, false), ('p2', ${new Date(NOW - 65_000)}, false), ('p3', ${new Date(NOW - 9 * D)}, true)`;
+  const h = await health(deps(sql), windowOf("24h", NOW));
+  expect(h.keeper).toEqual({ lastAt: new Date(NOW - H + 5_000).toISOString(), ok: false, error: "rpc down", launches: 0, runs: 2, failedRuns: 2, errors: 3 });
+  expect(h.wallet).toEqual({ address: "Keeper1", lamports: "5000000", low: true });
+  expect(h.steps.failed).toBe(1);
+  expect(h.steps.stuck).toBe(1);
+  expect(h.steps.recent).toEqual([{ kind: "claim", mint: "mint-AAA", symbol: "AAA", error: "transaction failed on-chain", at: new Date(NOW - 3 * H).toISOString() }]);
+  expect(h.indexer).toEqual({
+    lastPassAt: new Date(NOW - 5_000).toISOString(), stalestAt: new Date(NOW - 65_000).toISOString(), lagSeconds: 65, addresses: 2,
+    lastTradeAt: new Date(NOW - 30 * 60_000).toISOString(),
+  });
+  const failing = await health(deps(sql, { keeperWallet: async () => { throw new Error("rpc"); } }), windowOf("24h", NOW));
+  expect(failing.wallet).toBeNull();
+});
+
+test("pruning drops page views and keeper runs past 90 days, a batch at a time", async () => {
+  const { sql } = await seed();
+  await recordKeeperRun(sql, { startedAt: new Date(NOW - 91 * D) });
+  await recordKeeperRun(sql, { startedAt: new Date(NOW - 89 * D) });
+  await sql`insert into page_views (at, path, visitor) values (${new Date(NOW - 91 * D)}, '/', 'v'), (${new Date(NOW - 89 * D)}, '/', 'v')`;
+  expect(await pruneAnalytics(sql, NOW)).toEqual({ views: 1, runs: 1 });
+  expect(await pruneAnalytics(sql, NOW)).toEqual({ views: 0, runs: 0 });
+  const [left] = await sql`select (select count(*)::int from page_views) as v, (select count(*)::int from keeper_runs) as r`;
+  expect(left).toEqual({ v: 1, r: 1 });
 });
 
 test("all time has no previous period", async () => {
