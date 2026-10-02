@@ -1,18 +1,21 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { createChart, AreaSeries, ColorType, type UTCTimestamp } from "lightweight-charts";
-import { fmtPrice } from "@/web/ui/format";
+import { fmtCompact, fmtPrice } from "@/web/ui/format";
 import { useTokenLive } from "./TokenLive";
 
 type Candle = { time: number; open: number; high: number; low: number; close: number };
 const TFS = ["1M", "5M", "1H", "1D"] as const;
 const LABELS: Record<(typeof TFS)[number], string> = { "1M": "1 minute", "5M": "5 minute", "1H": "1 hour", "1D": "1 day" };
+// Every launch mints a fixed 1B supply, so market cap is price times this.
+const SUPPLY = 1_000_000_000;
 
 export function Chart({ mint, quoteSymbol }: { mint: string; quoteSymbol: string }) {
   const el = useRef<HTMLDivElement>(null);
   const [tf, setTf] = useState<(typeof TFS)[number]>("5M");
   const [candles, setCandles] = useState<Candle[] | null>(null);
   const [unit, setUnit] = useState<"usd" | "quote">("usd");
+  const [mode, setMode] = useState<"price" | "mcap">("price");
 
   useEffect(() => {
     let live = true;
@@ -40,17 +43,30 @@ export function Chart({ mint, quoteSymbol }: { mint: string; quoteSymbol: string
     const [r, g, b] = candles.at(-1)!.close >= candles[0]!.close ? [46, 189, 133] : [246, 70, 93];
     const s = chart.addSeries(AreaSeries, {
       lineColor: `rgb(${r},${g},${b})`, lineWidth: 2, topColor: `rgba(${r},${g},${b},0.24)`, bottomColor: `rgba(${r},${g},${b},0)`,
-      priceFormat: { type: "custom", minMove: 1e-12, formatter: (p: number) => (unit === "usd" ? `$${fmtPrice(p, 5)}` : fmtPrice(p, 5)) },
+      priceFormat: mode === "mcap"
+        ? { type: "custom", minMove: 0.01, formatter: (p: number) => (unit === "usd" ? `$${fmtCompact(p)}` : fmtCompact(p)) }
+        : { type: "custom", minMove: 1e-12, formatter: (p: number) => (unit === "usd" ? `$${fmtPrice(p, 5)}` : fmtPrice(p, 5)) },
     });
-    s.setData(candles.map((c) => ({ time: c.time as UTCTimestamp, value: c.close })));
+    const k = mode === "mcap" ? SUPPLY : 1;
+    s.setData(candles.map((c) => ({ time: c.time as UTCTimestamp, value: c.close * k })));
     chart.timeScale().fitContent();
     return () => chart.remove();
-  }, [candles, tf, unit]);
+  }, [candles, tf, unit, mode]);
 
   return (
     <div className="flex flex-col gap-4 bg-surface border line rounded-[32px] px-5 md:px-7 py-6 min-w-0">
       <div className="flex justify-between items-center gap-3 flex-wrap">
-        <span className="font-display font-bold">Price{unit === "quote" && <span className="font-sans font-normal text-sm text-muted"> in {quoteSymbol}</span>}</span>
+        <span className="flex items-center gap-3">
+          <span className="flex rounded-full bg-white/[0.04] p-1 text-[13px] font-semibold" role="group" aria-label="Chart shows">
+            {(["price", "mcap"] as const).map((m) => (
+              <button key={m} type="button" onClick={() => setMode(m)} aria-pressed={mode === m}
+                className={`px-3 min-h-9 rounded-full cursor-pointer ${mode === m ? "bg-raised-2 text-ink" : "text-muted hover:text-ink"}`}>
+                {m === "price" ? "Price" : "MCap"}
+              </button>
+            ))}
+          </span>
+          {unit === "quote" && <span className="text-sm text-muted">in {quoteSymbol}</span>}
+        </span>
         <div className="flex gap-1.5 font-mono text-[13px]">
           {TFS.map((t) => (
             <button
@@ -71,7 +87,7 @@ export function Chart({ mint, quoteSymbol }: { mint: string; quoteSymbol: string
       ) : candles.length === 0 ? (
         <div className="h-[280px] md:h-[340px] flex items-center justify-center text-muted text-sm">No trades to chart yet</div>
       ) : (
-        <div ref={el} className="h-[280px] md:h-[340px]" role="img" aria-label="Price chart" />
+        <div ref={el} className="h-[280px] md:h-[340px]" role="img" aria-label={mode === "mcap" ? "Market cap chart" : "Price chart"} />
       )}
     </div>
   );

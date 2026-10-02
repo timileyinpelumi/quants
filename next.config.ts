@@ -19,7 +19,7 @@ const config: NextConfig = {
   turbopack: {},
   // Under Bun the dev server's file watcher misses edits, so dev polls for changes instead.
   webpack: (cfg, { dev }) => {
-    if (dev) cfg.watchOptions = { ...cfg.watchOptions, poll: 1000, aggregateTimeout: 300 };
+    if (dev) cfg.watchOptions = { ...cfg.watchOptions, poll: 1000, aggregateTimeout: 300, ignored: /[\\/](\.git|\.next|node_modules|\.claude|test-results|brand-src)[\\/]/ };
     return cfg;
   },
   onDemandEntries: { maxInactiveAge: 24 * 60 * 60 * 1000, pagesBufferLength: 100 },
