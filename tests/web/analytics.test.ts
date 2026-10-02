@@ -2,7 +2,7 @@ import { test, expect } from "bun:test";
 import type { SQL } from "bun";
 import { freshDb } from "../helpers/db";
 import { defaultSettings, saveSettings } from "../../src/domain/settings";
-import { overview, series, windowOf, type AnalyticsDeps } from "../../src/web/server/analytics";
+import { overview, series, topTokens, windowOf, type AnalyticsDeps } from "../../src/web/server/analytics";
 
 const NOW = Date.parse("2026-10-01T12:00:00Z");
 const H = 3_600_000;
@@ -115,6 +115,18 @@ test("24h series is hourly and all time starts at the first launch", async () =>
   const all = await series(sql, windowOf("all", NOW));
   expect(all[0]!.t).toBe("2026-09-21T00:00:00.000Z");
   expect(all.reduce((s, p) => s + p.trades, 0)).toBe(5);
+});
+
+test("top tokens rank by volume in the range with fees, traders and staking state", async () => {
+  const { sql, b } = await seed();
+  await sql`update stake_pools set rent_lamports = 1000, basket_value_lamports = 250 where launch_id = ${b}`;
+  const rows = await topTokens(sql, windowOf("7d", NOW));
+  expect(rows.map((r) => ({ ...r, volumeUsd: round(r.volumeUsd), feesUsd: round(r.feesUsd) }))).toEqual([
+    { mint: "mint-AAA", symbol: "AAA", name: null, status: "live", volumeUsd: 300, trades: 2, traders: 2, feesUsd: 100, staking: { state: "open", percent: null } },
+    { mint: "mint-BBB", symbol: "BBB", name: null, status: "graduated", volumeUsd: 100, trades: 1, traders: 1, feesUsd: 0, staking: { state: "opening", percent: 25 } },
+    { mint: "mint-CCC", symbol: "CCC", name: null, status: "live", volumeUsd: 100, trades: 1, traders: 1, feesUsd: 100, staking: { state: "trading", percent: null } },
+  ]);
+  expect(await topTokens(sql, windowOf("7d", NOW), 1)).toHaveLength(1);
 });
 
 test("all time has no previous period", async () => {

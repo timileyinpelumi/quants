@@ -1,9 +1,9 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
-import type { Overview, Range, Report, Stat } from "@/web/server/analytics";
+import type { Overview, Range, Report, Stat, TopToken } from "@/web/server/analytics";
 import { Segmented } from "@/web/ui/Segmented";
 import { Button } from "@/web/ui/Button";
-import { fmtChange, fmtCompact } from "@/web/ui/format";
+import { fmtChange, fmtCompact, shortAddr } from "@/web/ui/format";
 
 const RANGE_OPTIONS: { value: Range; label: string }[] = [
   { value: "24h", label: "24h" }, { value: "7d", label: "7d" }, { value: "30d", label: "30d" }, { value: "all", label: "All" },
@@ -106,6 +106,40 @@ function Series({ r }: { r: Report }) {
   );
 }
 
+const stakingLabel = (s: TopToken["staking"]) =>
+  s.state === "open" ? "Open" : s.state === "opening" ? `${s.percent ?? 0}% to open` : s.state === "trading" ? "Trading only" : "None";
+
+const TOKEN_COLS = "grid grid-cols-[minmax(0,1fr)_96px] md:grid-cols-[minmax(0,1fr)_110px_80px_80px_100px_120px] gap-x-4";
+
+function Tokens({ rows }: { rows: TopToken[] }) {
+  if (rows.length === 0) return <p className="m-0 text-muted">No trades in this range.</p>;
+  return (
+    <div className="flex flex-col text-sm">
+      <div className={`${TOKEN_COLS} pb-2 text-[13px] text-muted`}>
+        <span>Token</span><span className="text-right">Volume</span>
+        <span className="hidden md:block text-right">Trades</span><span className="hidden md:block text-right">Traders</span>
+        <span className="hidden md:block text-right">Fees</span><span className="hidden md:block text-right">Staking</span>
+      </div>
+      {rows.map((t) => (
+        <a key={t.mint} href={`/t/${t.mint}`} className={`${TOKEN_COLS} gap-y-1 py-3 border-t line hover:bg-white/[0.02]`}>
+          <span className="min-w-0 truncate">
+            <span className="font-mono font-semibold">{t.symbol}</span> <span className="text-muted font-mono">{shortAddr(t.mint)}</span>
+            {t.status === "graduated" && <span className="text-faint"> graduated</span>}
+          </span>
+          <span className="font-mono text-right">{fmtUsd(t.volumeUsd)}</span>
+          <span className="md:hidden col-span-2 text-[12px] text-muted">
+            {fmtCount(t.trades)} trades, {fmtCount(t.traders)} traders, {fmtUsd(t.feesUsd)} fees, staking {stakingLabel(t.staking).toLowerCase()}
+          </span>
+          <span className="hidden md:block font-mono text-right">{fmtCount(t.trades)}</span>
+          <span className="hidden md:block font-mono text-right">{fmtCount(t.traders)}</span>
+          <span className="hidden md:block font-mono text-right">{fmtUsd(t.feesUsd)}</span>
+          <span className={`hidden md:block text-right ${t.staking.state === "open" ? "" : "text-muted"}`}>{stakingLabel(t.staking)}</span>
+        </a>
+      ))}
+    </div>
+  );
+}
+
 export function Section({ title, note, children }: { title: string; note?: string; children: React.ReactNode }) {
   return (
     <section className="flex flex-col gap-4">
@@ -152,6 +186,9 @@ export function AnalyticsPanel() {
           </Section>
           <Section title={shown.unit === "hour" ? "By hour" : "By day"} note="UTC. Hover a bar for its value.">
             <Series r={shown} />
+          </Section>
+          <Section title="Top tokens" note="By volume in this range, up to 20.">
+            <Tokens rows={shown.tokens} />
           </Section>
         </>
       )}

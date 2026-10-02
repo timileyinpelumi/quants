@@ -3,6 +3,7 @@ import type { WebContext } from "./context";
 import { usdPrices } from "./prices";
 import { platformWallets } from "./platform-wallets";
 import { ttlCache } from "@/domain/lru";
+import { stakingOpens } from "./reads";
 
 export type Range = "24h" | "7d" | "30d" | "all";
 export const RANGES = ["24h", "7d", "30d", "all"] as const satisfies readonly Range[];
@@ -163,12 +164,44 @@ export async function series(sql: SQL, w: Window): Promise<Point[]> {
   return out;
 }
 
-export type Report = { range: Range; from: string; to: string; unit: Unit; overview: Overview; series: Point[] };
+export type Staking = { state: "open" | "opening" | "trading" | "none"; percent: number | null };
+export type TopToken = {
+  mint: string; symbol: string; name: string | null; status: string;
+  volumeUsd: number; trades: number; traders: number; feesUsd: number; staking: Staking;
+};
+export const TOP_TOKENS = 20;
+
+export async function topTokens(sql: SQL, w: Window, limit = TOP_TOKENS): Promise<TopToken[]> {
+  const rows = await sql`
+    with t as (
+      select launch_id, count(*)::int as n, count(distinct trader)::int as traders, coalesce(sum(quote_value * quote_usd), 0)::float8 as vol
+      from trades where block_time >= ${w.from} and block_time < ${w.to}
+      group by 1 order by 4 desc, 2 desc, 1 limit ${limit}
+    ), f as (
+      select s.launch_id, sum(s.amt * px.usd)::float8 as fees
+      from (${splitShares(sql, w.from, w.to, null)}) s ${pxJoin(sql, sql`s.launch_id`)}
+      where s.launch_id in (select launch_id from t) group by 1
+    )
+    select l.mint, coalesce(l.symbol, left(l.mint, 4)) as symbol, l.name, l.status, l.trading_only, t.n, t.traders, t.vol, coalesce(f.fees, 0) as fees,
+      sp.status as pool_status, sp.rent_lamports, sp.basket_value_lamports
+    from t join launches l on l.id = t.launch_id left join f on f.launch_id = t.launch_id left join stake_pools sp on sp.launch_id = t.launch_id
+    order by t.vol desc, t.n desc, l.id`;
+  return rows.map((r: any) => {
+    const opens = r.pool_status ? stakingOpens({ status: r.pool_status, rent_lamports: r.rent_lamports, basket_value_lamports: r.basket_value_lamports ?? 0 }) : null;
+    const staking: Staking = r.trading_only ? { state: "trading", percent: null }
+      : r.pool_status === "ready" ? { state: "open", percent: null }
+      : r.pool_status ? { state: "opening", percent: opens?.percent ?? 0 }
+      : { state: "none", percent: null };
+    return { mint: r.mint, symbol: r.symbol, name: r.name, status: r.status, volumeUsd: Number(r.vol), trades: r.n, traders: r.traders, feesUsd: Number(r.fees), staking };
+  });
+}
+
+export type Report = { range: Range; from: string; to: string; unit: Unit; overview: Overview; series: Point[]; tokens: TopToken[] };
 
 export async function report(d: AnalyticsDeps, range: Range, now = Date.now()): Promise<Report> {
   const w = windowOf(range, now);
-  const [ov, pts] = await Promise.all([overview(d, w), series(d.sql, w)]);
-  return { range, from: w.from.toISOString(), to: w.to.toISOString(), unit: w.unit, overview: ov, series: pts };
+  const [ov, pts, tokens] = await Promise.all([overview(d, w), series(d.sql, w), topTokens(d.sql, w)]);
+  return { range, from: w.from.toISOString(), to: w.to.toISOString(), unit: w.unit, overview: ov, series: pts, tokens };
 }
 
 export function contextDeps(ctx: WebContext): AnalyticsDeps {
