@@ -7,6 +7,7 @@ import { allQuotes, launchableQuotes } from "./quotes";
 import { resolveConfig, seedConfigKeys } from "@/launch/config-keys";
 import { keeperTopUp } from "./keeper-topup";
 import { checkTx, walletTx, type WalletTx } from "./tx-check";
+import { issueCosign } from "./cosign";
 
 const g = globalThis as { __quantsConfigSeed?: Promise<number> };
 
@@ -86,7 +87,7 @@ export async function prepareWithSwap(ctx: WebContext, raw: unknown): Promise<La
     // Optional: when another launch created the same config key first, this one fails and the launch goes on.
     const transaction = walletTx(p.transaction, { optional: true });
     await checkTx(ctx.conn, transaction);
-    return { step: "config", transaction };
+    return { step: "config", transaction: await issueCosign(ctx.sql, transaction, p.signers) };
   }
   if (p.step === "ready") {
     if (!swap) throw new Error("ready without a swap");
@@ -96,5 +97,5 @@ export async function prepareWithSwap(ctx: WebContext, raw: unknown): Promise<La
   }
   const transaction = walletTx(p.transaction);
   await checkTx(ctx.conn, transaction);
-  return { step: "launch", transaction, mint: p.mint, pool: p.pool, settingsVersion: p.settingsVersion };
+  return { step: "launch", transaction: await issueCosign(ctx.sql, transaction, p.signers), mint: p.mint, pool: p.pool, settingsVersion: p.settingsVersion };
 }

@@ -4,8 +4,8 @@ import { POST as prepare } from "../../src/app/api/launch/prepare/route";
 import { POST as confirm } from "../../src/app/api/launch/confirm/route";
 import { GET as search } from "../../src/app/api/tokens/search/route";
 import { NATIVE_MINT } from "../../src/domain/types";
-import { PublicKey, VersionedTransaction } from "@solana/web3.js";
-import nacl from "tweetnacl";
+import { POST as cosign } from "../../src/app/api/launch/cosign/route";
+import { Keypair, Transaction, VersionedTransaction } from "@solana/web3.js";
 
 const body = (over: object = {}) => ({
   name: "Cat", symbol: "CAT", uri: "https://ipfs.io/ipfs/x", creator: "Creator111111111111111111111111111111111111",
@@ -13,9 +13,11 @@ const body = (over: object = {}) => ({
 });
 const post = (h: (r: Request) => Promise<Response>, b: object) => h(new Request("http://x", { method: "POST", body: JSON.stringify(b) }));
 
-test("SOL launch is one launch step: the wallet signs first and the mint's signature travels beside it", async () => {
-  const c = await makeWebContext();
-  const r = await post(prepare, body({ devBuySol: "1000000000" }));
+test("SOL launch is one launch step: the wallet signs first, then the server checks it, adds the mint's signature and sends it", async () => {
+  const sent: Buffer[] = [];
+  const c = await makeWebContext({ conn: { sendRawTransaction: async (raw: Buffer) => { sent.push(Buffer.from(raw)); return "sig-launch"; } } as any });
+  const user = Keypair.generate();
+  const r = await post(prepare, body({ devBuySol: "1000000000", creator: user.publicKey.toBase58() }));
   const j = await r.json();
   expect(r.status).toBe(200);
   expect(j.step).toBe("launch");
@@ -23,12 +25,18 @@ test("SOL launch is one launch step: the wallet signs first and the mint's signa
   expect((c.meteora as any).launches[0].devBuyQuoteAmount).toBe(1_000_000_000n);
   const tx = VersionedTransaction.deserialize(Buffer.from(j.transaction.base64, "base64"));
   expect(tx.signatures.every((s) => s.every((b) => b === 0))).toBe(true);
-  // the one server signature is the prepared mint's, over exactly this message
-  expect(j.transaction.signatures.map((s: any) => s.publicKey)).toEqual([j.mint]);
-  expect(nacl.sign.detached.verify(tx.message.serialize(), Buffer.from(j.transaction.signatures[0].signature, "base64"), new PublicKey(j.mint).toBytes())).toBe(true);
+  expect(typeof j.transaction.cosign).toBe("string");
   const [row] = await c.sql`select creator from prepared_launches where mint = ${j.mint}`;
-  expect(row.creator).toBe(body().creator);
+  expect(row.creator).toBe(user.publicKey.toBase58());
   expect(c.simulated.length).toBe(1);
+  const signed = Transaction.from(Buffer.from(j.transaction.base64, "base64"));
+  signed.partialSign(user);
+  const cr = await post(cosign, { id: j.transaction.cosign, transaction: signed.serialize({ requireAllSignatures: false }).toString("base64") });
+  expect(await cr.json()).toEqual({ signature: "sig-launch" });
+  const landed = Transaction.from(sent[0]!);
+  expect(landed.verifySignatures()).toBe(true);
+  expect(landed.signatures.some((s) => s.publicKey.toBase58() === j.mint)).toBe(true);
+  expect(c.simulated.length).toBe(2);
 });
 
 test("OURTOKEN launch with a first buy swaps first, and the launch is built only on the next call", async () => {
@@ -38,7 +46,7 @@ test("OURTOKEN launch with a first buy swaps first, and the launch is built only
   const j = await r.json();
   expect(j.step).toBe("swap");
   expect(j.transaction.versioned).toBe(true);
-  expect(j.transaction.signatures).toBeUndefined();
+  expect(j.transaction.cosign).toBeUndefined();
   expect(j.quoteBought).toBe("1980000000");
   expect((c.meteora as any).launches).toEqual([]);
   expect((await c.sql`select mint from prepared_launches`).length).toBe(0);
@@ -185,7 +193,7 @@ test("the first USDC launch creates its config key in its own optional step, the
   expect(cfg.create.keeper).toBe(c.keeperAddress);
   expect(cfg.creator).toBe(body().creator);
   const configKey = cfg.create.config.publicKey.toBase58();
-  expect(first.transaction.signatures.map((s: any) => s.publicKey)).toEqual([configKey]);
+  expect(typeof first.transaction.cosign).toBe("string");
   expect(meteora.launches).toEqual([]);
   const [row] = await c.sql`select address, status from config_keys where quote_mint = ${USDC} and fee_bps = 200`;
   expect(row).toMatchObject({ address: configKey, status: "pending" });

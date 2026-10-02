@@ -1,5 +1,5 @@
 import { test, expect } from "bun:test";
-import { Keypair, Transaction, SystemProgram, VersionedTransaction } from "@solana/web3.js";
+import { Keypair, Transaction, SystemProgram } from "@solana/web3.js";
 import { sendOne, sendSequence, SendError, type UnsignedTx } from "../../src/web/wallet/send";
 
 const kp = Keypair.generate();
@@ -11,24 +11,21 @@ const single = (): UnsignedTx => {
     .add(SystemProgram.transfer({ fromPubkey: kp.publicKey, toPubkey: kp.publicKey, lamports: 1 }));
   return { base64: t.serialize({ requireAllSignatures: false }).toString("base64"), versioned: false };
 };
-// A server signer (a new mint) whose signature travels beside the transaction, not inside it.
+// A server signer (a new mint) signs on the server after the wallet, through cosign.
 const cosigned = (): UnsignedTx => {
   const t = new Transaction({ feePayer: kp.publicKey, recentBlockhash: BLOCKHASH })
     .add(SystemProgram.createAccount({ fromPubkey: kp.publicKey, newAccountPubkey: mint.publicKey, lamports: 1, space: 0, programId: SystemProgram.programId }));
-  const base64 = t.serialize({ requireAllSignatures: false }).toString("base64");
-  t.partialSign(mint);
-  const sig = Buffer.from(t.signatures.find((s) => s.publicKey.equals(mint.publicKey))!.signature!).toString("base64");
-  return { base64, versioned: false, signatures: [{ publicKey: mint.publicKey.toBase58(), signature: sig }] };
+  return { base64: t.serialize({ requireAllSignatures: false }).toString("base64"), versioned: false, cosign: "req-1" };
 };
 
-type Calls = { sent: Transaction[]; signed: Transaction[]; raw: Buffer[]; presigned: number[] };
+type Calls = { sent: Transaction[]; signed: Transaction[]; raw: Buffer[]; presigned: number[]; cosigned: { id: string; tx: Transaction }[] };
 const wallet = (calls: Calls, opts: { reject?: boolean; sendFail?: string; tamper?: boolean } = {}) => ({
   publicKey: kp.publicKey,
   sendTransaction: async (tx: Transaction) => {
     if (opts.reject) throw new Error("User rejected the request.");
     if (opts.sendFail) throw new Error(opts.sendFail);
     calls.sent.push(tx);
-    return `sig${calls.sent.length + calls.raw.length - 1}`;
+    return `sig${calls.sent.length + calls.cosigned.length - 1}`;
   },
   signTransaction: async (tx: Transaction) => {
     if (opts.reject) throw new Error("User rejected the request.");
@@ -45,7 +42,12 @@ const conn = (calls: Calls, fail = false) => ({
   confirmTransaction: async () => ({ value: { err: fail ? { InstructionError: [0, "Custom"] } : null } }),
   getLatestBlockhash: async () => ({ blockhash: BLOCKHASH, lastValidBlockHeight: 10 }),
 }) as any;
-const fresh = (): Calls => ({ sent: [], signed: [], raw: [], presigned: [] });
+const fresh = (): Calls => ({ sent: [], signed: [], raw: [], presigned: [], cosigned: [] });
+const server = (calls: Calls, fail?: string) => async (id: string, base64: string) => {
+  if (fail) throw new SendError(fail);
+  calls.cosigned.push({ id, tx: Transaction.from(Buffer.from(base64, "base64")) });
+  return `sig${calls.sent.length + calls.cosigned.length - 1}`;
+};
 
 test("a wallet only transaction goes through the wallet's send, one prompt, no batch signing", async () => {
   const c = fresh();
@@ -55,30 +57,31 @@ test("a wallet only transaction goes through the wallet's send, one prompt, no b
   expect(c.raw.length).toBe(0);
 });
 
-test("a transaction with a server signer is signed by the wallet first, then gets the server signature and is sent by us", async () => {
+test("a transaction with a server signer is signed by the wallet first, then handed to the server, which sends it", async () => {
   const c = fresh();
-  expect(await sendOne(wallet(c), conn(c), cosigned())).toBe("sig0");
+  expect(await sendOne(wallet(c), conn(c), cosigned(), server(c))).toBe("sig0");
   expect(c.sent.length).toBe(0);
-  expect(c.signed.length).toBe(1);
-  // the wallet saw no signatures before its own
+  expect(c.raw.length).toBe(0);
   expect(c.presigned).toEqual([0]);
-  const landed = VersionedTransaction.deserialize(c.raw[0]!);
-  expect(landed.signatures.every((s) => s.some((b) => b !== 0))).toBe(true);
-  expect(Transaction.from(c.raw[0]!).verifySignatures()).toBe(true);
+  expect(c.cosigned.length).toBe(1);
+  expect(c.cosigned[0]!.id).toBe("req-1");
+  const sigs = c.cosigned[0]!.tx.signatures;
+  expect(sigs.find((s) => s.publicKey.equals(kp.publicKey))!.signature).not.toBeNull();
+  expect(sigs.find((s) => s.publicKey.equals(mint.publicKey))!.signature).toBeNull();
 });
 
-test("a wallet that changes a cosigned transaction is refused before anything is sent", async () => {
+test("whatever the wallet changed goes to the server as signed; the server's refusal is the error shown", async () => {
   const c = fresh();
-  const err = await sendOne(wallet(c, { tamper: true }), conn(c), cosigned()).catch((e) => e);
+  const err = await sendOne(wallet(c, { tamper: true }), conn(c), cosigned(), server(c, "Your wallet changed this transaction in a way quants cannot accept (an instruction was added or changed). Nothing was sent. Try again.")).catch((e) => e);
   expect(err).toBeInstanceOf(SendError);
-  expect(err.message).toContain("changed this transaction");
+  expect(err.message).toContain("cannot accept");
   expect(c.raw.length).toBe(0);
 });
 
 test("a rejection becomes a readable error on both paths", async () => {
   for (const t of [single(), cosigned()]) {
     const c = fresh();
-    await expect(sendOne(wallet(c, { reject: true }), conn(c), t)).rejects.toThrow(new SendError("Transaction cancelled in your wallet."));
+    await expect(sendOne(wallet(c, { reject: true }), conn(c), t, server(c))).rejects.toThrow(new SendError("Transaction cancelled in your wallet."));
   }
 });
 
@@ -99,9 +102,9 @@ test("a sequence asks for each transaction only after the one before confirmed",
   const steps = [single(), cosigned(), single()];
   const sigs = await sendSequence(wallet(c), conn(c), async (done) => {
     seen.push(done);
-    expect(c.sent.length + c.raw.length).toBe(done.length);
+    expect(c.sent.length + c.cosigned.length).toBe(done.length);
     return steps[done.length] ?? null;
-  });
+  }, server(c));
   expect(sigs).toEqual(["sig0", "sig1", "sig2"]);
   expect(seen).toEqual([[], ["sig0"], ["sig0", "sig1"], ["sig0", "sig1", "sig2"]]);
 });
@@ -144,7 +147,7 @@ test("an optional transaction that fails leaves an empty slot and the flow goes 
   let n = 0;
   const cn = conn(c);
   cn.confirmTransaction = async () => ({ value: { err: n++ === 0 ? { InstructionError: [0, "Custom"] } : null } });
-  const sigs = await sendSequence(wallet(c), cn, async (done) => (done.length === 0 ? { ...cosigned(), optional: true } : done.length === 1 ? single() : null));
+  const sigs = await sendSequence(wallet(c), cn, async (done) => (done.length === 0 ? { ...cosigned(), optional: true } : done.length === 1 ? single() : null), server(c));
   expect(sigs).toEqual(["", "sig1"]);
   const f = fresh();
   const err = await sendSequence(wallet(f), conn(f, true), async (done) => (done.length === 0 ? { ...single(), optional: true } : done.length === 1 ? single() : null)).catch((e) => e);

@@ -1,25 +1,33 @@
-import { PublicKey, Transaction, VersionedTransaction, type Connection } from "@solana/web3.js";
+import { Transaction, VersionedTransaction, type Connection } from "@solana/web3.js";
 import type { WalletContextState } from "@solana/wallet-adapter-react";
 
 export class SendError extends Error {
   constructor(message: string, public confirmed: string[] = [], public unconfirmed: string | null = null) { super(message); }
 }
 /**
- * `signatures`: signatures the server already made over this exact message (a new mint, a new config key). They are
- * added after the wallet signs, so the wallet sees and signs the transaction first.
+ * `cosign`: the transaction also needs server signatures (a new mint, a new config key). The wallet signs it first and
+ * the server checks what the wallet signed, adds its signatures and sends it.
  * `optional`: the flow goes on if it fails (a config key another launch created first).
  */
-export type UnsignedTx = { base64: string; versioned: boolean; optional?: boolean; signatures?: { publicKey: string; signature: string }[] };
+export type UnsignedTx = { base64: string; versioned: boolean; optional?: boolean; cosign?: string };
 export type Wallet = Pick<WalletContextState, "publicKey" | "sendTransaction" | "signTransaction">;
+/** Hands the wallet-signed transaction to the server, which signs, sends and returns the signature. */
+export type Cosign = (id: string, signedBase64: string) => Promise<string>;
 
 const decode = (t: UnsignedTx) => {
   const bytes = Buffer.from(t.base64, "base64");
   return t.versioned ? VersionedTransaction.deserialize(bytes) : Transaction.from(bytes);
 };
-const messageOf = (tx: Transaction | VersionedTransaction) => (tx instanceof Transaction ? tx.serializeMessage() : Buffer.from(tx.message.serialize()));
 const firstLine = (e: unknown) => (e instanceof Error ? e.message.split("\n")[0] : String(e));
 const CANCELLED = "Transaction cancelled in your wallet.";
 const cancelled = (e: unknown) => /reject|cancel|denied|declined|closed/i.test(firstLine(e) ?? "");
+
+export const postCosign: Cosign = async (id, transaction) => {
+  const r = await fetch("/api/launch/cosign", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ id, transaction }) });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new SendError(j.error?.message ?? "Something went wrong. Try again.");
+  return j.signature as string;
+};
 
 // Phantom can only check a transaction it signs and sends itself, one at a time; a wallet-only transaction goes that way.
 async function walletSends(wallet: Wallet, conn: Connection, t: UnsignedTx): Promise<string> {
@@ -31,35 +39,22 @@ async function walletSends(wallet: Wallet, conn: Connection, t: UnsignedTx): Pro
   }
 }
 
-async function cosignAndSend(wallet: Wallet, conn: Connection, t: UnsignedTx): Promise<string> {
+async function walletSignsFirst(wallet: Wallet, t: UnsignedTx & { cosign: string }, cosign: Cosign): Promise<string> {
   if (!wallet.signTransaction) throw new SendError("This wallet cannot sign this transaction. Try another wallet.");
-  const tx = decode(t);
-  const message = messageOf(tx);
   let signed: Transaction | VersionedTransaction;
   try {
-    signed = await wallet.signTransaction(tx);
+    signed = await wallet.signTransaction(decode(t));
   } catch {
     throw new SendError(CANCELLED);
   }
-  let raw: Uint8Array;
-  try {
-    if (!messageOf(signed).equals(message)) throw new Error("changed");
-    for (const s of t.signatures ?? []) signed.addSignature(new PublicKey(s.publicKey), Buffer.from(s.signature, "base64"));
-    raw = signed.serialize();
-  } catch {
-    throw new SendError("Your wallet changed this transaction, so it cannot be sent. Nothing was sent. Try again.");
-  }
-  try {
-    return await conn.sendRawTransaction(raw, { preflightCommitment: "confirmed", maxRetries: 3 });
-  } catch (e) {
-    throw new SendError(`The network rejected the transaction: ${firstLine(e)}`);
-  }
+  const raw = signed instanceof Transaction ? signed.serialize({ requireAllSignatures: false, verifySignatures: false }) : signed.serialize();
+  return cosign(t.cosign, Buffer.from(raw).toString("base64"));
 }
 
 /** Sends one transaction and waits for it to confirm. Errors carry no confirmed signatures; `sendSequence` adds them. */
-export async function sendOne(wallet: Wallet, conn: Connection, t: UnsignedTx): Promise<string> {
+export async function sendOne(wallet: Wallet, conn: Connection, t: UnsignedTx, cosign: Cosign = postCosign): Promise<string> {
   if (!wallet.publicKey) throw new SendError("Connect a wallet first.");
-  const sig = t.signatures?.length ? await cosignAndSend(wallet, conn, t) : await walletSends(wallet, conn, t);
+  const sig = t.cosign ? await walletSignsFirst(wallet, { ...t, cosign: t.cosign }, cosign) : await walletSends(wallet, conn, t);
   let res: Awaited<ReturnType<Connection["confirmTransaction"]>>;
   try {
     const { blockhash, lastValidBlockHeight } = await conn.getLatestBlockhash("confirmed");
@@ -76,7 +71,7 @@ export async function sendOne(wallet: Wallet, conn: Connection, t: UnsignedTx): 
  * confirmed, so the server builds it against current chain state and the wallet can simulate it on its own.
  * It returns null when the flow is done. A failed optional transaction leaves an empty slot.
  */
-export async function sendSequence(wallet: Wallet, conn: Connection, next: (sigs: string[]) => Promise<UnsignedTx | null>): Promise<string[]> {
+export async function sendSequence(wallet: Wallet, conn: Connection, next: (sigs: string[]) => Promise<UnsignedTx | null>, cosign: Cosign = postCosign): Promise<string[]> {
   if (!wallet.publicKey) throw new SendError("Connect a wallet first.");
   const sigs: string[] = [];
   for (;;) {
@@ -88,7 +83,7 @@ export async function sendSequence(wallet: Wallet, conn: Connection, next: (sigs
     }
     if (!t) return sigs;
     try {
-      sigs.push(await sendOne(wallet, conn, t));
+      sigs.push(await sendOne(wallet, conn, t, cosign));
     } catch (e) {
       const err = e instanceof SendError ? e : new SendError(firstLine(e) ?? "Something went wrong. Try again.");
       if (t.optional && !err.unconfirmed && err.message !== CANCELLED) { sigs.push(""); continue; }

@@ -19,21 +19,16 @@ const sim = (value: object = ok.value) => {
   return { calls, conn: { simulateTransaction: async (tx: VersionedTransaction, config: any) => { calls.push({ tx, config }); return { context: { slot: 1 }, value }; } } as any };
 };
 
-test("server signatures move out of the transaction so the wallet signs first", () => {
+test("server signatures are dropped so the wallet signs first; the server signs later through cosign", () => {
   const t = presigned();
-  const w = walletTx(t.serialize({ requireAllSignatures: false }).toString("base64"), { optional: true });
-  expect(w.optional).toBe(true);
+  const w = walletTx(t.serialize({ requireAllSignatures: false }).toString("base64"));
   expect(w.versioned).toBe(false);
-  expect(w.signatures).toEqual([{ publicKey: extra.publicKey.toBase58(), signature: Buffer.from(t.signatures[1]!.signature!).toString("base64") }]);
   const back = Transaction.from(Buffer.from(w.base64, "base64"));
   expect(back.signatures.every((s) => s.signature === null)).toBe(true);
   expect(back.serializeMessage().equals(t.serializeMessage())).toBe(true);
-  back.partialSign(payer);
-  back.addSignature(extra.publicKey, Buffer.from(w.signatures![0]!.signature, "base64"));
-  expect(back.verifySignatures()).toBe(true);
 });
 
-test("a wallet only transaction carries no signatures field", () => {
+test("a wallet only transaction is passed through as is", () => {
   const t = new Transaction({ feePayer: payer.publicKey, recentBlockhash: BLOCKHASH }).add(SystemProgram.transfer({ fromPubkey: payer.publicKey, toPubkey: payer.publicKey, lamports: 1 }));
   expect(walletTx(t.serialize({ requireAllSignatures: false }).toString("base64"))).toEqual({ base64: t.serialize({ requireAllSignatures: false }).toString("base64"), versioned: false });
 });
