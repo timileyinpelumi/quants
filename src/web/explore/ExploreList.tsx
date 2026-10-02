@@ -8,7 +8,7 @@ import { LoadMore, getJson, usePaged } from "@/web/ui/LoadMore";
 import type { TokenRow } from "@/web/server/landing";
 import { StakingAt } from "@/web/ui/StakingAt";
 
-const COLS = "md:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)_minmax(0,0.7fr)_96px_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.3fr)]";
+const COLS = "md:grid-cols-[minmax(0,2.2fr)_minmax(0,0.9fr)_minmax(0,0.7fr)_96px_minmax(0,0.9fr)_minmax(0,0.9fr)_minmax(0,1.5fr)]";
 const PAGE = 30;
 
 const usd = (n: number | null) => (n === null ? "No trades" : `$${fmtCompact(n)}`);
@@ -35,7 +35,7 @@ export function ExploreList({ initial, nextOffset, query }: { initial: TokenRow[
                 <span className="font-mono text-[12px] text-faint shrink-0">{fmtAgo(t.createdAt)}</span>
                 <StakingAt pct={t.stakingPct} tradingOnly={t.tradingOnly} />
               </span>
-              <span className="text-[13px] text-muted truncate flex items-center gap-1.5">{t.name ?? shortAddr(t.mint)} · <CoinTag coin={t.quote} size={14} /></span>
+              <span className="text-[13px] text-muted flex items-center gap-1.5 min-w-0"><span className="truncate">{t.name ?? shortAddr(t.mint)}</span><span className="shrink-0">·</span><span className="shrink-0"><CoinTag coin={t.quote} size={14} /></span></span>
             </span>
           </span>
           <Sparkline points={t.spark ?? []} width={56} height={24} className="md:hidden" />

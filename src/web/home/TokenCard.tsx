@@ -32,8 +32,8 @@ export function TokenCard({ t }: { t: TokenRow }) {
           </span>
         </span>
         <span className="flex flex-1 flex-col min-w-0 gap-1">
-          <span className="flex items-center gap-2 min-w-0">
-            <span className="font-display font-bold text-lg leading-none truncate">{t.symbol}</span>
+          <span className="flex flex-wrap items-center gap-x-2 gap-y-1 min-w-0">
+            <span className="font-display font-bold text-lg leading-none break-all">{t.symbol}</span>
             {t.tradingOnly && <TradingOnly />}
             <span className="ml-auto font-mono text-[11px] text-faint shrink-0">{fmtAgo(t.createdAt)}</span>
           </span>
