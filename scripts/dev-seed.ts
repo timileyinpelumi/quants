@@ -18,6 +18,7 @@ import { confirmLaunch } from "../src/launch/confirm";
 import { NATIVE_MINT } from "../src/domain/types";
 import { quoteCoins } from "../src/domain/quotes";
 import { generateCode, hashCode } from "../src/admin-code";
+import { staticConfigs } from "../src/launch/config-keys";
 
 const RPC = process.env.RPC_URL ?? "http://127.0.0.1:8899";
 const DB = process.env.SEED_DATABASE_URL ?? "postgres://quants:quants@localhost:5434/quants";
@@ -83,7 +84,7 @@ await saveSettings(sql, defaultSettings(ours.toBase58()), "seed");
 const chain = new SolanaChain(conn, keeper, spill);
 const meteora = new MeteoraLive(chain, DAMM_CUSTOM);
 const stockMints = localStocks.map((st) => st.mint.toBase58());
-const deps = { sql, meteora, configKeys, quoteMints: [NATIVE_MINT, ours.toBase58(), ...stockMints], tradingOnlyMints: stockMints, isVerified: async () => true,
+const deps = { sql, meteora, configFor: staticConfigs(configKeys), quoteMints: [NATIVE_MINT, ours.toBase58(), ...stockMints], tradingOnlyMints: stockMints, isVerified: async () => true,
   tokenProgramOf: async (m: string) => (await conn.getAccountInfo(new PublicKey(m)))!.owner.toBase58() };
 
 async function launch(name: string, symbol: string, basket: { mint: PublicKey; symbol: string; decimals: number; weightBps: number }[], quoteMint = NATIVE_MINT) {

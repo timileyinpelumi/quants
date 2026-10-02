@@ -2,6 +2,7 @@ import type { SQL } from "bun";
 import { PublicKey, type Connection } from "@solana/web3.js";
 import { getAssociatedTokenAddressSync } from "@solana/spl-token";
 import { LaunchError } from "./prepare";
+import { markConfigLive } from "./config-keys";
 import type { MeteoraPort } from "../meteora/port";
 import { launchCost } from "../domain/launch-cost";
 import { parseSettings } from "../domain/settings";
@@ -23,6 +24,7 @@ export async function confirmLaunch(
   if (pool.baseMint !== i.mint || pool.config !== prep.config_key || pool.creator !== prep.creator) {
     throw new LaunchError("pool_mismatch", "The on-chain pool does not match the prepared launch");
   }
+  await markConfigLive(deps.sql, prep.config_key);
   return recordLaunch(deps.sql, prep, deps.spillWallet);
 }
 

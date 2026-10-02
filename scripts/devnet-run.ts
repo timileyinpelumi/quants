@@ -26,6 +26,7 @@ import { runKeeper, ReconcileError } from "../src/keeper/run";
 import { NATIVE_MINT } from "../src/domain/types";
 import { uploadsFrom } from "../src/web/server/uploads";
 import { arg, keypairOf, loadState, num, printBudget, runBudget, saveState, secretOf, sendSigned, sendTx, sol, withRetries, type SecretKey } from "./lib/devnet";
+import { staticConfigs } from "../src/launch/config-keys";
 
 const e = applyClusterDefaults(process.env);
 if (clusterOf(e) !== "devnet") throw new Error("devnet-run only runs with CLUSTER=devnet");
@@ -69,7 +70,7 @@ const spill = loadKeypair(e.SPILL_KEYPAIR!);
 const chain = new SolanaChain(conn, keeper, spill);
 const meteora = new MeteoraLive(chain, e.DAMM_V2_MIGRATION_CONFIG!);
 const jupiter = swapPortFor(e, chain);
-const staking = new KaminoBackend(chain, e.RPC_URL!, e.KAMINO_GLOBAL_CONFIG!);
+const staking = new KaminoBackend(chain, e.RPC_URL!, e.KAMINO_GLOBAL_CONFIG ?? "");
 const trade = new TradeLive(conn);
 const sql = db(e.DATABASE_URL, 4);
 const configKeys: Record<string, string> = JSON.parse(e.CONFIG_KEYS ?? readFileSync(configKeysPath(e), "utf8"));
@@ -202,7 +203,7 @@ await step("launch", async () => {
       note(`Launch metadata was not uploaded (${String(err).slice(0, 120)}); the launch uses a placeholder URI.`);
     }
     const p = await prepareLaunch(
-      { sql, meteora, configKeys, quoteMints: [NATIVE_MINT], isVerified: (m) => jupiter.isVerified(m),
+      { sql, meteora, configFor: staticConfigs(configKeys), quoteMints: [NATIVE_MINT], isVerified: (m) => jupiter.isVerified(m),
         tokenProgramOf: async (m) => (await conn.getAccountInfo(new PublicKey(m)))?.owner.toBase58() ?? "" },
       { name: "Devnet Cat", symbol: "DCAT", uri, creator: A.publicKey.toBase58(), quoteMint: NATIVE_MINT, feeTierBps: FEE_TIER_BPS,
         basket: basket.map(([s, w]) => ({ mint: pick(s).mint, symbol: s, decimals: pick(s).decimals, weightBps: w })), devBuyQuoteAmount: String(0.05 * LAMPORTS_PER_SOL) },

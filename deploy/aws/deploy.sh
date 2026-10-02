@@ -18,7 +18,7 @@ bun -e '
     const pub = Keypair.fromSecretKey(Uint8Array.from(await Bun.file(`secrets/${file}.json`).json())).publicKey.toBase58();
     if (pub !== env[name]) { console.error(`secrets/${file}.json is ${pub} but ${name} is ${env[name] || "unset"}`); process.exit(1); }
   }
-  for (const k of ["SITE_HOST", "SITE_URL", "POSTGRES_PASSWORD", "ADMIN_SESSION_SECRET", "ADMIN_CODE_HASH", "PLATFORM_ADDRESSES", "CONFIG_KEYS", "NEXT_PUBLIC_RPC_URL"]) {
+  for (const k of ["SITE_HOST", "SITE_URL", "POSTGRES_PASSWORD", "ADMIN_SESSION_SECRET", "ADMIN_CODE_HASH", "PLATFORM_ADDRESSES", "NEXT_PUBLIC_RPC_URL"]) {
     if (!env[k]) { console.error(`${k} is empty in .env.production`); process.exit(1); }
   }
   const roles = JSON.parse(env.PLATFORM_ADDRESSES);

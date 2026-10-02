@@ -4,6 +4,11 @@ export interface StakingAdapter {
   readonly backend: "kamino";
   /** rewardsPerTx is how many reward mints buildAddRewards can register in one transaction. */
   capabilities(): { earlyExit: boolean; tiersOnChain: boolean; rewardsPerTx: number };
+  /** The global config new farms are created under, or "" until one exists. */
+  globalConfig(): string;
+  setGlobalConfig(address: string): void;
+  /** Creates a global config at the keypair's address with the keeper as admin and no treasury fee. */
+  buildCreateGlobalConfig(secret: Uint8Array): Promise<SignedTx>;
   buildCreateFarm(stakeMint: string, farmSecret: Uint8Array): Promise<SignedTx>;
   buildAddRewards(farm: string, rewardMints: string[]): Promise<SignedTx>;
   farmRewardMints(farm: string): Promise<string[]>;

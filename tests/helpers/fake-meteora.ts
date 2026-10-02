@@ -12,9 +12,15 @@ export class FakeMeteora implements MeteoraPort {
   firstBuyQuotes: { configKey: string; amount: bigint }[] = [];
   firstBuyOut = async (_configKey: string, amount: bigint) => amount;
   thresholds = new Map<string, bigint>();
+  configs = new Map<string, { feeClaimer: string; quoteMint: string; threshold: bigint }>();
   constructor(private chain: FakeChain) {}
   async configThreshold(configKey: string) { return this.thresholds.get(configKey) ?? 0n; }
-  async firstBuyMaxOut(configKey: string, amount: bigint) { this.firstBuyQuotes.push({ configKey, amount }); return this.firstBuyOut(configKey, amount); }
+  async configState(configKey: string) { return this.configs.get(configKey) ?? null; }
+  async firstBuyMaxOut(config: string | { feeBps: number }, amount: bigint) {
+    const configKey = typeof config === "string" ? config : `new:${config.feeBps}`;
+    this.firstBuyQuotes.push({ configKey, amount });
+    return this.firstBuyOut(configKey, amount);
+  }
   async pendingPartnerQuoteFee(pool: string) { return this.partnerFee.get(pool) ?? 0n; }
   async buildClaimPartnerFee(pool: string) {
     const t = this.chain.tx(`claim-${pool}`);
@@ -31,6 +37,10 @@ export class FakeMeteora implements MeteoraPort {
     const baseMint = Keypair.generate();
     const tx = new Transaction({ feePayer: baseMint.publicKey, recentBlockhash: "11111111111111111111111111111111" })
       .add(SystemProgram.transfer({ fromPubkey: baseMint.publicKey, toPubkey: baseMint.publicKey, lamports: 1 }));
-    return { tx, baseMint, pool: `pool-${baseMint.publicKey.toBase58()}` };
+    const setupTx = input.createConfig
+      ? new Transaction({ feePayer: baseMint.publicKey, recentBlockhash: "11111111111111111111111111111111" })
+        .add(SystemProgram.transfer({ fromPubkey: baseMint.publicKey, toPubkey: input.createConfig.config.publicKey, lamports: 1 }))
+      : undefined;
+    return { tx, setupTx, baseMint, pool: `pool-${baseMint.publicKey.toBase58()}` };
   }
 }

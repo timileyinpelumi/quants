@@ -13,11 +13,11 @@ export async function allQuotes(ctx: Pick<WebContext, "stocks" | "sql">): Promis
   return [...quoteCoins(), ...stocks];
 }
 
-/** Pairs a new launch can use: enabled on the admin page with curve configs on this network, and stocks only with the stock pairs switch on. */
+/** Pairs a new launch can use: crypto pairs enabled on the admin page (their config keys are created on demand), and stocks with config keys only while the stock pairs switch is on. */
 export async function launchableQuotes(ctx: Pick<WebContext, "stocks" | "configKeys" | "sql">, quotes?: QuoteCoin[]): Promise<QuoteCoin[]> {
   const keyed = new Set(Object.keys(ctx.configKeys).map((k) => k.split(":")[0]));
   const { stockPairs } = await cachedSettings(ctx.sql);
-  return (quotes ?? await allQuotes(ctx)).filter((c) => keyed.has(c.mint) && (c.tradingOnly ? stockPairs : c.enabled && c.graduation > 0));
+  return (quotes ?? await allQuotes(ctx)).filter((c) => (c.tradingOnly ? stockPairs && keyed.has(c.mint) : c.enabled && c.graduation > 0));
 }
 
 /** Jupiter logos first; a stock Jupiter has no logo for falls back to its issuer's. */

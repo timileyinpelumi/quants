@@ -18,7 +18,7 @@ const r = await runKeeper({
   chain,
   meteora: new MeteoraLive(chain, e.DAMM_V2_MIGRATION_CONFIG!),
   jupiter: e.LOCAL_REWARD_MINTS ? localJupiter(chain, e.LOCAL_REWARD_MINTS.split(",")) : swapPortFor(e, chain),
-  staking: new KaminoBackend(chain, e.RPC_URL!, e.KAMINO_GLOBAL_CONFIG!),
+  staking: new KaminoBackend(chain, e.RPC_URL!, e.KAMINO_GLOBAL_CONFIG ?? ""),
   wallets: { keeper: keeper.publicKey.toBase58(), spill: spill.publicKey.toBase58(), treasury: e.TREASURY_ADDRESS! },
 });
 console.log(JSON.stringify(r));

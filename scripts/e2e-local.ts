@@ -17,6 +17,7 @@ import { prepareLaunch } from "../src/launch/prepare";
 import { confirmLaunch } from "../src/launch/confirm";
 import { runKeeper } from "../src/keeper/run";
 import { NATIVE_MINT } from "../src/domain/types";
+import { staticConfigs } from "../src/launch/config-keys";
 
 const RPC = process.env.RPC_URL ?? "http://127.0.0.1:8899";
 const DB = process.env.E2E_DATABASE_URL ?? "postgres://quants:quants@localhost:5434/quants_test";
@@ -55,7 +56,7 @@ log("3. database migrated, default settings saved");
 
 const meteora = new MeteoraLive(chain, DAMM_CUSTOM);
 const prepared = await prepareLaunch(
-  { sql, meteora, configKeys, quoteMints: [NATIVE_MINT, ours.toBase58()], isVerified: async () => true,
+  { sql, meteora, configFor: staticConfigs(configKeys), quoteMints: [NATIVE_MINT, ours.toBase58()], isVerified: async () => true,
     tokenProgramOf: async (m: string) => (await conn.getAccountInfo(new PublicKey(m)))!.owner.toBase58() },
   { name: "Cat", symbol: "CAT", uri: "https://example.com/cat.json", creator: creator.publicKey.toBase58(), quoteMint: NATIVE_MINT, feeTierBps: 200,
     basket: [{ mint: zec.toBase58(), weightBps: 10_000 }], devBuyQuoteAmount: "100000000" },

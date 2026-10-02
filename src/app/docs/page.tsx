@@ -95,7 +95,7 @@ export default async function DocsPage() {
 
           <H2 id="launch">Launching a token</H2>
           <P>Pick a name, a symbol and a square image, then pick the pair token: {pairs.map((c) => c.symbol).join(", ")}. Choose a trading fee of {feeList} and pick your reward basket. An optional first buy of your own token goes in the same approval. It is paid in SOL and swapped to the pair token if needed.</P>
-          <P>Every token has a supply of 1,000,000,000. Launching costs only the network fee for your own transaction and any first buy. A first buy is capped at {pct(s.devBuyCapBps)} of supply.</P>
+          <P>Every token has a supply of 1,000,000,000. Launching costs the Solana network fees and account rent for your transactions, plus any first buy. Your wallet shows the total before you approve. A first buy is capped at {pct(s.devBuyCapBps)} of supply.</P>
           <P>Staking does not open at launch. The staking farms are paid for out of the stakers&apos; share of trading fees, so a token can be staked once it has traded enough. See <a href="#opens" className="text-accent">When staking opens</a>.</P>
 
           <H2 id="fees">Where fees go</H2>

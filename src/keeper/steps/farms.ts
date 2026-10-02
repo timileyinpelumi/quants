@@ -4,12 +4,14 @@ import type { LaunchRow } from "../launch-row";
 import type { VersionedSettings } from "../../domain/settings";
 import { beginStep } from "../../ledger/ledger";
 import { runTxStep } from "../../ledger/run-step";
+import { ensureGlobalConfig } from "./global-config";
 
 // Farm keypairs are stored before sending so a retry after an expired blockhash reuses the same address.
 export async function createFarmsStep(deps: KeeperDeps, launch: LaunchRow, s: VersionedSettings, _runId: string): Promise<"ready" | "pending"> {
   const [pool] = await deps.sql`select * from stake_pools where launch_id = ${launch.id}`;
   if (!pool) return "pending";
   if (pool.status === "ready") return "ready";
+  if (!(await ensureGlobalConfig(deps, launch, s))) return "pending";
   const tiers = await deps.sql`select * from stake_tiers where launch_id = ${launch.id} order by lock_seconds`;
   const rewardMints = (await deps.sql`select reward_mint from baskets where launch_id = ${launch.id} order by reward_mint`).map((r: any) => r.reward_mint);
   let allDone = true;

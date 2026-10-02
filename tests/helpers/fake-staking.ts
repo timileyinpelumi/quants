@@ -13,6 +13,17 @@ export class FakeStaking implements StakingAdapter {
   rewards = new Map<string, string[]>();
   rewardBatches: string[][] = [];
   capabilities() { return { earlyExit: true, tiersOnChain: false, rewardsPerTx: 4 }; }
+  gc = "GlobalConfig1111111111111111111111111111111";
+  createdGlobalConfigs: string[] = [];
+  globalConfig() { return this.gc; }
+  setGlobalConfig(a: string) { this.gc = a; }
+  async buildCreateGlobalConfig(secret: Uint8Array) {
+    const { Keypair } = await import("@solana/web3.js");
+    const a = Keypair.fromSecretKey(secret).publicKey.toBase58();
+    this.createdGlobalConfigs.push(a);
+    const t = this.chain.tx("create_global_config");
+    return { ...t, send: async () => { await t.send(); this.farms.add(a); } };
+  }
   async buildCreateFarm() { return this.chain.tx("create_farm"); }
   async buildConfigureFarm(i: { farm: string }) { this.farms.add(i.farm); return this.chain.tx("configure_farm"); }
   async buildAddRewards(farm: string, mints: string[]) {

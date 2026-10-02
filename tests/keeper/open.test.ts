@@ -7,7 +7,7 @@ import { loadLaunches } from "../../src/keeper/launch-row";
 import { processLaunch, reconcile, resume, runKeeper, ReconcileError } from "../../src/keeper/run";
 import { openStakingStep } from "../../src/keeper/steps/open";
 import { beginStep, confirmStep, getBalance } from "../../src/ledger/ledger";
-import { launchCost } from "../../src/domain/launch-cost";
+import { GLOBAL_CONFIG_COST, launchCost } from "../../src/domain/launch-cost";
 import { NATIVE_MINT } from "../../src/domain/types";
 
 const TIER = { id: "7d", lockSeconds: 604_800, multiplierBps: 10_000 };
@@ -165,4 +165,37 @@ test("a launch made while the launch fee existed opens without taking rent from 
   expect(await openStakingStep(t.deps, await t.launch(), t.settings, "r1")).toBe(true);
   expect(await t.rentSteps()).toEqual([]);
   expect(BigInt((await t.pool()).basket_value_lamports)).toBe(BigInt((await t.pool()).rent_lamports));
+});
+
+test("with no Kamino global config the first launch to open pays for it in its rent and the keeper creates it before the farms", async () => {
+  const t = await setup();
+  t.staking.gc = "";
+  const withGc = RENT + GLOBAL_CONFIG_COST;
+  await t.seed(NATIVE_MINT, RENT);
+  await processLaunch(t.deps, await t.launch(), t.settings, "r1");
+  expect(await t.rentSteps()).toEqual([]);
+  expect(BigInt((await t.pool()).rent_lamports)).toBe(withGc);
+  await t.seed(NATIVE_MINT, GLOBAL_CONFIG_COST);
+  await processLaunch(t.deps, await t.launch(), t.settings, "r2");
+  const [rent] = await t.sql`select detail from distributions where launch_id = ${t.id} and kind = 'rent'`;
+  expect(rent.detail).toMatchObject({ amount: withGc.toString(), globalConfig: true });
+  expect(t.staking.createdGlobalConfigs).toHaveLength(1);
+  const gc = t.staking.createdGlobalConfigs[0]!;
+  expect(t.staking.globalConfig()).toBe(gc);
+  expect((await t.sql`select address from platform_accounts where name = 'kamino_global_config'`)[0].address).toBe(gc);
+  expect(t.chain.sent.indexOf("create_global_config")).toBeLessThan(t.chain.sent.findIndex((s) => s.startsWith("create_farm")));
+  expect((await t.pool()).status).toBe("ready");
+
+  const id2 = await insertLaunch(t.sql, { pool: "P2" });
+  await t.sql`insert into baskets values (${id2}, 'ZEC', 10000)`;
+  await t.sql`insert into stake_pools values (${id2}, 'kamino', 3000, 'SpillAta2', 'pending')`;
+  await t.sql`insert into stake_tiers (launch_id, tier_id, lock_seconds, multiplier_bps) values (${id2}, ${TIER.id}, ${TIER.lockSeconds}, ${TIER.multiplierBps})`;
+  t.staking.gc = "";
+  const r = await beginStep(t.sql, { launchId: id2, idemKey: "seed2", kind: "split", settingsVersion: 1, detail: {} });
+  await confirmStep(t.sql, r, [{ bucket: "basket", mint: NATIVE_MINT, amount: RENT }]);
+  await processLaunch(t.deps, (await loadLaunches(t.sql)).find((l) => l.id === id2)!, t.settings, "r3");
+  const [p2] = await t.sql`select status, rent_lamports from stake_pools where launch_id = ${id2}`;
+  expect(BigInt(p2.rent_lamports)).toBe(RENT);
+  expect(p2.status).toBe("ready");
+  expect(t.staking.createdGlobalConfigs).toHaveLength(1);
 });

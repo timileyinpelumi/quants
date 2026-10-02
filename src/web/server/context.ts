@@ -1,5 +1,5 @@
 import type { SQL } from "bun";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { Connection, Keypair, PublicKey } from "@solana/web3.js";
 import { sharedDb } from "@/db/client";
 import { SolanaChain } from "@/chain/solana";
@@ -65,13 +65,14 @@ export function getContext(): WebContext {
   const chain = new SolanaChain(conn, Keypair.generate(), Keypair.generate());
   const sql = sharedDb();
   const meteora = new MeteoraLive(chain, e.DAMM_V2_MIGRATION_CONFIG!);
-  // hosted deploys pass the keys as JSON since config-keys.json is not committed
-  const configKeys: Record<string, string> = JSON.parse(e.CONFIG_KEYS ?? readFileSync(configKeysPath(e), "utf8"));
+  // Optional seed: config keys made by scripts/create-configs.ts (stocks need them); crypto pairs get theirs on demand.
+  const keysFile = configKeysPath(e);
+  const configKeys: Record<string, string> = e.CONFIG_KEYS ? JSON.parse(e.CONFIG_KEYS) : existsSync(keysFile) ? JSON.parse(readFileSync(keysFile, "utf8")) : {};
   const ctx: WebContext = {
     sql,
     conn,
     meteora,
-    staking: new KaminoBackend(chain, e.RPC_URL!, e.KAMINO_GLOBAL_CONFIG!),
+    staking: new KaminoBackend(chain, e.RPC_URL!, e.KAMINO_GLOBAL_CONFIG ?? ""),
     jupiter: withLocalTokens(swapPortFor(e, chain), e.LOCAL_TOKEN_LIST),
     uploads: uploadsFrom(e),
     trade: new TradeLive(conn),

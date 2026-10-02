@@ -10,7 +10,8 @@ const Env = z.object({
   KEEPER_KEYPAIR: z.string(),
   SPILL_KEYPAIR: z.string(),
   TREASURY_ADDRESS: z.string().min(32),
-  KAMINO_GLOBAL_CONFIG: z.string().min(32),
+  // Optional: the keeper creates one on the first staking open and records it in platform_accounts.
+  KAMINO_GLOBAL_CONFIG: z.preprocess((v) => v || undefined, z.string().min(32).optional()),
   DAMM_V2_MIGRATION_CONFIG: z.string().min(32),
   JUPITER_BASE_URL: z.string().url().default("https://api.jup.ag/swap/v1"),
   JUPITER_API_KEY: z.string().optional(),

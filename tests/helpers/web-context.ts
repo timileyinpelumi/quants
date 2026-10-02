@@ -9,6 +9,8 @@ import { TokenIcons } from "../../src/web/server/icons";
 import { JupiterPrices } from "../../src/indexer/prices";
 import { resetRateLimits } from "../../src/web/server/http";
 import { resetStakeCache } from "../../src/web/server/stake";
+import { resetConfigSeed } from "../../src/web/server/launch";
+import { resetKeeperBalanceCache } from "../../src/web/server/keeper-topup";
 import type { UploadPort } from "../../src/web/server/uploads";
 import { defaultSettings, saveSettings } from "../../src/domain/settings";
 import { NATIVE_MINT } from "../../src/domain/types";
@@ -43,10 +45,16 @@ export async function makeWebContext(over: Partial<WebContext> = {}) {
   const sql = await freshDb();
   await saveSettings(sql, defaultSettings(OURS), "t");
   const chain = new FakeChain();
+  const meteora = new FakeMeteora(chain);
+  // the seeded config keys carry the default graduation targets, so launches reuse them
+  meteora.thresholds.set("CfgSol200", 85n * 10n ** 9n);
+  meteora.thresholds.set("CfgOurs200", 100_000n * 10n ** 6n);
+  resetConfigSeed();
+  resetKeeperBalanceCache();
   const ctx: WebContext = {
     sql,
     conn: {} as any,
-    meteora: new FakeMeteora(chain),
+    meteora,
     staking: new FakeStaking(chain),
     jupiter: new FakeJupiter(chain),
     uploads: new FakeUploads(),

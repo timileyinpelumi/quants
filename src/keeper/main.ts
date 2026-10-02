@@ -18,7 +18,7 @@ const deps = {
   sql, chain,
   meteora: new MeteoraLive(chain, env.DAMM_V2_MIGRATION_CONFIG),
   jupiter: swapPortFor(process.env, chain),
-  staking: new KaminoBackend(chain, env.RPC_URL, env.KAMINO_GLOBAL_CONFIG),
+  staking: new KaminoBackend(chain, env.RPC_URL, env.KAMINO_GLOBAL_CONFIG ?? ""),
   wallets: { keeper: keeper.publicKey.toBase58(), spill: spill.publicKey.toBase58(), treasury: env.TREASURY_ADDRESS },
 };
 

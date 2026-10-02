@@ -1,6 +1,6 @@
 import { Keypair, PublicKey, SystemProgram, Transaction, type TransactionInstruction } from "@solana/web3.js";
 import { createAssociatedTokenAccountIdempotentInstruction, createSyncNativeInstruction, getAssociatedTokenAddressSync, NATIVE_MINT, TOKEN_PROGRAM_ID } from "@solana/spl-token";
-import { Farms, FarmConfigOption, fetchAllMaybeUserState, getUserStatePDA, getWithdrawSlashedAmountInstruction, type UserState } from "@kamino-finance/farms-sdk";
+import { Farms, FarmConfigOption, GlobalConfigOption, fetchAllMaybeUserState, getUserStatePDA, getWithdrawSlashedAmountInstruction, type UserState } from "@kamino-finance/farms-sdk";
 import { address, createNoopSigner, createSolanaRpc, none, type Address } from "@solana/kit";
 import Decimal from "decimal.js";
 import type { StakePosition, StakingAdapter } from "./adapter";
@@ -16,13 +16,29 @@ export class KaminoBackend implements StakingAdapter {
   readonly backend = "kamino" as const;
   private farms: Farms;
   private rpc;
-  constructor(private chain: SolanaChain, rpcUrl: string, private globalConfig: string) {
+  constructor(private chain: SolanaChain, rpcUrl: string, private globalConfigAddress = "") {
     const rpc = createSolanaRpc(rpcUrl);
     this.rpc = rpc;
     this.farms = new Farms(rpc);
   }
 
   capabilities() { return { earlyExit: true, tiersOnChain: false, rewardsPerTx: REWARDS_PER_TX }; }
+
+  globalConfig() { return this.globalConfigAddress; }
+  setGlobalConfig(address: string) { this.globalConfigAddress = address; }
+
+  private gc() {
+    if (!this.globalConfigAddress) throw new Error("no Kamino global config yet");
+    return address(this.globalConfigAddress);
+  }
+
+  async buildCreateGlobalConfig(secret: Uint8Array) {
+    const gc = Keypair.fromSecretKey(secret);
+    const admin = kitSigner(this.chain.keeper);
+    const ixs = await this.farms.createGlobalConfigIxs(admin, kitSigner(gc));
+    const fee = await this.farms.updateGlobalConfigIx(admin, address(gc.publicKey.toBase58()), GlobalConfigOption.SetTreasuryFeeBps, "0", "number");
+    return this.chain.signLegacy(new Transaction().add(...ixs.map(fromKitInstruction), fromKitInstruction(fee)), [gc]);
+  }
 
   private async state(farm: string) {
     const [f] = await this.farms.getAllFarmStatesByPubkeys([address(farm)]);
@@ -32,14 +48,14 @@ export class KaminoBackend implements StakingAdapter {
 
   async buildCreateFarm(stakeMint: string, farmSecret: Uint8Array) {
     const farm = Keypair.fromSecretKey(farmSecret);
-    const ixs = await this.farms.createFarmIxs(kitSigner(this.chain.keeper), kitSigner(farm), address(this.globalConfig), address(stakeMint));
+    const ixs = await this.farms.createFarmIxs(kitSigner(this.chain.keeper), kitSigner(farm), this.gc(), address(stakeMint));
     return this.chain.signLegacy(new Transaction().add(...ixs.map(fromKitInstruction)), [farm]);
   }
 
   async buildAddRewards(farm: string, rewardMints: string[]) {
     const admin = kitSigner(this.chain.keeper);
     const tx = new Transaction();
-    for (const m of rewardMints) tx.add(fromKitInstruction(await this.farms.addRewardToFarmIx(admin, address(this.globalConfig), address(farm), address(m), TOKEN_PROGRAM)));
+    for (const m of rewardMints) tx.add(fromKitInstruction(await this.farms.addRewardToFarmIx(admin, this.gc(), address(farm), address(m), TOKEN_PROGRAM)));
     return this.chain.signLegacy(tx, []);
   }
 
