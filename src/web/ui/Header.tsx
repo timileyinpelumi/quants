@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { WalletButton } from "@/web/wallet/WalletButton";
 import { PhoneNav } from "./PhoneNav";
+import { XIcon, xUrl } from "./XIcon";
 
 const links = [
   { href: "/", label: "Home", key: "home" },
@@ -27,6 +28,7 @@ function Search({ className }: { className: string }) {
 
 export function Header({ active }: { active: HeaderKey }) {
   const cls = (k: string) => (active === k ? "text-ink" : "text-muted hover:text-ink");
+  const x = xUrl();
   return (
     <header className="border-b line">
       <div className="wrap flex items-center gap-3 md:gap-8 py-3 md:py-5">
@@ -39,7 +41,13 @@ export function Header({ active }: { active: HeaderKey }) {
         </nav>
         <Search className="hidden md:block flex-1 min-w-44 max-w-md" />
         <div className="ml-auto flex items-center gap-2 md:gap-2.5 shrink-0">
-          <PhoneNav links={links} active={active} />
+          {x && (
+            <a href={x} target="_blank" rel="noreferrer" aria-label="quants on X" title="quants on X"
+              className="hidden md:flex w-11 h-11 items-center justify-center rounded-full bg-raised-2 border border-white/[0.08] text-ink hover:border-white/25 shrink-0">
+              <XIcon />
+            </a>
+          )}
+          <PhoneNav links={links} active={active} xUrl={x} />
           <Link href="/launch" className={`hidden md:flex items-center gap-1.5 font-display font-bold rounded-full px-5 min-h-11 ${active === "launch" ? "bg-raised-2 border border-white/10" : "text-ground bg-accent"}`}>
             <span aria-hidden className="text-lg leading-none">+</span> Launch
           </Link>
