@@ -21,3 +21,4 @@ config-keys.devnet.json
 !.env.production.example
 secrets/
 backups/
+deploy/aws/.host
