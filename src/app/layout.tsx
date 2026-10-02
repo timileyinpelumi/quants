@@ -9,6 +9,7 @@ const geist = Geist({ subsets: ["latin"], variable: "--font-geist" });
 const mono = Geist_Mono({ subsets: ["latin"], variable: "--font-geist-mono" });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(process.env.SITE_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : `http://localhost:${process.env.PORT || 3000}`)),
   title: { default: "quants", template: "%s · quants" },
   description: "Launch a token that pays its stakers. Trading fees buy up to ten tokens the creator picks and pay them to people who stake it.",
   openGraph: { title: "quants", description: "Launch a token that pays its stakers. Trading fees buy up to ten tokens the creator picks and pay them to people who stake it.", images: ["/brand/quants-logo-512h.png"] },
