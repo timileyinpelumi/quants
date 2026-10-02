@@ -8,8 +8,8 @@ Copy `.env.example` to `.env` and fill in:
 |---|---|
 | `DATABASE_URL` | Postgres for the app and keeper |
 | `RPC_URL` | Solana RPC |
-| `KEEPER_KEYPAIR` | JSON secret key array of the keeper wallet |
-| `SPILL_KEYPAIR` | JSON secret key array of the spill wallet |
+| `KEEPER_KEYPAIR` | JSON secret key array of the keeper wallet. Or `KEEPER_KEYPAIR_PATH`, a file holding it (not both) |
+| `SPILL_KEYPAIR` | JSON secret key array of the spill wallet. Or `SPILL_KEYPAIR_PATH` |
 | `TREASURY_ADDRESS` | Platform treasury (receive only) |
 | `OURTOKEN_MINT` | The platform token, classic SPL |
 | `KAMINO_GLOBAL_CONFIG` | Output of `scripts/create-kamino-global-config.ts` |
@@ -161,6 +161,97 @@ Never set these in production: `NEXT_PUBLIC_TEST_WALLET_SECRET`, `PINATA_JWT=stu
 6. Watch the keeper with `journalctl -u quants-keeper -f`. A `ReconcileError` exits the keeper; systemd restarts it after 30 seconds and it exits again until the ledger and wallets agree.
 
 `bun run build` runs `next build` under Node 22 or newer (install Node on the server too), because Bun 1.3.14 crashes when Next's build workers exit. The app itself runs on Bun (`bun --bun next start`), which it needs for `Bun.SQL`.
+
+## AWS (EC2, Docker Compose)
+
+One EC2 instance runs everything from `docker-compose.prod.yml`: Postgres 18 (named volume, not published on the host), a one shot `migrate`, `web` (Next on 3000, reachable only through Caddy), `indexer`, `keeper`, Caddy on 80 and 443 with automatic HTTPS, and `backup`. The app image is built on the instance from the `Dockerfile`; `migrate`, `web`, `indexer` and `keeper` all run it with different commands. Container logs are capped at 5 files of 10 MB each.
+
+Caches (prices, icons, landing data, the rate limiter) live in each process's memory. With one web container that is all the sharing needed, so there is no Redis. A second web replica would need a shared rate limiter.
+
+The scripts in `deploy/aws/` use the AWS CLI on your machine (`aws configure` or `aws sso login` first). They default to `us-east-1`; override with `REGION`, `NAME`, `INSTANCE_TYPE` and `KEY_FILE`.
+
+### Provision
+
+```bash
+deploy/aws/provision.sh            # add --dns to upsert the A records when quants.wtf is in Route 53
+```
+
+It creates or reuses: key pair `quants` (private key in `~/.ssh/quants-deploy.pem`), security group `quants` (22 from your current IP only, 80 and 443 from anywhere), an Ubuntu 24.04 `t3.medium` with a 30 GB gp3 disk, and an Elastic IP. User data installs Docker with the compose plugin and adds 4 GB of swap; the Next build needs it on a 4 GB instance. It saves the IP in `deploy/aws/.host`, waits up to 10 minutes for first boot, and prints the DNS records to create. Running it again from a new IP adds that IP to port 22; remove old rules in the console.
+
+With `BACKUP_BUCKET=<bucket>` it also gives the instance a role that can write backups to that bucket, so no AWS keys go into `.env.production`.
+
+### DNS
+
+Create two A records pointing at the Elastic IP: `quants.wtf` and `www.quants.wtf` (`www` redirects to the bare domain). If the zone is in Route 53, `provision.sh --dns` upserts them. Let's Encrypt only issues a certificate once the A record resolves to the instance, so until DNS has propagated Caddy logs certificate errors and keeps retrying. Check with `dig +short quants.wtf`.
+
+Before DNS is pointed, use sslip.io, which resolves `<ip with dashes>.sslip.io` to that IP: set `SITE_HOST=3-80-12-34.sslip.io` and `SITE_URL=https://3-80-12-34.sslip.io` (the line provision prints). Let's Encrypt issues for it like any other name. Switch both to `quants.wtf` and deploy again once DNS resolves; `SITE_URL` is the domain the admin sign in message names.
+
+### Fill .env.production and secrets
+
+```bash
+cp .env.production.example .env.production      # gitignored; fill in every empty value
+mkdir -p secrets
+bun scripts/hd-wallet.ts show                    # keeper, spill, treasury addresses
+bun scripts/hd-wallet.ts export keeper secrets/keeper.json
+bun scripts/hd-wallet.ts export spill secrets/spill.json
+```
+
+`KEEPER_ADDRESS`, `SPILL_ADDRESS` and `TREASURY_ADDRESS` come from `show`. `CONFIG_KEYS` is the contents of the mainnet `config-keys.json` on one line, in single quotes. `POSTGRES_PASSWORD` must be hex (`openssl rand -hex 24`) because it goes into `DATABASE_URL` as is. The keypairs are mounted read only into the keeper container only (`/run/secrets/keeper` and `/run/secrets/spill`, read through `KEEPER_KEYPAIR_PATH` and `SPILL_KEYPAIR_PATH`); they are never in the image or in `.env.production`. The container user has uid 1000, the same as `ubuntu` on the instance, so the files can stay mode 600.
+
+### Deploy
+
+```bash
+deploy/aws/deploy.sh
+```
+
+It checks that each keypair file matches its address and that required values are set, rsyncs the repo (without `.git`, `node_modules`, `.next`, local env files and devnet state) plus `.env.production` and `secrets/` to `/opt/quants`, builds the image there tagged with the commit (`quants-app:<sha>`, plus `latest`), runs `docker compose up -d`, waits for web to be healthy and then runs `deploy/aws/smoke.sh` on the instance. The smoke check passes when `migrate` exited 0, web returns 200 on `/` and `/explore` (inside the network and on `https://SITE_HOST/`), the indexer logged its first pass and the keeper logged a run, with no restarts. On a fresh database the keeper reaches the chain and then waits for settings; smoke prints a warning for that. Sign in on `/admin` and save the settings, and the next keeper run (within a minute) goes through. `NEXT_PUBLIC_*` values are built into the bundle, so every deploy rebuilds. A build takes several minutes on a t3.medium.
+
+### Logs
+
+```bash
+deploy/aws/logs.sh                      # last 200 lines of every service
+deploy/aws/logs.sh keeper indexer
+FOLLOW=1 deploy/aws/logs.sh keeper      # follow until Ctrl-C
+```
+
+On the instance: `cd /opt/quants && docker compose -f docker-compose.prod.yml --env-file .env.production ps` (or `logs`, `restart keeper`).
+
+### Backups
+
+The `backup` container runs `pg_dump -Fc` every day at `BACKUP_HOUR_UTC` (default 3) into `/opt/quants/backups`, deletes dumps older than `BACKUP_RETENTION_DAYS` (default 7), and copies each new dump to `BACKUP_S3_URI` (for example `s3://my-bucket/quants`) when that is set. Credentials come from the instance role (`BACKUP_BUCKET` on provision) or `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` in `.env.production`; those keys reach every container that reads the env file, so prefer the role.
+
+```bash
+deploy/aws/backup-now.sh                # dump now; --download also copies it to ./backups here
+```
+
+Restore, on the instance (this replaces the database):
+
+```bash
+cd /opt/quants
+C="docker compose -f docker-compose.prod.yml --env-file .env.production"
+$C stop web indexer keeper
+$C exec -T postgres sh -c 'pg_restore --clean --if-exists --no-owner -U "$POSTGRES_USER" -d "$POSTGRES_DB"' < backups/quants-<stamp>.dump
+$C start web indexer keeper
+```
+
+To restore from S3 first: `aws s3 cp s3://<bucket>/quants/quants-<stamp>.dump backups/`. The keeper reconciles the ledger against the wallets on its first run; a dump older than the last keeper run can make it stop with a `ReconcileError` (see When something goes wrong).
+
+### Update
+
+Pull or commit locally, then `deploy/aws/deploy.sh` again. New migrations run in `migrate` before the other services start.
+
+### Rollback
+
+The last five builds stay on the instance. On the instance:
+
+```bash
+cd /opt/quants
+docker images quants-app                         # pick the tag to go back to
+docker tag quants-app:<sha> quants-app:latest
+docker compose -f docker-compose.prod.yml --env-file .env.production up -d --no-build
+```
+
+Migrations are not rolled back. An older build has to work with the newer schema, or restore a backup taken before the deploy. The next `deploy.sh` builds from your working tree again, so check out the old commit locally if the rollback should stick.
 
 ## Local development
 
