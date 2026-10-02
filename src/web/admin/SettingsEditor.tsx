@@ -16,7 +16,7 @@ export type AdminSettings = {
   featured: { headline: string; body: string; prelaunch: string };
   xUrl: string; alertWebhookUrl: string; launchesPaused: boolean; bannerMessage: string; stockPairs: boolean;
 };
-export type Pair = { mint: string; symbol: string; name: string; decimals: number };
+export type Pair = { mint: string; symbol: string; name: string; decimals: number; payoutMin: string };
 
 const small = `${inputClass} text-base py-3 font-mono`;
 const text = `${inputClass} text-base py-3`;
@@ -37,7 +37,7 @@ function Num({ label, value, onChange, suffix, step = 1 }: { label: string; valu
     <label className="flex flex-col gap-2 text-[13px] text-muted min-w-0">
       <span>{label}</span>
       <span className="flex items-center gap-2">
-        <input inputMode="decimal" value={raw} step={step} onChange={(e) => { setRaw(e.target.value); const n = Number(e.target.value); if (e.target.value.trim() !== "" && Number.isFinite(n)) onChange(n); }} className={small} />
+        <input inputMode="decimal" value={raw} step={step} onChange={(e) => { setRaw(e.target.value); const n = Number(e.target.value); if (e.target.value.trim() !== "" && Number.isFinite(n)) onChange(n); }} className={`${small} min-w-0`} />
         {suffix && <span className="text-muted text-sm shrink-0">{suffix}</span>}
       </span>
     </label>
@@ -135,7 +135,7 @@ export function SettingsEditor({ initial, version, pairs, onSave }: {
               <div key={c.symbol} className="grid grid-cols-1 md:grid-cols-[180px_minmax(0,1fr)_minmax(0,1fr)] gap-3 md:gap-4 py-4 border-t line items-end">
                 <Check label={`${c.symbol}`} hint={c.name} checked={q.enabled} onChange={(v) => setQ({ enabled: v })} />
                 <Num label="Graduates at" suffix={c.symbol} value={q.graduation} onChange={(v) => setQ({ graduation: v })} />
-                <Num label="Creator payout minimum" suffix={c.symbol} value={units(s.creatorPayoutMin[c.mint], c.decimals)}
+                <Num label="Creator payout minimum" suffix={c.symbol} value={units(s.creatorPayoutMin[c.mint] ?? c.payoutMin, c.decimals)}
                   onChange={(v) => set({ creatorPayoutMin: { ...s.creatorPayoutMin, [c.mint]: toBase(v, c.decimals) } })} />
               </div>
             );
