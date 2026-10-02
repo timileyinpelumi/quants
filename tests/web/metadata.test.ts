@@ -1,5 +1,5 @@
 import { test, expect } from "bun:test";
-import { makeWebContext, FakePinata } from "../helpers/web-context";
+import { makeWebContext, FakeUploads } from "../helpers/web-context";
 import { POST } from "../../src/app/api/metadata/route";
 
 function png(w: number, h: number): Uint8Array<ArrayBuffer> {
@@ -20,11 +20,11 @@ test("uploads image then metadata and returns the uri", async () => {
   const r = await POST(form({ image: new File([png(512, 512)], "cat.png", { type: "image/png" }), name: "Cat", symbol: "CAT", website: "https://cat.xyz" }));
   expect(r.status).toBe(200);
   const body = await r.json();
-  expect(body.uri).toContain("ipfs/cid-2");
-  expect(body.image).toContain("ipfs/cid-1");
-  const meta = (c.pinata as FakePinata).json[0]!;
+  expect(body.uri).toBe("https://res.cloudinary.com/demo/raw/upload/quants/u2.json");
+  expect(body.image).toBe("https://res.cloudinary.com/demo/image/upload/quants/u1");
+  const meta = (c.uploads as FakeUploads).json[0]!;
   expect(meta).toMatchObject({ name: "Cat", symbol: "CAT", extensions: { website: "https://cat.xyz" } });
-  expect(meta.image).toContain("ipfs/cid-1");
+  expect(meta.image).toBe("https://res.cloudinary.com/demo/image/upload/quants/u1");
 });
 
 test("rejects non square, too large, wrong type, bad links and a missing image before uploading", async () => {
@@ -42,7 +42,7 @@ test("rejects non square, too large, wrong type, bad links and a missing image b
     expect(r.status).toBe(400);
     expect((await r.json()).error.message.length).toBeGreaterThan(0);
   }
-  expect((c.pinata as FakePinata).files.length).toBe(0);
+  expect((c.uploads as FakeUploads).files.length).toBe(0);
 });
 
 test("an SVG labelled as PNG is rejected", async () => {
@@ -50,7 +50,7 @@ test("an SVG labelled as PNG is rejected", async () => {
   const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64"><script>alert(1)</script></svg>';
   const r = await POST(form({ image: new File([svg], "a.png", { type: "image/png" }), name: "Cat", symbol: "CAT" }));
   expect(r.status).toBe(400);
-  expect((c.pinata as FakePinata).files.length).toBe(0);
+  expect((c.uploads as FakeUploads).files.length).toBe(0);
 });
 
 test("a body larger than the upload limit is refused before it is read", async () => {

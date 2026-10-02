@@ -7,10 +7,12 @@ import { MeteoraLive, type MeteoraPort } from "@/meteora/port";
 import { KaminoBackend } from "@/staking/kamino";
 import type { StakingAdapter } from "@/staking/adapter";
 import { TradeLive, type TradePort } from "@/meteora/trade";
-import { JupiterLive, type JupiterPort } from "@/jupiter/port";
-import { DevPinata, PinataRest, type PinataPort } from "./pinata";
+import type { JupiterPort } from "@/jupiter/port";
+import { uploadsFrom, type UploadPort } from "./uploads";
 import { TokenIcons } from "./icons";
-import { JupiterPrices } from "@/indexer/prices";
+import { JupiterPrices, type PricePort } from "@/indexer/prices";
+import { applyClusterDefaults, configKeysPath } from "@/cluster";
+import { pricesFor, swapPortFor } from "@/jupiter/select";
 import { checkWebEnv } from "@/env";
 import { StockRegistry } from "@/stocks/registry";
 import type { StockListing } from "@/stocks/sources";
@@ -21,10 +23,10 @@ export interface WebContext {
   meteora: MeteoraPort;
   staking: StakingAdapter;
   jupiter: JupiterPort;
-  pinata: PinataPort;
+  uploads: UploadPort;
   trade: TradePort;
   icons: TokenIcons;
-  prices: JupiterPrices;
+  prices: PricePort;
   configKeys: Record<string, string>;
   keeperAddress: string;
   spillWallet: PublicKey;
@@ -52,7 +54,7 @@ export const setContextForTests = (c: WebContext | null) => { g.__quantsCtx = c;
 
 export function getContext(): WebContext {
   if (g.__quantsCtx) return g.__quantsCtx;
-  const e = process.env;
+  const e = applyClusterDefaults(process.env);
   checkWebEnv(e);
   const conn = new Connection(e.RPC_URL!, "confirmed");
   // The web server never signs: these throwaway keypairs only satisfy constructors whose signing paths it never calls.
@@ -60,16 +62,16 @@ export function getContext(): WebContext {
   const sql = sharedDb();
   const meteora = new MeteoraLive(chain, e.DAMM_V2_MIGRATION_CONFIG!);
   // hosted deploys pass the keys as JSON since config-keys.json is not committed
-  const configKeys: Record<string, string> = JSON.parse(e.CONFIG_KEYS ?? readFileSync(e.CONFIG_KEYS_PATH ?? "config-keys.json", "utf8"));
+  const configKeys: Record<string, string> = JSON.parse(e.CONFIG_KEYS ?? readFileSync(configKeysPath(e), "utf8"));
   const ctx: WebContext = {
     sql,
     conn,
     meteora,
     staking: new KaminoBackend(chain, e.RPC_URL!, e.KAMINO_GLOBAL_CONFIG!),
-    jupiter: withLocalTokens(new JupiterLive(e.JUPITER_BASE_URL ?? "https://api.jup.ag/swap/v1", chain, fetch, e.JUPITER_API_KEY), e.LOCAL_TOKEN_LIST),
-    pinata: e.PINATA_JWT === "stub" ? new DevPinata() : new PinataRest(e.PINATA_JWT!),
+    jupiter: withLocalTokens(swapPortFor(e, chain), e.LOCAL_TOKEN_LIST),
+    uploads: uploadsFrom(e),
     trade: new TradeLive(conn),
-    prices: new JupiterPrices(e.JUPITER_API_KEY ? "https://api.jup.ag/price/v3" : "https://lite-api.jup.ag/price/v3", e.JUPITER_API_KEY),
+    prices: pricesFor(e, conn, new JupiterPrices(e.JUPITER_API_KEY ? "https://api.jup.ag/price/v3" : "https://lite-api.jup.ag/price/v3", e.JUPITER_API_KEY)),
     icons: new TokenIcons(e.JUPITER_API_KEY ? "https://api.jup.ag/tokens/v2" : "https://lite-api.jup.ag/tokens/v2", e.JUPITER_API_KEY),
     configKeys,
     keeperAddress: e.KEEPER_ADDRESS!,

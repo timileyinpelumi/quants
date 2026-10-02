@@ -12,9 +12,9 @@ export function securityHeaders(rpcUrl: string, dev: boolean): { key: string; va
     // App Router hydration uses inline scripts; dev tooling also needs eval.
     `script-src 'self' 'unsafe-inline'${dev ? " 'unsafe-eval'" : ""}`,
     "style-src 'self' 'unsafe-inline'",
-    "img-src 'self' data: blob: https:",
+    "img-src 'self' data: blob: https: https://res.cloudinary.com",
     "font-src 'self' data:",
-    `connect-src 'self' ${rpcOrigins(rpcUrl).join(" ")}${dev ? " ws: http://localhost:* http://127.0.0.1:*" : ""}`,
+    `connect-src 'self' ${rpcOrigins(rpcUrl).join(" ")} https://res.cloudinary.com${dev ? " ws: http://localhost:* http://127.0.0.1:*" : ""}`,
     "frame-ancestors 'none'",
     "base-uri 'self'",
     "form-action 'self'",

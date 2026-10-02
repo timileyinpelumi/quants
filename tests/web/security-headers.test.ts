@@ -36,6 +36,12 @@ test("images from the resizing proxy and data URLs are allowed, eval only in dev
   expect(directive(prod, "font-src")).toContain("'self'");
 });
 
+test("launch images and metadata on Cloudinary are allowed", () => {
+  const p = csp(securityHeaders("https://rpc.example.com", false));
+  expect(directive(p, "img-src")).toContain("https://res.cloudinary.com");
+  expect(directive(p, "connect-src")).toContain("https://res.cloudinary.com");
+});
+
 test("next.config sends the headers on every path", async () => {
   const rules = await config.headers!();
   const all = rules.find((r) => r.source === "/:path*")!;

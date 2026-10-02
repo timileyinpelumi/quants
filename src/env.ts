@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { applyClusterDefaults } from "./cluster";
 
 const Env = z.object({
   DATABASE_URL: z.string().url(),
@@ -15,6 +16,7 @@ const Env = z.object({
 });
 export type Env = z.infer<typeof Env>;
 export const loadEnv = (): Env => {
+  applyClusterDefaults(process.env);
   assertNoDevSwitches(process.env);
   return Env.parse(process.env);
 };

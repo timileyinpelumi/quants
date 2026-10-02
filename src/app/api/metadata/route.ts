@@ -2,7 +2,6 @@ import { z } from "zod";
 import { getContext } from "@/web/server/context";
 import { json, jsonError, limitBody, rateLimit } from "@/web/server/http";
 import { validateImage } from "@/web/server/image";
-import { gatewayUrl } from "@/web/server/pinata";
 
 export const dynamic = "force-dynamic";
 
@@ -29,17 +28,16 @@ export async function POST(req: Request) {
     const raw = Object.fromEntries([...form.entries()].filter(([k, v]) => k !== "image" && v !== ""));
     const fields = Fields.parse(raw);
     const image = await validateImage(form.get("image"));
-    const { pinata } = getContext();
-    const imageCid = await pinata.uploadFile(image, `${fields.symbol}.${image.type.split("/")[1]}`);
-    const imageUrl = gatewayUrl(imageCid);
-    const metaCid = await pinata.uploadJson({
+    const { uploads } = getContext();
+    const imageUrl = await uploads.uploadImage(image, `${fields.symbol}.${image.type.split("/")[1]}`);
+    const uri = await uploads.uploadJson({
       name: fields.name,
       symbol: fields.symbol,
       description: fields.description ?? "",
       image: imageUrl,
       extensions: { website: fields.website, twitter: fields.x, telegram: fields.telegram },
     }, `${fields.symbol}.json`);
-    return json({ uri: gatewayUrl(metaCid), image: imageUrl });
+    return json({ uri, image: imageUrl });
   } catch (e) {
     return jsonError(e);
   }

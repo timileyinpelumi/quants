@@ -1,4 +1,5 @@
 import { readFile } from "node:fs/promises";
+import { devUploadsOn } from "@/web/server/uploads";
 
 export const dynamic = "force-dynamic";
 
@@ -12,7 +13,7 @@ const sniff = (b: Uint8Array) =>
 
 export async function GET(_req: Request, { params }: { params: Promise<{ cid: string }> }) {
   const { cid } = await params;
-  if (process.env.PINATA_JWT !== "stub" || !/^[0-9a-f]{32}$/.test(cid)) return new Response(null, { status: 404 });
+  if (!devUploadsOn(process.env) || !/^[0-9a-f]{32}$/.test(cid)) return new Response(null, { status: 404 });
   const bytes = await readFile(`.dev-uploads/${cid}`).then((b) => new Uint8Array(b), () => null);
   if (!bytes) return new Response(null, { status: 404 });
   return new Response(bytes, { headers: { "content-type": sniff(bytes), "cache-control": "public, max-age=31536000, immutable" } });

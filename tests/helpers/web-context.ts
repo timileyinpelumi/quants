@@ -9,7 +9,7 @@ import { TokenIcons } from "../../src/web/server/icons";
 import { JupiterPrices } from "../../src/indexer/prices";
 import { resetRateLimits } from "../../src/web/server/http";
 import { resetStakeCache } from "../../src/web/server/stake";
-import type { PinataPort } from "../../src/web/server/pinata";
+import type { UploadPort } from "../../src/web/server/uploads";
 import { defaultSettings, saveSettings } from "../../src/domain/settings";
 import { NATIVE_MINT } from "../../src/domain/types";
 
@@ -17,12 +17,12 @@ export const OURS = "OURS1111111111111111111111111111111111111111";
 export const ADMIN = Keypair.generate();
 export const CLASSIC = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
 
-export class FakePinata implements PinataPort {
+export class FakeUploads implements UploadPort {
   files: string[] = [];
   json: any[] = [];
   private n = 0;
-  async uploadFile(_f: File, name: string) { this.files.push(name); return `cid-${++this.n}`; }
-  async uploadJson(data: object) { this.json.push(data); return `cid-${++this.n}`; }
+  async uploadImage(_f: File, name: string) { this.files.push(name); return `https://res.cloudinary.com/demo/image/upload/quants/u${++this.n}`; }
+  async uploadJson(data: object) { this.json.push(data); return `https://res.cloudinary.com/demo/raw/upload/quants/u${++this.n}.json`; }
 }
 
 export class FakeTrade {
@@ -47,7 +47,7 @@ export async function makeWebContext(over: Partial<WebContext> = {}) {
     meteora: new FakeMeteora(chain),
     staking: new FakeStaking(chain),
     jupiter: new FakeJupiter(chain),
-    pinata: new FakePinata(),
+    uploads: new FakeUploads(),
     trade: new FakeTrade(),
     prices: new JupiterPrices("https://prices.test", undefined, async () => Response.json({})),
     icons: new TokenIcons("https://jup.test/tokens/v2", undefined, async () => Response.json([])),
