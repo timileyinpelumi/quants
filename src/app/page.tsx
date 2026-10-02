@@ -1,53 +1,27 @@
 import Link from "next/link";
 import { Header } from "@/web/ui/Header";
-import { fmtCompact, fmtPrice } from "@/web/ui/format";
+import { fmtCompact } from "@/web/ui/format";
 import { getContext } from "@/web/server/context";
 import { allQuotes, quoteIcons } from "@/web/server/quotes";
-import { HOME_TABS, landing, type Featured } from "@/web/server/landing";
+import { HOME_TABS, landing } from "@/web/server/landing";
+import { platformCardFor, platformLinks } from "@/web/server/platform-token";
+import { clusterOf } from "@/cluster";
 import { HomeGrid } from "@/web/home/HomeGrid";
 import { BuyTicker } from "@/web/home/BuyTicker";
-import { Change } from "@/web/home/TokenCard";
+import { FeaturedCard } from "@/web/home/FeaturedCard";
 
 export const dynamic = "force-dynamic";
 
 const usd = (n: number | null) => (n === null ? "No price" : `$${fmtCompact(n)}`);
 
-function FeaturedToken({ f }: { f: Featured }) {
-  const t = f.token;
-  return (
-    <section aria-label="Featured" className="rounded-2xl border border-accent/35 bg-surface">
-      <div className="flex flex-col md:flex-row md:items-center gap-5 md:gap-8 px-5 py-5 md:px-7 md:py-6">
-        <div className="flex items-center gap-4 min-w-0 md:flex-1">
-          <img src="/brand/quants-mark.svg" alt="" width={64} height={64} className="w-16 h-16 shrink-0" />
-          <span className="flex flex-col gap-1 min-w-0">
-            <span className="flex items-center gap-2.5">
-              <span className="font-display font-black text-2xl tracking-tight">{f.symbol}</span>
-              <span className="text-[11px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full bg-accent text-ground">Featured</span>
-            </span>
-            <span className="text-sm text-muted">The quants platform token. Pair a launch with it, or trade the tokens paired with it.</span>
-          </span>
-        </div>
-        {t && (
-          <div className="grid grid-cols-3 gap-5 md:gap-8 md:w-[380px] shrink-0 font-display font-bold text-[17px] tabular-nums">
-            <span className="flex flex-col gap-1"><span className="font-sans font-normal text-[12px] text-faint">Price</span><span>{t.priceUsd === null ? "No trades" : `$${fmtPrice(t.priceUsd)}`}</span></span>
-            <span className="flex flex-col gap-1"><span className="font-sans font-normal text-[12px] text-faint">Market cap</span><span>{usd(t.mcapUsd)}</span></span>
-            <span className="flex flex-col gap-1"><span className="font-sans font-normal text-[12px] text-faint">24h</span><Change value={t.change24h} traded={t.price !== null} /></span>
-          </div>
-        )}
-        <div className="flex flex-wrap gap-2.5 shrink-0">
-          {t && <Link href={`/t/${t.mint}`} className="font-display font-bold text-ground bg-accent rounded-full px-5 min-h-11 flex items-center">Trade {f.symbol}</Link>}
-          <Link href={`/explore?quote=${f.mint}`} className="font-display font-bold rounded-full px-5 min-h-11 flex items-center bg-raised-2 border border-white/10">
-            {f.symbol} pairs{f.pairs > 0 && <span className="ml-2 font-mono font-normal text-sm text-muted">{f.pairs}</span>}
-          </Link>
-        </div>
-      </div>
-    </section>
-  );
-}
-
 export default async function HomePage() {
   const ctx = getContext();
-  const d = await landing(ctx.sql, Date.now(), async (m) => quoteIcons(ctx, m, await allQuotes(ctx)));
+  const now = Date.now();
+  const [d, card] = await Promise.all([
+    landing(ctx.sql, now, async (m) => quoteIcons(ctx, m, await allQuotes(ctx))),
+    platformCardFor(ctx, now).catch(() => null),
+  ]);
+  const launchedHere = card ? (await ctx.sql`select 1 from launches where mint = ${card.mint}`).length > 0 : false;
   return (
     <div className="flex-1 bg-launch">
       <Header active="home" />
@@ -83,7 +57,7 @@ export default async function HomePage() {
           </div>
         </section>
 
-        {d.featured && <FeaturedToken f={d.featured} />}
+        {card && <FeaturedCard c={card} links={platformLinks(card.mint, clusterOf(), launchedHere)} />}
 
         <HomeGrid tabs={HOME_TABS} initial={d.tokens} nextOffset={d.nextOffset} />
       </main>

@@ -44,8 +44,9 @@ async function postJson<T>(url: string, body: unknown): Promise<T> {
   return j as T;
 }
 
-export function LaunchForm({ split, tiers, maxPenaltyBps, quotes }: {
+export function LaunchForm({ split, tiers, maxPenaltyBps, quotes, initialPair }: {
   quotes: QuoteOption[];
+  initialPair?: string;
   split: { basketBps: number; platformBps: number; creatorBps: number };
   tiers: Tier[];
   maxPenaltyBps: number;
@@ -60,7 +61,7 @@ export function LaunchForm({ split, tiers, maxPenaltyBps, quotes }: {
   const [imageError, setImageError] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [symbol, setSymbol] = useState("");
-  const [pair, setPair] = useState<string>(quotes[0]?.mint ?? SOL);
+  const [pair, setPair] = useState<string>(initialPair ?? quotes[0]?.mint ?? SOL);
   const [fee, setFee] = useState(200);
   const [mode, setMode] = useState<"pair" | "basket">("basket");
   const [picked, setBasket] = useState<BasketItem[]>([]);

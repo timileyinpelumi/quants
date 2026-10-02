@@ -6,7 +6,8 @@ import { launchableQuotes, quoteIcons } from "@/web/server/quotes";
 
 export const dynamic = "force-dynamic";
 
-export default async function LaunchPage() {
+export default async function LaunchPage({ searchParams }: { searchParams: Promise<{ pair?: string }> }) {
+  const { pair } = await searchParams;
   const ctx = getContext();
   const s = await loadLatestSettings(ctx.sql);
   // only pairs whose curve configs exist on this network can be launched
@@ -16,7 +17,7 @@ export default async function LaunchPage() {
   return (
     <div className="flex-1 bg-launch">
       <Header active="launch" />
-      <LaunchForm split={s.split} tiers={s.tiers} maxPenaltyBps={s.maxPenaltyBps} quotes={quotes} />
+      <LaunchForm split={s.split} tiers={s.tiers} maxPenaltyBps={s.maxPenaltyBps} quotes={quotes} initialPair={quotes.some((q) => q.mint === pair) ? pair : undefined} />
     </div>
   );
 }

@@ -29,7 +29,7 @@ export type TradeRow = {
 export type Featured = { mint: string; symbol: string; name: string; pairs: number; token: TokenRow | null };
 export type Landing = {
   stats: { launches: number; graduated: number; volume24hUsd: number; volumeAllUsd: number; traders24h: number; stakersUsd: number };
-  tokens: TokenRow[]; nextOffset: number | null; featured: Featured | null;
+  tokens: TokenRow[]; nextOffset: number | null;
 };
 export type ExploreSort = "trending" | "mcap" | "new" | "gainers" | "graduating" | "active";
 export type ExploreFilter = "all" | "live" | "graduated";
@@ -137,7 +137,6 @@ export async function landing(sql: SQL, now = Date.now(), icons?: Icons): Promis
       traders24h: stats.traders, stakersUsd: Number(stats.stakers),
     },
     tokens: rows.slice(0, HOME_PAGE), nextOffset: rows.length > HOME_PAGE ? HOME_PAGE : null,
-    featured: await featured(sql, now, icons),
   };
 }
 
