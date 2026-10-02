@@ -24,14 +24,17 @@ function readable(err: TransactionError, logs: string[], _need?: bigint): string
   return "This transaction would fail on chain right now, so it was not sent to your wallet. Try again in a moment.";
 }
 
-/** Refuses a transaction that is over the size limit or does not simulate on its own against current chain state. */
+/**
+ * Refuses a transaction that is over the size limit or does not simulate on its own against current chain state.
+ * The RPC swaps in its own blockhash, so a node a few slots behind the one that built it cannot fail the check.
+ */
 export async function checkTx(conn: Pick<Connection, "simulateTransaction">, t: { base64: string }): Promise<void> {
   const bytes = Buffer.from(t.base64, "base64");
   if (bytes.length > TX_LIMIT) throw new LaunchError("tx_too_large", "This transaction is too large to send. Try a shorter name or symbol.");
   const tx = VersionedTransaction.deserialize(bytes);
   let res: Awaited<ReturnType<Connection["simulateTransaction"]>>;
   try {
-    res = await conn.simulateTransaction(tx, { sigVerify: false, replaceRecentBlockhash: false, commitment: "confirmed" });
+    res = await conn.simulateTransaction(tx, { sigVerify: false, replaceRecentBlockhash: true, commitment: "confirmed" });
   } catch {
     throw new LaunchError("simulation_failed", "Could not check this transaction with the network right now. Try again in a moment.");
   }

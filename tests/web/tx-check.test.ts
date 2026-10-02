@@ -33,12 +33,12 @@ test("a wallet only transaction is passed through as is", () => {
   expect(walletTx(t.serialize({ requireAllSignatures: false }).toString("base64"))).toEqual({ base64: t.serialize({ requireAllSignatures: false }).toString("base64"), versioned: false });
 });
 
-test("simulation runs on the transaction as is, without signature checks and without a new blockhash", async () => {
+test("simulation runs without signature checks and with the RPC's own blockhash", async () => {
   const { calls, conn } = sim();
   const w = walletTx(presigned().serialize({ requireAllSignatures: false }).toString("base64"));
   await checkTx(conn, w);
   expect(calls.length).toBe(1);
-  expect(calls[0]!.config).toEqual({ sigVerify: false, replaceRecentBlockhash: false, commitment: "confirmed" });
+  expect(calls[0]!.config).toEqual({ sigVerify: false, replaceRecentBlockhash: true, commitment: "confirmed" });
   expect(Buffer.from(calls[0]!.tx.serialize()).toString("base64")).toBe(w.base64);
 });
 

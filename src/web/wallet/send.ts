@@ -1,8 +1,9 @@
 import { Transaction, VersionedTransaction, type Connection } from "@solana/web3.js";
 import type { WalletContextState } from "@solana/wallet-adapter-react";
 
+/** `stale`: the transaction never landed because its blockhash was gone; building it again with a fresh one can work. */
 export class SendError extends Error {
-  constructor(message: string, public confirmed: string[] = [], public unconfirmed: string | null = null) { super(message); }
+  constructor(message: string, public confirmed: string[] = [], public unconfirmed: string | null = null, public stale = false) { super(message); }
 }
 /**
  * `cosign`: the transaction also needs server signatures (a new mint, a new config key). The wallet signs it first and
@@ -24,7 +25,7 @@ const cancelled = (e: unknown) => /reject|cancel|denied|declined|closed/i.test(f
 export const postCosign: Cosign = async (id, transaction) => {
   const r = await fetch("/api/launch/cosign", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ id, transaction }) });
   const j = await r.json().catch(() => ({}));
-  if (!r.ok) throw new SendError(j.error?.message ?? "Something went wrong. Try again.");
+  if (!r.ok) throw new SendError(j.error?.message ?? "Something went wrong. Try again.", [], null, j.error?.code === "blockhash_expired");
   return j.signature as string;
 };
 
@@ -34,7 +35,7 @@ async function walletSends(wallet: Wallet, conn: Connection, t: UnsignedTx): Pro
     return await wallet.sendTransaction(decode(t), conn, { preflightCommitment: "confirmed", maxRetries: 3 });
   } catch (e) {
     if (cancelled(e)) throw new SendError(CANCELLED);
-    throw new SendError(`The network rejected the transaction: ${firstLine(e)}`);
+    throw new SendError(`The network rejected the transaction: ${firstLine(e)}`, [], null, /blockhash ?not ?found/i.test(String(e)));
   }
 }
 
@@ -68,11 +69,13 @@ export async function sendOne(wallet: Wallet, conn: Connection, t: UnsignedTx, c
 /**
  * Runs a flow one wallet prompt at a time. `next` is asked for each transaction only after the previous one
  * confirmed, so the server builds it against current chain state and the wallet can simulate it on its own.
- * It returns null when the flow is done. Any failure stops the flow with its own error.
+ * It returns null when the flow is done. Any failure stops the flow with its own error, except that a transaction
+ * whose blockhash was not found is fetched again once, built with a fresh blockhash.
  */
 export async function sendSequence(wallet: Wallet, conn: Connection, next: (sigs: string[]) => Promise<UnsignedTx | null>, cosign: Cosign = postCosign): Promise<string[]> {
   if (!wallet.publicKey) throw new SendError("Connect a wallet first.");
   const sigs: string[] = [];
+  let rebuilt = -1;
   for (;;) {
     let t: UnsignedTx | null;
     try {
@@ -85,6 +88,7 @@ export async function sendSequence(wallet: Wallet, conn: Connection, next: (sigs
       sigs.push(await sendOne(wallet, conn, t, cosign));
     } catch (e) {
       const err = e instanceof SendError ? e : new SendError(firstLine(e) ?? "Something went wrong. Try again.");
+      if (err.stale && !err.unconfirmed && rebuilt !== sigs.length) { rebuilt = sigs.length; continue; }
       throw new SendError(err.message, [...sigs], err.unconfirmed);
     }
   }

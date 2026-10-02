@@ -154,3 +154,21 @@ test("a failed setup transaction stops the flow with its own error, nothing afte
   expect(failed.message).toContain("Transaction failed");
   expect(failed.confirmed).toEqual([]);
 });
+
+test("a blockhash the network no longer knows gets the step built again once, then the error stands", async () => {
+  const c = fresh();
+  let asked = 0;
+  let failures = 1;
+  const flaky = async (id: string, b64: string) => {
+    if (failures-- > 0) throw new SendError("The network moved on before this was sent. Nothing was sent. Try again.", [], null, true);
+    return server(c)(id, b64);
+  };
+  expect(await sendSequence(wallet(c), conn(c), async (done) => { asked++; return done.length === 0 ? cosigned() : null; }, flaky)).toEqual(["sig0"]);
+  expect(asked).toBe(3);
+
+  const w = fresh();
+  let n = 0;
+  const err = await sendSequence(wallet(w, { sendFail: "Transaction simulation failed: Blockhash not found" }), conn(w), async () => { n++; return single(); }).catch((e) => e);
+  expect(err.message).toContain("Blockhash not found");
+  expect(n).toBe(2);
+});
