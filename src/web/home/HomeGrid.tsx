@@ -32,7 +32,7 @@ function Grid({ tab, initial, nextOffset }: { tab: Tab; initial: TokenRow[] | nu
       </div>
     ) : (
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4" aria-busy="true">
-        {Array.from({ length: 8 }, (_, i) => <div key={i} className="h-[248px] rounded-3xl bg-surface border border-white/[0.05] animate-pulse" />)}
+        {Array.from({ length: 8 }, (_, i) => <div key={i} className="h-[214px] rounded-2xl bg-surface border border-white/[0.06] animate-pulse" />)}
       </div>
     );
   }

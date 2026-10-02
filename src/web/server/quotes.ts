@@ -1,5 +1,5 @@
 import type { WebContext } from "./context";
-import { quoteCoins, stockQuotes, type QuoteCoin } from "@/domain/quotes";
+import { quoteCoins, stockPairsEnabled, stockQuotes, type QuoteCoin } from "@/domain/quotes";
 import { iconsFor } from "./icons";
 
 /** Crypto pairs and approved stock pairs; if the stock registry fails, the last stock list this process loaded. */
@@ -11,10 +11,11 @@ export async function allQuotes(ctx: Pick<WebContext, "stocks">): Promise<QuoteC
   return [...quoteCoins(), ...stocks];
 }
 
-/** Pairs whose curve configs exist on this network, so a launch against them can be built. */
-export async function launchableQuotes(ctx: Pick<WebContext, "stocks" | "configKeys">): Promise<QuoteCoin[]> {
+/** Pairs a new launch can use: curve configs exist on this network, and stocks only when STOCK_PAIRS=1. */
+export async function launchableQuotes(ctx: Pick<WebContext, "stocks" | "configKeys">, quotes?: QuoteCoin[]): Promise<QuoteCoin[]> {
   const keyed = new Set(Object.keys(ctx.configKeys).map((k) => k.split(":")[0]));
-  return (await allQuotes(ctx)).filter((c) => keyed.has(c.mint));
+  const stocks = stockPairsEnabled();
+  return (quotes ?? await allQuotes(ctx)).filter((c) => keyed.has(c.mint) && (stocks || !c.tradingOnly));
 }
 
 /** Jupiter logos first; a stock Jupiter has no logo for falls back to its issuer's. */

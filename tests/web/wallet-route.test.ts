@@ -4,7 +4,7 @@ import { GET } from "../../src/app/api/wallet/[owner]/route";
 import { TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID } from "@solana/spl-token";
 
 const OWNER = (await import("@solana/web3.js")).Keypair.generate().publicKey.toBase58();
-process.env.NEXT_PUBLIC_OURTOKEN_SYMBOL = "QNT";
+process.env.NEXT_PUBLIC_OURTOKEN_SYMBOL = "QUANTS";
 
 test("lists SOL and held tokens with names for known mints, biggest known first", async () => {
   const c = await makeWebContext();
@@ -20,7 +20,7 @@ test("lists SOL and held tokens with names for known mints, biggest known first"
   const r = await (await GET(new Request("http://x"), { params: Promise.resolve({ owner: OWNER }) })).json();
   expect(r.sol).toBe("2500000000");
   expect(r.tokens.map((t: any) => [t.mint, t.symbol, t.kind])).toEqual([
-    ["CATmint", "CAT", "launch"], [OURS, "QNT", "platform"], ["ZECmint", "ZEC", "reward"], ["Unknown1", null, "other"],
+    ["CATmint", "CAT", "launch"], [OURS, "QUANTS", "platform"], ["ZECmint", "ZEC", "reward"], ["Unknown1", null, "other"],
   ]);
   expect(r.tokens[0]).toMatchObject({ amount: "5000000", decimals: 6, image: "https://i/cat.png" });
 });

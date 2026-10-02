@@ -1,5 +1,5 @@
 "use client";
-import { fmtCompact, fmtPrice } from "@/web/ui/format";
+import { changeTone, fmtChange, fmtCompact, fmtPrice } from "@/web/ui/format";
 import { useTokenLive } from "./TokenLive";
 
 export function MarketStats({ quoteSymbol }: { quoteSymbol: string }) {
@@ -15,14 +15,14 @@ export function MarketStats({ quoteSymbol }: { quoteSymbol: string }) {
       <div className="flex flex-col gap-1.5">
         <span className="text-[13px] text-muted">Price</span>
         <span className="font-display font-bold text-2xl md:text-[30px]">{m ? price : dash}</span>
-        {m && <span className={`font-mono text-sm ${m.change24h >= 0 ? "text-accent" : "text-burn"}`}>{m.change24h >= 0 ? "+" : ""}{m.change24h.toFixed(1)}% today</span>}
+        {m && <span className={`font-mono text-sm ${changeTone(m.change24h)}`}>{fmtChange(m.change24h)} today</span>}
       </div>
       <div className="flex flex-col gap-1.5">
         <span className="text-[13px] text-muted">Market cap</span>
         <span className="font-display font-bold text-2xl md:text-[30px]">{m ? cap : dash}</span>
         <span className="flex flex-wrap gap-x-2.5 gap-y-0.5 font-mono text-[12px]">
           {changes.length ? changes.map((a) => (
-            <span key={a.window} className="text-muted">{a.window} <span className={a.change! >= 0 ? "text-accent" : "text-burn"}>{a.change! >= 0 ? "+" : ""}{a.change!.toFixed(1)}%</span></span>
+            <span key={a.window} className="text-muted">{a.window} <span className={changeTone(a.change!)}>{fmtChange(a.change!)}</span></span>
           )) : <span className="text-muted">1B supply</span>}
         </span>
       </div>

@@ -36,7 +36,7 @@ export function BuyTicker() {
   if (!b) return null;
   return (
     <div className="flex items-center gap-2.5 h-6 text-[13px] text-muted overflow-hidden" aria-live="off">
-      <span aria-hidden className="w-1.5 h-1.5 rounded-full bg-accent shrink-0 animate-pulse" />
+      <span aria-hidden className="w-1.5 h-1.5 rounded-full bg-up shrink-0 animate-pulse" />
       <Link key={b.id} href={`/t/${b.mint}`} className="ticker-in block truncate min-w-0 hover:text-ink">
         <span className="font-mono">{shortAddr(b.trader)}</span> bought {b.amount >= 1 ? fmtCompact(b.amount) : fmtPrice(b.amount)} <span className="font-semibold text-ink">{b.symbol}</span>
       </Link>

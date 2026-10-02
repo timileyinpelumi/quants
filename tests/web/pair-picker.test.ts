@@ -16,3 +16,8 @@ test("filter by tab and by symbol, name or mint", () => {
   expect(filterPairs(quotes, "all", "spcx").map((q) => q.symbol)).toEqual(["SPCX.US"]);
   expect(filterPairs(quotes, "crypto", "tesla")).toEqual([]);
 });
+
+test("groups with no pairs get no tab", () => {
+  const crypto = quotes.filter((q) => q.kind === "crypto");
+  expect(pairTabs(crypto).map((t) => t.label)).toEqual(["All", "Crypto"]);
+});

@@ -3,13 +3,14 @@ import { WalletButton } from "@/web/wallet/WalletButton";
 
 const links = [
   { href: "/", label: "Home", key: "home" },
+  { href: "/launch", label: "Launch", key: "launch" },
   { href: "/explore", label: "Explore", key: "explore" },
   { href: "/rewards", label: "Rewards", key: "rewards" },
   { href: "/portfolio", label: "Portfolio", key: "portfolio" },
   { href: "/docs", label: "Docs", key: "docs" },
 ] as const;
 
-export type HeaderKey = (typeof links)[number]["key"] | "launch" | "token" | "admin" | "other";
+export type HeaderKey = (typeof links)[number]["key"] | "token" | "admin" | "other";
 
 function Search({ className }: { className: string }) {
   return (
@@ -29,7 +30,7 @@ export function Header({ active }: { active: HeaderKey }) {
     <header className="border-b line">
       <div className="wrap flex items-center gap-4 md:gap-8 py-4 md:py-5">
         <Link href="/" className="flex items-center gap-2.5 shrink-0" aria-label="quants home">
-          <img src="/brand/quants-mark.svg" alt="" width={32} height={32} className="w-8 h-8" style={{ filter: "drop-shadow(0 4px 14px rgba(76,157,255,0.18))" }} />
+          <img src="/brand/quants-mark.svg" alt="" width={32} height={32} className="w-8 h-8" />
           <span className="font-display font-black text-xl md:text-2xl tracking-tight">quants</span>
         </Link>
         <nav aria-label="Main" className="hidden lg:flex gap-7 text-[15px] font-medium shrink-0">
@@ -46,7 +47,6 @@ export function Header({ active }: { active: HeaderKey }) {
       <div className="lg:hidden wrap flex flex-col gap-3 pb-3">
         <Search className="md:hidden" />
         <nav aria-label="Main" className="flex gap-6 text-sm font-medium overflow-x-auto">
-          <Link href="/launch" className={`${cls("launch")} sm:hidden min-h-9 flex items-center shrink-0`}>Launch</Link>
           {links.map((l) => <Link key={l.href} href={l.href} className={`${cls(l.key)} min-h-9 flex items-center shrink-0`}>{l.label}</Link>)}
         </nav>
       </div>

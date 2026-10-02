@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import type { TradeRow } from "@/web/server/landing";
 import type { Trader } from "@/web/server/live";
 import { LoadMore, getJson } from "@/web/ui/LoadMore";
-import { fmtAgo, fmtCompact, fmtPrice, shortAddr } from "@/web/ui/format";
+import { changeTone, fmtAgo, fmtChange, fmtCompact, fmtPrice, shortAddr } from "@/web/ui/format";
 import { Jazzicon } from "@/web/ui/Jazzicon";
 import { useTokenLive } from "./TokenLive";
 
@@ -22,6 +22,8 @@ function mergeTrades(...lists: TradeRow[][]): TradeRow[] {
 }
 
 const solscan = (path: string) => `https://solscan.io/${path}`;
+const ago = (iso: string) => { const a = fmtAgo(iso); return a === "just now" ? "now" : a.replace(" ago", ""); };
+const TRADE_COLS = "grid-cols-[44px_36px_minmax(0,1fr)_minmax(0,1fr)] md:grid-cols-[56px_44px_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,168px)]";
 
 function Wallet({ address, tag }: { address: string; tag?: string | null }) {
   return (
@@ -37,8 +39,8 @@ function Bar({ buy, sell }: { buy: number; sell: number }) {
   const total = buy + sell || 1;
   return (
     <span className="flex h-1.5 w-full rounded-full overflow-hidden bg-white/[0.07]">
-      <span className="bg-accent" style={{ width: `${(buy / total) * 100}%` }} />
-      <span className="bg-burn" style={{ width: `${(sell / total) * 100}%` }} />
+      <span className="bg-up" style={{ width: `${(buy / total) * 100}%` }} />
+      <span className="bg-down" style={{ width: `${(sell / total) * 100}%` }} />
     </span>
   );
 }
@@ -100,7 +102,7 @@ export function TokenInsights({ mint, symbol, quoteSymbol }: { mint: string; sym
   const a = live?.activity.find((x) => x.window === win);
 
   return (
-    <section className="flex flex-col gap-4">
+    <section id="insights" className="flex flex-col gap-4 scroll-mt-6">
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <nav aria-label="Token insights" className="flex gap-1 overflow-x-auto">
           {TABS.map((t) => (
@@ -120,18 +122,24 @@ export function TokenInsights({ mint, symbol, quoteSymbol }: { mint: string; sym
 
       {tab === "Trades" && (
         <div className="flex flex-col max-h-[520px] overflow-y-auto overscroll-contain pr-1">
-          <div className="hidden md:grid sticky top-0 z-10 bg-ground/95 backdrop-blur grid-cols-[64px_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.4fr)_90px] gap-6 py-2 text-[12px] text-faint">
-            <span>Side</span><span className="text-right">{symbol}</span><span className="text-right">Value</span><span>Wallet</span><span className="text-right">When</span>
+          <div className={`grid ${TRADE_COLS} sticky top-0 z-10 bg-ground/95 backdrop-blur gap-3 md:gap-5 py-2 text-[12px] text-faint`}>
+            <span>Time</span><span>Type</span><span className="text-right">USD</span><span className="text-right truncate">{symbol}</span>
+            <span className="hidden md:block text-right truncate">{quoteSymbol}</span><span className="hidden md:block text-right">Price</span><span className="hidden md:block text-right">Maker</span>
           </div>
-          {!live || trades.length === 0 ? <p className="m-0 py-6 border-t line text-muted text-sm">No trades yet.</p> : trades.map((t) => (
-            <div key={`${t.signature}:${t.eventIndex}`} className="grid grid-cols-[52px_minmax(0,1fr)_auto] md:grid-cols-[64px_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.4fr)_90px] gap-3 md:gap-6 items-center py-2.5 border-t line text-sm font-mono">
-              <span className={`font-sans font-semibold ${t.side === "buy" ? "text-accent" : "text-burn"}`}>{t.side === "buy" ? "Buy" : "Sell"}</span>
-              <span className="md:text-right truncate">{fmtCompact(t.amount)}</span>
-              <span className={`text-right ${t.quoteValue >= big && live.trades.length > 5 ? "text-violet-light font-semibold" : ""}`}>{t.valueUsd === null ? `${fmtPrice(t.quoteValue)} ${quoteSymbol}` : `$${fmtPrice(t.valueUsd)}`}</span>
-              <span className="hidden md:block min-w-0"><Wallet address={t.trader} tag={tagFor(t.trader)} /></span>
-              <a href={solscan(`tx/${t.signature}`)} target="_blank" rel="noreferrer" className="hidden md:block text-right text-muted hover:text-ink">{fmtAgo(t.at)}</a>
-            </div>
-          ))}
+          {!live || trades.length === 0 ? <p className="m-0 py-6 border-t line text-muted text-sm">No trades yet.</p> : trades.map((t) => {
+            const price = t.amount > 0 ? (t.valueUsd ?? t.quoteValue) / t.amount : null;
+            return (
+              <div key={`${t.signature}:${t.eventIndex}`} className={`grid ${TRADE_COLS} gap-3 md:gap-5 items-center py-2 border-t line text-[13px] font-mono tabular-nums ${t.side === "buy" ? "text-up" : "text-down"} ${t.quoteValue >= big && live.trades.length > 5 ? "font-semibold" : ""}`}>
+                <a href={solscan(`tx/${t.signature}`)} target="_blank" rel="noreferrer" className="text-faint hover:text-ink">{ago(t.at)}</a>
+                <span className="font-sans font-semibold">{t.side === "buy" ? "Buy" : "Sell"}</span>
+                <span className="text-right truncate">{t.valueUsd === null ? `${fmtPrice(t.quoteValue)} ${quoteSymbol}` : `$${fmtPrice(t.valueUsd)}`}</span>
+                <span className="text-right truncate">{fmtCompact(t.amount)}</span>
+                <span className="hidden md:block text-right truncate">{fmtPrice(t.quoteValue)}</span>
+                <span className="hidden md:block text-right truncate">{price === null ? "" : `${t.valueUsd === null ? "" : "$"}${fmtPrice(price)}`}</span>
+                <span className="hidden md:flex justify-end min-w-0 text-[12px]"><Wallet address={t.trader} tag={tagFor(t.trader)} /></span>
+              </div>
+            );
+          })}
           {liveTrades.length >= LIVE_TRADES && (
             <LoadMore done={olderDone} state={olderState} onMore={loadOlder} label="Load older trades" doneText="No older trades" />
           )}
@@ -141,17 +149,17 @@ export function TokenInsights({ mint, symbol, quoteSymbol }: { mint: string; sym
       {tab === "Activity" && a && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-x-8 gap-y-6 py-2">
           <div className="flex flex-col gap-1"><span className="text-[13px] text-muted">Price change</span>
-            <span className={`font-display font-bold text-2xl ${a.change === null ? "" : a.change >= 0 ? "text-accent" : "text-burn"}`}>{a.change === null ? "No trades" : `${a.change >= 0 ? "+" : ""}${a.change.toFixed(1)}%`}</span></div>
+            <span className={`font-display font-bold text-2xl ${a.change === null ? "" : changeTone(a.change)}`}>{a.change === null ? "No trades" : fmtChange(a.change)}</span></div>
           <div className="flex flex-col gap-1"><span className="text-[13px] text-muted">Volume</span><span className="font-display font-bold text-2xl">{compact(a.buyValue + a.sellValue)}</span></div>
           <div className="flex flex-col gap-1"><span className="text-[13px] text-muted">Net flow</span>
-            <span className={`font-display font-bold text-2xl ${a.buyValue >= a.sellValue ? "text-accent" : "text-burn"}`}>{a.buyValue >= a.sellValue ? "+" : "-"}{compact(Math.abs(a.buyValue - a.sellValue))}</span></div>
+            <span className={`font-display font-bold text-2xl ${a.buyValue >= a.sellValue ? "text-up" : "text-down"}`}>{a.buyValue >= a.sellValue ? "+" : "-"}{compact(Math.abs(a.buyValue - a.sellValue))}</span></div>
           <div className="flex flex-col gap-1"><span className="text-[13px] text-muted">Wallets</span><span className="font-display font-bold text-2xl">{a.buyers + a.sellers}</span></div>
           {[["Trades", a.buys, a.sells, (n: number) => String(n)], ["Volume", a.buyValue, a.sellValue, compact], ["Wallets", a.buyers, a.sellers, (n: number) => String(n)]].map(([label, b, s, f]) => (
             <div key={label as string} className="col-span-2 flex flex-col gap-2">
               <span className="flex justify-between text-[13px]">
-                <span className="text-accent">{(f as (n: number) => string)(b as number)} {label === "Wallets" ? "buyers" : "buys"}</span>
+                <span className="text-up">{(f as (n: number) => string)(b as number)} {label === "Wallets" ? "buyers" : "buys"}</span>
                 <span className="text-muted">{label as string}</span>
-                <span className="text-burn">{(f as (n: number) => string)(s as number)} {label === "Wallets" ? "sellers" : "sells"}</span>
+                <span className="text-down">{(f as (n: number) => string)(s as number)} {label === "Wallets" ? "sellers" : "sells"}</span>
               </span>
               <Bar buy={b as number} sell={s as number} />
             </div>
@@ -170,7 +178,7 @@ export function TokenInsights({ mint, symbol, quoteSymbol }: { mint: string; sym
               <span className="hidden md:flex flex-col items-end"><span>{value(t.spent)}</span><span className="text-[12px] text-muted">{fmtCompact(t.bought)} {symbol}</span></span>
               <span className="hidden md:flex flex-col items-end"><span>{value(t.received)}</span><span className="text-[12px] text-muted">{fmtCompact(t.sold)} {symbol}</span></span>
               <span className="hidden md:block text-right">{fmtCompact(t.position)}</span>
-              <span className={`text-right ${t.pnl >= 0 ? "text-accent" : "text-burn"}`}>{t.pnl >= 0 ? "+" : "-"}{value(Math.abs(t.pnl))}</span>
+              <span className={`text-right ${t.pnl >= 0 ? "text-up" : "text-down"}`}>{t.pnl >= 0 ? "+" : "-"}{value(Math.abs(t.pnl))}</span>
             </div>
           ))}
           {(live?.traders.length ?? 0) >= LIVE_TRADERS && (

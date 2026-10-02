@@ -1,7 +1,7 @@
 import { test, expect } from "bun:test";
 import type { SQL } from "bun";
 import { freshDb } from "../helpers/db";
-import { landing, exploreTokens, featured, recentBuys, HOME_TABS, HOME_PAGE } from "../../src/web/server/landing";
+import { landing, exploreTokens, featured, recentBuys, sparklines, withSparks, HOME_TABS, HOME_PAGE } from "../../src/web/server/landing";
 import { defaultSettings, saveSettings } from "../../src/domain/settings";
 
 const NOW = Date.parse("2026-10-01T12:00:00Z");
@@ -98,14 +98,14 @@ test("recent buys are the newest buys across every launch", async () => {
 
 test("the featured platform token shows its market when it launched here, else its pairs", async () => {
   const sql = await freshDb();
-  const coins = [{ mint: "mint-QNT", symbol: "QNT", name: "quants", decimals: 6, graduation: 1, iconMint: null, platform: true, payoutMin: 0n, kind: "crypto" as const, tradingOnly: false }];
+  const coins = [{ mint: "mint-QUANTS", symbol: "QUANTS", name: "quants", decimals: 6, graduation: 1, iconMint: null, platform: true, payoutMin: 0n, kind: "crypto" as const, tradingOnly: false }];
   await launch(sql, "AAA", 2);
-  await sql`update launches set quote_mint = 'mint-QNT' where symbol = 'AAA'`;
-  expect(await featured(sql, NOW, undefined, coins)).toEqual({ mint: "mint-QNT", symbol: "QNT", name: "quants", pairs: 1, token: null });
-  const q = await launch(sql, "QNT", 1);
+  await sql`update launches set quote_mint = 'mint-QUANTS' where symbol = 'AAA'`;
+  expect(await featured(sql, NOW, undefined, coins)).toEqual({ mint: "mint-QUANTS", symbol: "QUANTS", name: "quants", pairs: 1, token: null });
+  const q = await launch(sql, "QUANTS", 1);
   await trade(sql, q, 5, 0.002);
   const f = (await featured(sql, NOW, undefined, coins))!;
-  expect(f.token).toMatchObject({ mint: "mint-QNT", symbol: "QNT" });
+  expect(f.token).toMatchObject({ mint: "mint-QUANTS", symbol: "QUANTS" });
   expect(f.token!.priceUsd).toBeCloseTo(0.2, 9);
   expect(await featured(sql, NOW, undefined, [])).toBeNull();
 });
@@ -114,8 +114,8 @@ test("explore filters by pair token", async () => {
   const sql = await freshDb();
   await launch(sql, "AAA", 2);
   await launch(sql, "BBB", 1);
-  await sql`update launches set quote_mint = 'mint-QNT' where symbol = 'BBB'`;
-  expect((await exploreTokens(sql, { sort: "new", quote: "mint-QNT" }, NOW)).map((t) => t.symbol)).toEqual(["BBB"]);
+  await sql`update launches set quote_mint = 'mint-QUANTS' where symbol = 'BBB'`;
+  expect((await exploreTokens(sql, { sort: "new", quote: "mint-QUANTS" }, NOW)).map((t) => t.symbol)).toEqual(["BBB"]);
 });
 
 test("token rows show staking progress until staking opens", async () => {
@@ -181,6 +181,39 @@ test("explore pages continue without overlap or gaps, ties broken by newest then
   }
   expect((await exploreTokens(sql, { sort: "trending", limit: 50 }, NOW)).map((t) => t.symbol)).toEqual(["P1", "P4", "P7", "P6", "P5", "P3", "P2"]);
   expect(await exploreTokens(sql, { sort: "new", limit: 3, offset: 7 }, NOW)).toEqual([]);
+});
+
+test("sparklines bucket the last 24h of prices per token in one query, carrying the last price forward", async () => {
+  const sql = await freshDb();
+  const a = await launch(sql, "AAA", 48);
+  const b = await launch(sql, "BBB", 30);
+  await launch(sql, "CCC", 1);
+  await trade(sql, a, 60 * 30, 1);
+  await trade(sql, a, 60 * 20 + 10, 2);
+  await trade(sql, a, 60 * 20 + 5, 3);
+  await trade(sql, a, 30, 4);
+  await trade(sql, b, 60 * 26, 5);
+  const s = await sparklines(sql, ["mint-AAA", "mint-BBB", "mint-CCC", "mint-nope"], NOW, 6);
+  // 4 hour buckets: AAA starts at the price before the window, closes 3 in the bucket 20h ago, 4 in the last
+  expect(s["mint-AAA"]).toEqual([1, 3, 3, 3, 3, 3, 4]);
+  expect(s["mint-BBB"]).toEqual([5, 5, 5, 5, 5, 5, 5]);
+  expect(s["mint-CCC"]).toEqual([]);
+  expect(s["mint-nope"]).toBeUndefined();
+  expect(await sparklines(sql, [], NOW)).toEqual({});
+  const rows = await withSparks(sql, await exploreTokens(sql, { sort: "new" }, NOW), NOW);
+  expect(rows.find((r) => r.symbol === "AAA")!.spark).toHaveLength(25);
+});
+
+test("explore route adds sparklines when asked", async () => {
+  const { makeWebContext } = await import("../helpers/web-context");
+  const { GET } = await import("../../src/app/api/explore/route");
+  const { sql } = await makeWebContext();
+  const a = await launch(sql, "AAA", 3);
+  await trade(sql, a, 30, 0.001);
+  const plain = await (await GET(new Request("http://x/api/explore?sort=new"))).json();
+  expect(plain.tokens[0].spark).toBeUndefined();
+  const withSpark = await (await GET(new Request("http://x/api/explore?sort=new&spark=1"))).json();
+  expect(withSpark.tokens[0].spark.length).toBeGreaterThan(1);
 });
 
 test("explore search treats like wildcards as text", async () => {

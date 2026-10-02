@@ -6,7 +6,7 @@ import { allQuotes, quoteIcons } from "@/web/server/quotes";
 import { HOME_TABS, landing, type Featured } from "@/web/server/landing";
 import { HomeGrid } from "@/web/home/HomeGrid";
 import { BuyTicker } from "@/web/home/BuyTicker";
-import { Change, CURVE, Meter } from "@/web/home/TokenCard";
+import { Change } from "@/web/home/TokenCard";
 
 export const dynamic = "force-dynamic";
 
@@ -15,10 +15,10 @@ const usd = (n: number | null) => (n === null ? "No price" : `$${fmtCompact(n)}`
 function FeaturedToken({ f }: { f: Featured }) {
   const t = f.token;
   return (
-    <section aria-label="Featured" className="relative overflow-hidden rounded-[28px] p-[1px]" style={{ background: "linear-gradient(120deg, rgba(76,157,255,0.7), rgba(76,157,255,0.08) 45%, rgba(140,207,223,0.4))" }}>
-      <div className="flex flex-col md:flex-row md:items-center gap-5 md:gap-8 rounded-[27px] px-5 py-5 md:px-7 md:py-6" style={{ background: "radial-gradient(600px 220px at 0% 0%, rgba(76,157,255,0.16), transparent 70%), #111018" }}>
+    <section aria-label="Featured" className="rounded-2xl border border-accent/35 bg-surface">
+      <div className="flex flex-col md:flex-row md:items-center gap-5 md:gap-8 px-5 py-5 md:px-7 md:py-6">
         <div className="flex items-center gap-4 min-w-0 md:flex-1">
-          <img src="/brand/quants-mark.svg" alt="" width={64} height={64} className="w-16 h-16 shrink-0" style={{ filter: "drop-shadow(0 8px 24px rgba(76,157,255,0.3))" }} />
+          <img src="/brand/quants-mark.svg" alt="" width={64} height={64} className="w-16 h-16 shrink-0" />
           <span className="flex flex-col gap-1 min-w-0">
             <span className="flex items-center gap-2.5">
               <span className="font-display font-black text-2xl tracking-tight">{f.symbol}</span>
@@ -28,17 +28,16 @@ function FeaturedToken({ f }: { f: Featured }) {
           </span>
         </div>
         {t && (
-          <div className="grid grid-cols-3 gap-5 md:gap-8 font-mono md:w-[380px] shrink-0">
-            <span className="flex flex-col gap-0.5"><span className="font-sans text-[12px] text-faint">Price</span><span>{t.priceUsd === null ? "No trades" : `$${fmtPrice(t.priceUsd)}`}</span></span>
-            <span className="flex flex-col gap-0.5"><span className="font-sans text-[12px] text-faint">Market cap</span><span>{usd(t.mcapUsd)}</span></span>
-            <span className="flex flex-col gap-0.5"><span className="font-sans text-[12px] text-faint">24h</span><Change value={t.change24h} traded={t.price !== null} /></span>
-            {t.status !== "graduated" && <span className="col-span-3"><Meter value={t.progress ?? 0} color={CURVE} /></span>}
+          <div className="grid grid-cols-3 gap-5 md:gap-8 md:w-[380px] shrink-0 font-display font-bold text-[17px] tabular-nums">
+            <span className="flex flex-col gap-1"><span className="font-sans font-normal text-[12px] text-faint">Price</span><span>{t.priceUsd === null ? "No trades" : `$${fmtPrice(t.priceUsd)}`}</span></span>
+            <span className="flex flex-col gap-1"><span className="font-sans font-normal text-[12px] text-faint">Market cap</span><span>{usd(t.mcapUsd)}</span></span>
+            <span className="flex flex-col gap-1"><span className="font-sans font-normal text-[12px] text-faint">24h</span><Change value={t.change24h} traded={t.price !== null} /></span>
           </div>
         )}
         <div className="flex flex-wrap gap-2.5 shrink-0">
-          {t && <Link href={`/t/${t.mint}`} className="font-display font-bold text-ground bg-accent glow-accent rounded-full px-5 min-h-11 flex items-center">Trade {f.symbol}</Link>}
+          {t && <Link href={`/t/${t.mint}`} className="font-display font-bold text-ground bg-accent rounded-full px-5 min-h-11 flex items-center">Trade {f.symbol}</Link>}
           <Link href={`/explore?quote=${f.mint}`} className="font-display font-bold rounded-full px-5 min-h-11 flex items-center bg-raised-2 border border-white/10">
-            {f.pairs === 0 ? `${f.symbol} pairs` : `${f.pairs} ${f.pairs === 1 ? "pair" : "pairs"}`}
+            {f.symbol} pairs{f.pairs > 0 && <span className="ml-2 font-mono font-normal text-sm text-muted">{f.pairs}</span>}
           </Link>
         </div>
       </div>

@@ -1,5 +1,5 @@
 import { test, expect } from "bun:test";
-import { fmtAmount, fmtCompact, fmtPrice, fmtAgo, shortAddr, avatarGradient } from "../../src/web/ui/format";
+import { fmtAmount, fmtCompact, fmtPrice, fmtAgo, shortAddr, avatarGradient, fmtChange, changeTone } from "../../src/web/ui/format";
 
 test("fmtAmount formats base units", () => {
   expect(fmtAmount(4_812_330_000_000n, 6)).toBe("4,812,330");
@@ -40,4 +40,15 @@ test("lock labels read in hours under a day", async () => {
   const { lockLabel, lockShort } = await import("../../src/web/ui/format");
   expect([lockLabel(43_200), lockLabel(86_400), lockLabel(259_200), lockLabel(3600)]).toEqual(["12 hours", "1 day", "3 days", "1 hour"]);
   expect([lockShort(43_200), lockShort(604_800)]).toEqual(["12h", "7d"]);
+});
+
+test("price changes read with a sign and take the market colour of the rounded value", () => {
+  expect(fmtChange(12.345)).toBe("+12.3%");
+  expect(fmtChange(-4.06)).toBe("-4.1%");
+  expect(fmtChange(0)).toBe("0.0%");
+  expect(fmtChange(-0.04)).toBe("0.0%");
+  expect(changeTone(3)).toBe("text-up");
+  expect(changeTone(-3)).toBe("text-down");
+  expect(changeTone(0.02)).toBe("text-muted");
+  expect(changeTone(-0.04)).toBe("text-muted");
 });

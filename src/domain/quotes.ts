@@ -32,7 +32,7 @@ export function quoteCoins(env: Env = process.env): QuoteCoin[] {
   const ours = env.OURTOKEN_MINT ?? env.NEXT_PUBLIC_OURTOKEN_MINT;
   if (ours) {
     list.push({
-      mint: ours, symbol: env.OURTOKEN_SYMBOL ?? env.NEXT_PUBLIC_OURTOKEN_SYMBOL ?? "OURTOKEN", name: "quants",
+      mint: ours, symbol: env.OURTOKEN_SYMBOL ?? env.NEXT_PUBLIC_OURTOKEN_SYMBOL ?? "QUANTS", name: "quants",
       decimals: Number(env.OURTOKEN_DECIMALS ?? 6), graduation: Number(env.OURTOKEN_GRADUATION ?? env.NEXT_PUBLIC_OURTOKEN_GRADUATION ?? 0),
       iconMint: null, platform: true, payoutMin: 0n, kind: "crypto", tradingOnly: false,
     });
@@ -51,5 +51,8 @@ export function quoteCoins(env: Env = process.env): QuoteCoin[] {
 const g = globalThis as { __quantsStocks?: QuoteCoin[] };
 export const setStockQuotes = (list: QuoteCoin[]) => { g.__quantsStocks = list; };
 export const stockQuotes = (): QuoteCoin[] => g.__quantsStocks ?? [];
+
+/** Stock pairs are trading only (no staking), so new launches against them stay off unless STOCK_PAIRS=1. Existing stock launches keep trading. */
+export const stockPairsEnabled = (env: Env = process.env) => env.STOCK_PAIRS === "1";
 
 export const quoteCoin = (mint: string, list = [...quoteCoins(), ...stockQuotes()]) => list.find((c) => c.mint === mint);

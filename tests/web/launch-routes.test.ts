@@ -29,18 +29,37 @@ test("OURTOKEN launch with a first buy puts the Jupiter swap first and caps the 
   expect((c.meteora as any).launches[0].devBuyQuoteAmount).toBe(1_980_000_000n);
 });
 
-test("a stock pair from the registry launches trading only, with no basket", async () => {
-  const STOCK = "Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh";
-  const stock = { mint: STOCK, symbol: "NVDAx", name: "NVIDIA xStock", decimals: 8, graduation: 50, iconMint: STOCK, platform: false, payoutMin: 0n, kind: "xstocks" as const, tradingOnly: true };
+const STOCK = "Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh";
+const stock = { mint: STOCK, symbol: "NVDAx", name: "NVIDIA xStock", decimals: 8, graduation: 50, iconMint: STOCK, platform: false, payoutMin: 0n, kind: "xstocks" as const, tradingOnly: true };
+
+test("with STOCK_PAIRS=1 a stock pair from the registry launches trading only, with no basket", async () => {
+  process.env.STOCK_PAIRS = "1";
+  try {
+    const c = await makeWebContext({ stocks: { list: async () => [stock], icons: async () => ({}) } });
+    c.configKeys[`${STOCK}:200`] = "CfgStock200";
+    const r = await post(prepare, body({ quoteMint: STOCK, basket: [] }));
+    const j = await r.json();
+    expect(r.status).toBe(200);
+    const [p] = await c.sql`select trading_only, basket from prepared_launches where mint = ${j.mint}`;
+    expect(p).toEqual({ trading_only: true, basket: [] });
+    const withBasket = await post(prepare, body({ quoteMint: STOCK }));
+    expect(withBasket.status).toBe(400);
+  } finally {
+    delete process.env.STOCK_PAIRS;
+  }
+});
+
+test("stock pairs are not launchable unless STOCK_PAIRS=1", async () => {
+  delete process.env.STOCK_PAIRS;
   const c = await makeWebContext({ stocks: { list: async () => [stock], icons: async () => ({}) } });
   c.configKeys[`${STOCK}:200`] = "CfgStock200";
   const r = await post(prepare, body({ quoteMint: STOCK, basket: [] }));
-  const j = await r.json();
-  expect(r.status).toBe(200);
-  const [p] = await c.sql`select trading_only, basket from prepared_launches where mint = ${j.mint}`;
-  expect(p).toEqual({ trading_only: true, basket: [] });
-  const withBasket = await post(prepare, body({ quoteMint: STOCK }));
-  expect(withBasket.status).toBe(400);
+  expect(r.status).toBe(400);
+  expect((await r.json()).error.code).toBe("invalid_input");
+  const { launchableQuotes, allQuotes } = await import("../../src/web/server/quotes");
+  expect((await launchableQuotes(c)).some((q) => q.tradingOnly)).toBe(false);
+  // existing stock launches still trade, so lookups keep stock pairs
+  expect((await allQuotes(c)).some((q) => q.mint === STOCK)).toBe(true);
 });
 
 test("OURTOKEN first buy with no route is a readable 400", async () => {

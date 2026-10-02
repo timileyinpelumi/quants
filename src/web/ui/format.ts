@@ -34,6 +34,14 @@ export function fmtPrice(n: number, sig = 3): string {
   return n.toFixed(decimals).replace(/0+$/, "").replace(/\.$/, "");
 }
 
+const tenths = (pct: number) => Math.round(pct * 10) / 10 || 0;
+
+/** "+12.3%", "-4.1%", "0.0%"; signed by the shown value so -0.04 is not "-0.0%". */
+export const fmtChange = (pct: number) => { const v = tenths(pct); return `${v > 0 ? "+" : ""}${v.toFixed(1)}%`; };
+
+/** Market colour for a change: green up, red down, muted when it rounds to zero. */
+export const changeTone = (pct: number) => { const v = tenths(pct); return v > 0 ? "text-up" : v < 0 ? "text-down" : "text-muted"; };
+
 export function fmtAgo(iso: string, now = Date.now()): string {
   const s = Math.max(0, (now - Date.parse(iso)) / 1000);
   if (s < 60) return "just now";
