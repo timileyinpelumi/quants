@@ -32,7 +32,7 @@ export const parseSettings = (input: unknown): Settings => Schema.parse(input);
 
 export function defaultSettings(ourtokenMint: string): Settings {
   return parseSettings({
-    split: { basketBps: 6000, platformBps: 2500, creatorBps: 1500 },
+    split: { basketBps: 6000, platformBps: 1500, creatorBps: 2500 },
     creatorPayoutMin: { [NATIVE_MINT]: 50_000_000n, [ourtokenMint]: 0n },
     tiers: [
       { id: "1d", lockSeconds: DAY, multiplierBps: 10_000 },

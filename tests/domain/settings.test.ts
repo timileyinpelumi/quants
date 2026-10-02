@@ -7,7 +7,7 @@ const OURS = "OURS1111111111111111111111111111111111111111";
 
 test("defaults match the spec", () => {
   const s = defaultSettings(OURS);
-  expect(s.split).toEqual({ basketBps: 6000, platformBps: 2500, creatorBps: 1500 });
+  expect(s.split).toEqual({ basketBps: 6000, platformBps: 1500, creatorBps: 2500 });
   expect(s.tiers.map((t) => [t.id, t.lockSeconds, t.multiplierBps])).toEqual([
     ["1d", 86_400, 10_000], ["3d", 259_200, 12_500], ["7d", 604_800, 15_000], ["30d", 2_592_000, 20_000],
   ]);
