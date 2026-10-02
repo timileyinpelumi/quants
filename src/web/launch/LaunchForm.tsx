@@ -168,12 +168,22 @@ export function LaunchForm({ split, tiers, maxPenaltyBps, quotes, initialPair, f
         basket: tradingOnly ? [] : basket.map((b) => ({ mint: b.mint, weightBps: b.weight * 100, symbol: b.symbol, decimals: b.decimals })),
       };
       // Each step is fetched only after the one before confirmed, so the wallet can check it against current state.
-      const sigs = await sendSequence(wallet, connection, async () => {
-        if (got.mint) return null;
+      const sigs = await sendSequence(wallet, connection, async (done) => {
+        const confirmed = steps.slice(0, done.length);
+        if (confirmed.includes("launch")) return null;
         setStatus("preparing");
-        const s = await postJson<LaunchStep>("/api/launch/prepare", request);
-        if (steps.filter((k) => k === s.step).length >= (s.step === "config" ? 2 : 1)) throw new Error("This launch could not be set up right now. Try again in a moment.");
-        steps.push(s.step);
+        let s = await postJson<LaunchStep>("/api/launch/prepare", request);
+        // The setup transaction confirmed, but the server's RPC can be a few seconds behind before it sees the config key.
+        for (let i = 0; s.step === "config" && confirmed.includes("config") && i < 3; i++) {
+          await new Promise((r) => setTimeout(r, 2000));
+          s = await postJson<LaunchStep>("/api/launch/prepare", request);
+        }
+        if (confirmed.includes(s.step)) {
+          throw new Error(s.step === "config"
+            ? "The setup transaction confirmed but the network has not caught up yet. Wait a minute and launch again."
+            : "This launch step came back twice. Wait a minute and launch again.");
+        }
+        steps[done.length] = s.step;
         if (s.step === "swap") request.quoteBought = s.quoteBought;
         if (s.step === "launch") got.mint = s.mint;
         setStatus("signing");

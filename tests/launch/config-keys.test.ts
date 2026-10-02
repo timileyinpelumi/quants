@@ -56,6 +56,22 @@ test("a pending address that exists on chain with other parameters is dropped fo
   expect(next!.create).toBeDefined();
 });
 
+test("a pending config not on chain and not handed out for 2 minutes is dropped for a fresh keypair; a recent one is reused", async () => {
+  const { sql, meteora, deps } = await setup();
+  const first = await resolveConfig(deps, SOL, 200);
+  await sql`update config_keys set issued_at = now() - interval '90 seconds'`;
+  expect((await resolveConfig(deps, SOL, 200))!.configKey).toBe(first!.configKey);
+  await sql`update config_keys set issued_at = now() - interval '3 minutes'`;
+  const next = await resolveConfig(deps, SOL, 200);
+  expect(next!.configKey).not.toBe(first!.configKey);
+  expect(next!.create).toBeDefined();
+  expect((await sql`select address from config_keys`).map((r: any) => r.address)).toEqual([next!.configKey]);
+  // a stale row whose transaction did land is kept and goes live
+  await sql`update config_keys set issued_at = now() - interval '3 minutes'`;
+  meteora.configs.set(next!.configKey, { feeClaimer: KEEPER, quoteMint: NATIVE_MINT, threshold: 85_000_000_000n });
+  expect(await resolveConfig(deps, SOL, 200)).toEqual({ configKey: next!.configKey });
+});
+
 test("a new graduation target gets its own config key; the old one stays for its pools", async () => {
   const { sql, deps } = await setup();
   const a = await resolveConfig(deps, SOL, 200);

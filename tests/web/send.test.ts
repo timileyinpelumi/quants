@@ -142,20 +142,15 @@ test("a server error fetching the next step keeps the confirmed list", async () 
   expect(err.confirmed).toEqual(["sig0"]);
 });
 
-test("an optional transaction that fails leaves an empty slot and the flow goes on; a required one stops it", async () => {
+test("a failed setup transaction stops the flow with its own error, nothing after it is asked for", async () => {
   const c = fresh();
-  let n = 0;
-  const cn = conn(c);
-  cn.confirmTransaction = async () => ({ value: { err: n++ === 0 ? { InstructionError: [0, "Custom"] } : null } });
-  const sigs = await sendSequence(wallet(c), cn, async (done) => (done.length === 0 ? { ...cosigned(), optional: true } : done.length === 1 ? single() : null), server(c));
-  expect(sigs).toEqual(["", "sig1"]);
-  const f = fresh();
-  const err = await sendSequence(wallet(f), conn(f, true), async (done) => (done.length === 0 ? { ...single(), optional: true } : done.length === 1 ? single() : null)).catch((e) => e);
+  let asked = 0;
+  const err = await sendSequence(wallet(c), conn(c), async () => { asked++; return cosigned(); }, server(c, "Your wallet does not have enough SOL.")).catch((e) => e);
   expect(err).toBeInstanceOf(SendError);
-  expect(err.confirmed).toEqual([""]);
-});
-
-test("cancelling an optional transaction still stops the flow", async () => {
-  const c = fresh();
-  await expect(sendSequence(wallet(c, { reject: true }), conn(c), async () => ({ ...single(), optional: true }))).rejects.toThrow("cancelled");
+  expect(err.message).toBe("Your wallet does not have enough SOL.");
+  expect(asked).toBe(1);
+  const f = fresh();
+  const failed = await sendSequence(wallet(f), conn(f, true), async (done) => (done.length < 2 ? cosigned() : null), server(f)).catch((e) => e);
+  expect(failed.message).toContain("Transaction failed");
+  expect(failed.confirmed).toEqual([]);
 });

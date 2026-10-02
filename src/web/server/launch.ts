@@ -84,8 +84,7 @@ export async function prepareWithSwap(ctx: WebContext, raw: unknown): Promise<La
     { stopBeforeLaunch: swap !== undefined },
   );
   if (p.step === "config") {
-    // Optional: when another launch created the same config key first, this one fails and the launch goes on.
-    const transaction = walletTx(p.transaction, { optional: true });
+    const transaction = walletTx(p.transaction);
     await checkTx(ctx.conn, transaction);
     return { step: "config", transaction: await issueCosign(ctx.sql, transaction, p.signers) };
   }

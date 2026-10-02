@@ -7,9 +7,8 @@ export class SendError extends Error {
 /**
  * `cosign`: the transaction also needs server signatures (a new mint, a new config key). The wallet signs it first and
  * the server checks what the wallet signed, adds its signatures and sends it.
- * `optional`: the flow goes on if it fails (a config key another launch created first).
  */
-export type UnsignedTx = { base64: string; versioned: boolean; optional?: boolean; cosign?: string };
+export type UnsignedTx = { base64: string; versioned: boolean; cosign?: string };
 export type Wallet = Pick<WalletContextState, "publicKey" | "sendTransaction" | "signTransaction">;
 /** Hands the wallet-signed transaction to the server, which signs, sends and returns the signature. */
 export type Cosign = (id: string, signedBase64: string) => Promise<string>;
@@ -69,7 +68,7 @@ export async function sendOne(wallet: Wallet, conn: Connection, t: UnsignedTx, c
 /**
  * Runs a flow one wallet prompt at a time. `next` is asked for each transaction only after the previous one
  * confirmed, so the server builds it against current chain state and the wallet can simulate it on its own.
- * It returns null when the flow is done. A failed optional transaction leaves an empty slot.
+ * It returns null when the flow is done. Any failure stops the flow with its own error.
  */
 export async function sendSequence(wallet: Wallet, conn: Connection, next: (sigs: string[]) => Promise<UnsignedTx | null>, cosign: Cosign = postCosign): Promise<string[]> {
   if (!wallet.publicKey) throw new SendError("Connect a wallet first.");
@@ -86,7 +85,6 @@ export async function sendSequence(wallet: Wallet, conn: Connection, next: (sigs
       sigs.push(await sendOne(wallet, conn, t, cosign));
     } catch (e) {
       const err = e instanceof SendError ? e : new SendError(firstLine(e) ?? "Something went wrong. Try again.");
-      if (t.optional && !err.unconfirmed && err.message !== CANCELLED) { sigs.push(""); continue; }
       throw new SendError(err.message, [...sigs], err.unconfirmed);
     }
   }

@@ -178,7 +178,7 @@ test("an empty search returns popular tokens", async () => {
   expect(j.popular).toBe(true);
 });
 
-test("the first USDC launch creates its config key in its own optional step, then swaps, then launches", async () => {
+test("the first USDC launch creates its config key in its own step, then swaps, then launches", async () => {
   const USDC = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
   const c = await makeWebContext();
   (c.jupiter as any).rates.set(USDC, 150);
@@ -186,7 +186,6 @@ test("the first USDC launch creates its config key in its own optional step, the
 
   const first = await call();
   expect(first.step).toBe("config");
-  expect(first.transaction.optional).toBe(true);
   const meteora = c.meteora as any;
   const cfg = meteora.configTxs[0];
   expect(cfg.create.quote).toEqual({ mint: USDC, decimals: 6, migrationQuoteThreshold: 12_000 });
