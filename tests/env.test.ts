@@ -51,3 +51,12 @@ test("keypairs can be read from files", () => {
   expect(() => readKeypairFiles({ KEEPER_KEYPAIR: "[7]", KEEPER_KEYPAIR_PATH: join(dir, "keeper.json") })).toThrow(/not both/);
   expect(() => readKeypairFiles({ SPILL_KEYPAIR_PATH: join(dir, "missing.json") })).toThrow();
 });
+
+test("a bad keypair error never quotes the secret", async () => {
+  const { loadKeypair } = await import("../src/chain/solana");
+  const secret = "[12,34,secretbytes-here]";
+  let msg = "";
+  try { loadKeypair(secret); } catch (e) { msg = String(e); }
+  expect(msg).toContain("keypair is not a JSON array");
+  expect(msg).not.toContain("secretbytes");
+});

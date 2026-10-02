@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { getContext } from "@/web/server/context";
-import { json, jsonError } from "@/web/server/http";
+import { json, jsonError, rateLimit } from "@/web/server/http";
 import { allQuotes, quoteIcons } from "@/web/server/quotes";
 import { EXPLORE_FILTERS, EXPLORE_SORTS, exploreTokens, withSparks } from "@/web/server/landing";
 import { page, pageParams, queryOf } from "@/web/server/paging";
@@ -18,6 +18,7 @@ const Query = z.object({
 
 export async function GET(req: Request) {
   try {
+    rateLimit(req, "explore", 240);
     const o = Query.parse(queryOf(req));
     const ctx = getContext();
     const now = Date.now();

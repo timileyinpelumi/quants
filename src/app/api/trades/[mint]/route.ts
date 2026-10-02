@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { getContext } from "@/web/server/context";
-import { json, jsonError } from "@/web/server/http";
+import { json, jsonError, rateLimit } from "@/web/server/http";
 import { parseTradeCursor, recentTrades, tradeCursor } from "@/web/server/landing";
 import { page, pageParams, queryOf } from "@/web/server/paging";
 
@@ -18,6 +18,7 @@ const Query = z.object({
 
 export async function GET(req: Request, { params }: { params: Promise<{ mint: string }> }) {
   try {
+    rateLimit(req, "trades", 240);
     const o = Query.parse(queryOf(req));
     const { sql } = getContext();
     const [l] = await sql`select id from launches where mint = ${(await params).mint}`;

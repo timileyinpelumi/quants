@@ -84,6 +84,14 @@ class NoUploads implements UploadPort {
 /** Local uploads are a dev switch (DEV_UPLOADS_BASE, or the older PINATA_JWT=stub) and refuse to start against a remote RPC. */
 export const devUploadsOn = (env: Env) => !!env.DEV_UPLOADS_BASE || env.PINATA_JWT === "stub";
 
+/** Where launch images and metadata must live: our Cloudinary cloud, the local dev store, or anywhere when neither is set. */
+export function uploadPrefix(env: Env): string | null {
+  const creds = cloudinaryCreds(env);
+  if (creds) return `https://res.cloudinary.com/${creds.cloudName}/`;
+  if (devUploadsOn(env)) return `${env.DEV_UPLOADS_BASE || "http://localhost:3000/api/dev-uploads"}/`;
+  return null;
+}
+
 export function uploadsFrom(env: Env, fetchFn: Fetch = fetch): UploadPort {
   const creds = cloudinaryCreds(env);
   if (creds) return new CloudinaryUploads(creds, fetchFn);

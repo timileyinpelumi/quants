@@ -19,11 +19,16 @@ export function securityHeaders(rpcUrl: string, dev: boolean): { key: string; va
     "base-uri 'self'",
     "form-action 'self'",
     "object-src 'none'",
+    ...(dev ? [] : ["upgrade-insecure-requests"]),
   ].join("; ");
   return [
     { key: "Content-Security-Policy", value: csp },
     { key: "X-Frame-Options", value: "DENY" },
     { key: "X-Content-Type-Options", value: "nosniff" },
     { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+    { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(), payment=(), usb=()" },
+    // Wallet adapters may open popups, which plain same-origin would cut off from the page.
+    { key: "Cross-Origin-Opener-Policy", value: "same-origin-allow-popups" },
+    ...(dev ? [] : [{ key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains" }]),
   ];
 }

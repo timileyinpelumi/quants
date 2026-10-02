@@ -34,6 +34,13 @@ export type UnsignedTx = { base64: string; versioned: boolean; optional?: boolea
 // A first buy in any pair token other than SOL is paid in SOL: a Jupiter swap runs first and the curve buy is capped at the swap's slippage floor.
 export async function prepareWithSwap(ctx: WebContext, raw: unknown) {
   const { devBuySol, ...rest } = Body.parse(raw);
+  const prefix = ctx.uploadPrefix;
+  for (const [field, label] of [["uri", "Metadata"], ["image", "Image"]] as const) {
+    const v = (rest as Record<string, unknown>)[field];
+    if (prefix && v !== undefined && (typeof v !== "string" || !v.startsWith(prefix))) {
+      throw new LaunchError("invalid_input", `${label} must be uploaded through quants. Upload the image again.`);
+    }
+  }
   const { slippageBps, launchesPaused } = await loadLatestSettings(ctx.sql);
   if (launchesPaused) throw new LaunchError("launches_paused", "New launches are paused for now. Trading and staking carry on as normal. Try again later.");
   // Labels and decimals shown to stakers come from Jupiter's verified list, never from the request.

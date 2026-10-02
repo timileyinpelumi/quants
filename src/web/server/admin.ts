@@ -4,7 +4,9 @@ import type { WebContext } from "./context";
 import { AuthError, LimitError, clientIp } from "./http";
 import { normalizeCode } from "@/admin-code";
 
-export const ADMIN_COOKIE = "quants_admin";
+const prod = () => process.env.NODE_ENV === "production";
+// __Host- makes browsers refuse the cookie unless it is Secure, host only and Path=/.
+export const adminCookie = () => (prod() ? "__Host-quants_admin" : "quants_admin");
 const SESSION_SECONDS = 12 * 3600;
 export const LOGIN_LIMITS = { perIp: 5, perIpMinutes: 15, global: 50, globalMinutes: 60 };
 
@@ -13,7 +15,7 @@ const fingerprint = (hash: string) => sha256(hash).slice(0, 32);
 const sign = (secret: Uint8Array, token: string) => createHmac("sha256", secret).update(token).digest("base64url");
 
 const cookie = (value: string, maxAge: number) =>
-  `${ADMIN_COOKIE}=${value}; HttpOnly;${process.env.NODE_ENV === "production" ? " Secure;" : ""} SameSite=Strict; Path=/; Max-Age=${maxAge}`;
+  `${adminCookie()}=${value}; HttpOnly;${prod() ? " Secure;" : ""} SameSite=Strict; Path=/; Max-Age=${maxAge}`;
 
 function readCookie(req: Request, name: string): string | null {
   const raw = req.headers.get("cookie") ?? "";
@@ -41,7 +43,7 @@ export function assertSameOrigin(req: Request) {
 }
 
 function tokenOf(ctx: WebContext, req: Request): string | null {
-  const raw = readCookie(req, ADMIN_COOKIE);
+  const raw = readCookie(req, adminCookie());
   if (!raw) return null;
   const [token, mac] = raw.split(".");
   if (!token || !mac) return null;

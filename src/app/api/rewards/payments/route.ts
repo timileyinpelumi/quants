@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { getContext } from "@/web/server/context";
-import { json, jsonError } from "@/web/server/http";
+import { json, jsonError, rateLimit } from "@/web/server/http";
 import { rewardPayments } from "@/web/server/rewards";
 import { usdPrices } from "@/web/server/prices";
 import { page, pageParams, queryOf } from "@/web/server/paging";
@@ -14,6 +14,7 @@ const Query = z.object({
 
 export async function GET(req: Request) {
   try {
+    rateLimit(req, "reward-payments", 120);
     const o = Query.parse(queryOf(req));
     const ctx = getContext();
     const r = page(await rewardPayments(ctx.sql, o.limit + 1, o.before ?? null), o.limit);

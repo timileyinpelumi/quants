@@ -49,23 +49,21 @@ test("an anonymous voter gets a cookie, and a vote can be changed and cleared", 
   expect(await voteTotals(sql, 10)).toEqual([]);
 });
 
-test("a connected wallet votes as itself", async () => {
+test("a wallet address in the request is not a voter id", async () => {
   const { sql } = await makeWebContext();
   await insertLaunch(sql, { mint: "mint-A" });
   const wallet = Keypair.generate().publicKey.toBase58();
   const r = await POST(req("mint-A", { vote: "up", wallet }), params("mint-A"));
-  expect(r.headers.get("set-cookie")).toBeNull();
-  const [row] = await sql`select voter, vote from token_votes`;
-  expect(row).toEqual({ voter: wallet, vote: 1 });
-  expect(await (await GET(new Request(`http://x/api/token/mint-A/vote?wallet=${wallet}`), params("mint-A"))).json()).toEqual({ vote: "up" });
-  expect(await (await GET(new Request("http://x/api/token/mint-A/vote"), params("mint-A"))).json()).toEqual({ vote: null });
+  expect(r.status).toBe(200);
+  const [row] = await sql`select voter from token_votes`;
+  expect(row.voter).toBe(voterCookie(r)!);
+  expect(await (await GET(new Request(`http://x/api/token/mint-A/vote?wallet=${wallet}`), params("mint-A"))).json()).toEqual({ vote: null });
 });
 
 test("bad input, unknown tokens and floods are refused", async () => {
   const { sql } = await makeWebContext();
   await insertLaunch(sql, { mint: "mint-A" });
   expect((await POST(req("mint-A", { vote: "sideways" }), params("mint-A"))).status).toBe(400);
-  expect((await POST(req("mint-A", { vote: "up", wallet: "not a wallet" }), params("mint-A"))).status).toBe(400);
   expect((await POST(req("mint-A", { vote: "up" }, { cookie: "quants_voter=../../x" }), params("mint-A"))).status).toBe(200);
   expect((await POST(req("mint-Nope", { vote: "up" }), params("mint-Nope"))).status).toBe(404);
   let last = 200;

@@ -160,3 +160,14 @@ test("a pair token outside the supported list is refused", async () => {
   const r = await post(prepare, body({ quoteMint: "BONK111111111111111111111111111111111111111" }));
   expect(r.status).toBe(400);
 });
+
+test("with an upload store set, metadata and images from elsewhere are refused", async () => {
+  await makeWebContext({ uploadPrefix: "https://res.cloudinary.com/demo/" });
+  const bad = await post(prepare, body());
+  expect(bad.status).toBe(400);
+  expect((await bad.json()).error.message).toContain("uploaded through quants");
+  const ok = await post(prepare, body({ uri: "https://res.cloudinary.com/demo/raw/upload/quants/a.json", image: "https://res.cloudinary.com/demo/image/upload/quants/a" }));
+  expect(ok.status).toBe(200);
+  const evil = await post(prepare, body({ uri: "https://res.cloudinary.com/demo/raw/upload/quants/a.json", image: "https://evil.test/a.png" }));
+  expect(evil.status).toBe(400);
+});

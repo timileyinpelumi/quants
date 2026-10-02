@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { getContext } from "@/web/server/context";
-import { json, jsonError, readJson } from "@/web/server/http";
+import { json, jsonError, readJson, rateLimit } from "@/web/server/http";
 import { confirmLaunch } from "@/launch/confirm";
 
 export const dynamic = "force-dynamic";
@@ -9,6 +9,7 @@ const Body = z.object({ signature: z.string().min(32).max(100), mint: z.string()
 
 export async function POST(req: Request) {
   try {
+    rateLimit(req, "confirm", 20);
     const c = getContext();
     const b = Body.parse(await readJson(req));
     return json({ launchId: await confirmLaunch({ sql: c.sql, conn: c.conn, meteora: c.meteora, spillWallet: c.spillWallet }, b) });

@@ -8,7 +8,7 @@ import { KaminoBackend } from "@/staking/kamino";
 import type { StakingAdapter } from "@/staking/adapter";
 import { TradeLive, type TradePort } from "@/meteora/trade";
 import type { JupiterPort } from "@/jupiter/port";
-import { uploadsFrom, type UploadPort } from "./uploads";
+import { uploadPrefix, uploadsFrom, type UploadPort } from "./uploads";
 import { TokenIcons } from "./icons";
 import { JupiterPrices, type PricePort } from "@/indexer/prices";
 import { applyClusterDefaults, configKeysPath } from "@/cluster";
@@ -26,6 +26,8 @@ export interface WebContext {
   staking: StakingAdapter;
   jupiter: JupiterPort;
   uploads: UploadPort;
+  /** Launch metadata and images must start with this (our upload store), so launches made here only show content uploaded here. */
+  uploadPrefix: string | null;
   trade: TradePort;
   icons: TokenIcons;
   prices: PricePort;
@@ -75,6 +77,7 @@ export function getContext(): WebContext {
     staking: new KaminoBackend(chain, e.RPC_URL!, e.KAMINO_GLOBAL_CONFIG ?? ""),
     jupiter: withLocalTokens(swapPortFor(e, chain), e.LOCAL_TOKEN_LIST),
     uploads: uploadsFrom(e),
+    uploadPrefix: uploadPrefix(e),
     trade: new TradeLive(conn),
     prices: pricesFor(e, conn, new JupiterPrices(e.JUPITER_API_KEY ? "https://api.jup.ag/price/v3" : "https://lite-api.jup.ag/price/v3", e.JUPITER_API_KEY)),
     icons: new TokenIcons(e.JUPITER_API_KEY ? "https://api.jup.ag/tokens/v2" : "https://lite-api.jup.ag/tokens/v2", e.JUPITER_API_KEY),

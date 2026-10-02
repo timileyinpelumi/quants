@@ -58,6 +58,7 @@ export async function makeWebContext(over: Partial<WebContext> = {}) {
     staking: new FakeStaking(chain),
     jupiter: new FakeJupiter(chain),
     uploads: new FakeUploads(),
+    uploadPrefix: null,
     trade: new FakeTrade(),
     prices: new JupiterPrices("https://prices.test", undefined, async () => Response.json({})),
     icons: new TokenIcons("https://jup.test/tokens/v2", undefined, async () => Response.json([])),
