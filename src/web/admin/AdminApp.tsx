@@ -17,6 +17,7 @@ type Settings = {
   maxPenaltyBps: number; rewardPeriodSeconds: number; slippageBps: number;
   devBuyCapBps: number; keeperIntervalSeconds: number; defaultBackend: "kamino";
 };
+type VoteRow = { mint: string; symbol: string | null; up: number; down: number; score: number };
 type Status = { lastActivity: string | null; failed: { id: number; mint: string; symbol: string | null; kind: string; error: string; attempts: number; at: string }[]; failedNext: number | null; inFlight: { mint: string; symbol: string | null }[] };
 
 const SOL = "So11111111111111111111111111111111111111112";
@@ -47,7 +48,8 @@ export function AdminApp({ pairs }: { pairs: Pair[] }) {
   const wallet = useWallet();
   const modal = useWalletModal();
   const [signedIn, setSignedIn] = useState(false);
-  const [tab, setTab] = useState<"settings" | "keeper" | "baskets" | "pairs">("settings");
+  const [tab, setTab] = useState<"settings" | "keeper" | "baskets" | "pairs" | "votes">("settings");
+  const [votes, setVotes] = useState<VoteRow[] | null>(null);
   const [settings, setSettings] = useState<Settings | null>(null);
   const [version, setVersion] = useState<number | null>(null);
   const [status, setStatus] = useState<Status | null>(null);
@@ -70,6 +72,10 @@ export function AdminApp({ pairs }: { pairs: Pair[] }) {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    if (tab !== "votes" || !signedIn) return;
+    call<{ tokens: VoteRow[] }>("/api/admin/votes").then((r) => setVotes(r.tokens), (e) => setMsg({ ok: false, text: e.message }));
+  }, [tab, signedIn]);
 
   async function loadFailed() {
     if (!status?.failedNext || failedState === "loading") return;
@@ -140,7 +146,7 @@ export function AdminApp({ pairs }: { pairs: Pair[] }) {
     <main className="flex flex-col gap-8 wrap pt-10 md:pt-14 pb-16">
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
         <h1 className="m-0 font-display font-black text-[40px] md:text-[56px] tracking-[-0.03em] leading-none">Admin</h1>
-        <Segmented label="Section" value={tab} onChange={setTab} options={[{ value: "settings", label: "Settings" }, { value: "keeper", label: "Keeper" }, { value: "baskets", label: "Baskets" }, { value: "pairs", label: "Pairs" }]} />
+        <Segmented label="Section" value={tab} onChange={setTab} options={[{ value: "settings", label: "Settings" }, { value: "keeper", label: "Keeper" }, { value: "baskets", label: "Baskets" }, { value: "pairs", label: "Pairs" }, { value: "votes", label: "Votes" }]} />
       </div>
       {msg && <p role="status" className={`m-0 text-sm ${msg.ok ? "text-accent" : "text-burn"}`}>{msg.text}</p>}
 
@@ -232,6 +238,26 @@ export function AdminApp({ pairs }: { pairs: Pair[] }) {
               </div>
             ))}
           </div>
+        </section>
+      )}
+      {tab === "votes" && (
+        <section className="flex flex-col gap-5 max-w-3xl">
+          <p className="m-0 text-sm text-muted">Thumbs on token pages, highest score first. Score is up votes minus down votes. Only admins see these counts.</p>
+          {votes === null ? <p className="m-0 text-muted">Loading</p> : votes.length === 0 ? <p className="m-0 text-muted">No votes yet.</p> : (
+            <div className="flex flex-col text-sm">
+              <div className="grid grid-cols-[minmax(0,1fr)_56px_56px_64px] gap-3 pb-2 text-[13px] text-muted">
+                <span>Token</span><span className="text-right">Up</span><span className="text-right">Down</span><span className="text-right">Score</span>
+              </div>
+              {votes.map((v) => (
+                <a key={v.mint} href={`/t/${v.mint}`} className="grid grid-cols-[minmax(0,1fr)_56px_56px_64px] gap-3 py-3 border-t line hover:bg-white/[0.02]">
+                  <span className="min-w-0 truncate"><span className="font-mono font-semibold">{v.symbol ?? shortAddr(v.mint)}</span> <span className="text-muted font-mono">{shortAddr(v.mint)}</span></span>
+                  <span className="font-mono text-right text-up">{v.up}</span>
+                  <span className="font-mono text-right text-down">{v.down}</span>
+                  <span className="font-mono text-right font-semibold">{v.score > 0 ? `+${v.score}` : v.score}</span>
+                </a>
+              ))}
+            </div>
+          )}
         </section>
       )}
     </main>
