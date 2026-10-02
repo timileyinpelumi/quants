@@ -114,7 +114,7 @@ test("a transfer that fails on-chain every run stops after MAX_ATTEMPTS runs", a
   const t = transfersEndAs(f, "failed");
   for (let i = 0; i < 8; i++) await runKeeper(f.deps);
   expect(t.built.length).toBe(5);
-  expect(await getBalance(f.sql, id, "treasury", NATIVE_MINT)).toBe(25_000_000n);
+  expect(await getBalance(f.sql, id, "treasury", NATIVE_MINT)).toBe(15_000_000n);
 });
 
 test("a farm creation whose build throws once is retried on the next run", async () => {

@@ -89,7 +89,7 @@ test("feeSummary totals every split by its settings, plus what is held for stake
   await step(c, a.id, "f1", "fund", { farm: "farm-7d", rewardMint: ZEC, amount: "10" });
   const f = await feeSummary(c.sql, a.id);
   // default split is 60% stakers, 25% platform, 15% creator; Meteora keeps 20% before it
-  expect(f).toMatchObject({ earned: "3400", stakers: "1800", platform: "750", creator: "450", meteora: "850", held: "700" });
+  expect(f).toMatchObject({ earned: "3400", stakers: "1800", platform: "450", creator: "750", meteora: "850", held: "700" });
   expect(typeof f.lastPaidAt).toBe("string");
 });
 

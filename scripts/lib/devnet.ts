@@ -37,9 +37,11 @@ export function saveState(path: string, state: object) {
   renameSync(`${path}.tmp`, path);
 }
 
-export function loadKeeper(path = process.env.DEVNET_KEEPER_PATH ?? join(KEYS_DIR, "devnet-keeper.json")): Keypair {
-  if (process.env.KEEPER_KEYPAIR) return Keypair.fromSecretKey(Uint8Array.from(JSON.parse(process.env.KEEPER_KEYPAIR)));
-  return Keypair.fromSecretKey(Uint8Array.from(JSON.parse(readFileSync(path, "utf8"))));
+export function loadKeeper(path?: string): Keypair {
+  // Bun auto-loads .env.local, whose KEEPER_KEYPAIR is the local validator keeper; only trust it in a devnet env.
+  if (!path && process.env.CLUSTER === "devnet" && process.env.KEEPER_KEYPAIR) return Keypair.fromSecretKey(Uint8Array.from(JSON.parse(process.env.KEEPER_KEYPAIR)));
+  const file = path ?? process.env.DEVNET_KEEPER_PATH ?? join(KEYS_DIR, "devnet-keeper.json");
+  return Keypair.fromSecretKey(Uint8Array.from(JSON.parse(readFileSync(file, "utf8"))));
 }
 
 /** A keypair kept in ~/.config/quants (spill, treasury), created on first use. */

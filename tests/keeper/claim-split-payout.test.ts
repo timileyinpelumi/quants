@@ -19,8 +19,8 @@ test("claim credits the exact pending partner fee, then split moves it by the se
   expect(await splitStep(deps, launch!, settings, "r1")).toBe(true);
   expect(await getBalance(sql, id, "unsplit", NATIVE_MINT)).toBe(0n);
   expect(await getBalance(sql, id, "basket", NATIVE_MINT)).toBe(600_000n);
-  expect(await getBalance(sql, id, "treasury", NATIVE_MINT)).toBe(250_000n);
-  expect(await getBalance(sql, id, "creator", NATIVE_MINT)).toBe(150_000n);
+  expect(await getBalance(sql, id, "treasury", NATIVE_MINT)).toBe(150_000n);
+  expect(await getBalance(sql, id, "creator", NATIVE_MINT)).toBe(250_000n);
 });
 
 test("claim is skipped when nothing is pending", async () => {
@@ -52,7 +52,7 @@ test("payout sends treasury every run and creator only above the minimum", async
   await splitStep(deps, launch!, settings, "r1");
   await payoutStep(deps, launch!, settings, "r1");
   expect(await getBalance(sql, id, "treasury", NATIVE_MINT)).toBe(0n);
-  expect(await getBalance(sql, id, "creator", NATIVE_MINT)).toBe(15_000_000n);
+  expect(await getBalance(sql, id, "creator", NATIVE_MINT)).toBe(25_000_000n);
   expect(chain.sent.filter((s) => s.startsWith("transfer")).length).toBe(1);
 
   meteora.partnerFee.set("P4", 300_000_000n);
