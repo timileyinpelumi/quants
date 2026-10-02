@@ -1,3 +1,4 @@
+import { NATIVE_MINT } from "../domain/types";
 import type { KeeperDeps } from "./deps";
 import { loadLaunches, type LaunchRow } from "./launch-row";
 import { makeResolvers } from "./resolvers";
@@ -55,9 +56,14 @@ export async function processLaunch(deps: KeeperDeps, launch: LaunchRow, s: Vers
   await penaltyStep(deps, l, s, runId);
 }
 
-export async function runKeeper(deps: KeeperDeps) {
+// Below this the keeper cannot pay for a claim plus its wrapped SOL account. Fees wait in the pools, so nothing is lost.
+export const KEEPER_MIN_LAMPORTS = 5_000_000n;
+
+export async function runKeeper(deps: KeeperDeps): Promise<{ runId: string; launches: number; errors: { launchId: number; error: string }[]; skipped?: "keeper_unfunded" }> {
   await resume(deps);
   await reconcile(deps);
+  const sol = await deps.chain.balance(deps.wallets.keeper, NATIVE_MINT);
+  if (sol < KEEPER_MIN_LAMPORTS) return { runId: crypto.randomUUID(), launches: 0, errors: [], skipped: "keeper_unfunded" };
   await sweepPreparedLaunches(deps).catch((e) => console.error("sweep failed", e));
   const settings = await loadLatestSettings(deps.sql);
   const runId = crypto.randomUUID();

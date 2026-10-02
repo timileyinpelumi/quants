@@ -210,13 +210,10 @@ test("the first USDC launch creates its config key in its own step, then swaps, 
   expect(c.simulated.length).toBe(4);
 });
 
-test("a keeper below 0.01 SOL is topped up inside the launch transaction, a funded one is not", async () => {
-  const c = await makeWebContext({ conn: { getBalance: async () => 4_000_000 } as any });
+test("a launch never pays the keeper, even when the keeper has no SOL", async () => {
+  const c = await makeWebContext({ conn: { getBalance: async () => 0 } as any });
   await post(prepare, body());
-  expect((c.meteora as any).launches[0].keeperTopUp).toEqual({ to: c.keeperAddress, lamports: 6_000_000n });
-  const funded = await makeWebContext({ conn: { getBalance: async () => 2_000_000_000 } as any });
-  await post(prepare, body());
-  expect((funded.meteora as any).launches[0].keeperTopUp).toBeUndefined();
+  expect((c.meteora as any).launches[0].keeperTopUp).toBeUndefined();
 });
 
 test("a pair token outside the supported list is refused", async () => {

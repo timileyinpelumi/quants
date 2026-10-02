@@ -11,6 +11,7 @@ export async function keeperFixture(extra: Partial<KeeperDeps> = {}) {
   const sql = await freshDb();
   await saveSettings(sql, defaultSettings(OURS), "t");
   const chain = new FakeChain();
+  chain.balances.set(`${WALLETS.keeper}:So11111111111111111111111111111111111111112`, 1_000_000_000n);
   const meteora = new FakeMeteora(chain);
   const deps = { sql, chain, meteora, wallets: WALLETS, ...extra } as KeeperDeps;
   return { sql, chain, meteora, deps, settings: await loadLatestSettings(sql) };

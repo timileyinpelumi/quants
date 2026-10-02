@@ -180,3 +180,17 @@ test("a flood of prepared launches that never landed does not keep a real one fr
   const [{ n }] = await f.sql`select count(*)::int as n from prepared_launches where mint like 'Old%'`;
   expect(n).toBe(0);
 });
+
+test("an unfunded keeper skips the run without touching any launch or burning attempts", async () => {
+  const f = await full();
+  f.chain.balances.set(`Keeper:${NATIVE_MINT}`, 1_000_000n);
+  const id = await insertLaunch(f.sql, { mint: "CAT", pool: "P1" });
+  f.meteora.partnerFee.set("P1", 1_000_000_000n);
+  const r = await runKeeper(f.deps);
+  expect(r.skipped).toBe("keeper_unfunded");
+  expect((await f.sql`select 1 from distributions where launch_id = ${id}`).length).toBe(0);
+  f.chain.balances.set(`Keeper:${NATIVE_MINT}`, 10n ** 18n);
+  const r2 = await runKeeper(f.deps);
+  expect(r2.skipped).toBeUndefined();
+  expect(await getBalance(f.sql, id, "unsplit", NATIVE_MINT) + await getBalance(f.sql, id, "basket", NATIVE_MINT)).toBeGreaterThan(0n);
+});
