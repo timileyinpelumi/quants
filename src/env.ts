@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { z } from "zod";
 import { applyClusterDefaults } from "./cluster";
 
@@ -17,11 +18,23 @@ const Env = z.object({
 export type Env = z.infer<typeof Env>;
 export const loadEnv = (): Env => {
   applyClusterDefaults(process.env);
+  readKeypairFiles(process.env);
   assertNoDevSwitches(process.env);
   return Env.parse(process.env);
 };
 
 type RawEnv = Record<string, string | undefined>;
+
+/** KEEPER_KEYPAIR and SPILL_KEYPAIR can come from a file named by KEEPER_KEYPAIR_PATH and SPILL_KEYPAIR_PATH. */
+export function readKeypairFiles(env: RawEnv) {
+  for (const name of ["KEEPER_KEYPAIR", "SPILL_KEYPAIR"]) {
+    const path = env[`${name}_PATH`];
+    if (!path) continue;
+    if (env[name]) throw new Error(`Set ${name} or ${name}_PATH, not both`);
+    env[name] = readFileSync(path, "utf8").trim();
+  }
+  return env;
+}
 
 // The hosted preview runs against a tunnelled local validator and sets ALLOW_DEV_SWITCHES=1 on purpose.
 export function assertNoDevSwitches(env: RawEnv) {

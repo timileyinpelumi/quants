@@ -1,0 +1,123 @@
+# Production stack for one host. Run with the env file for both interpolation and the containers:
+#   docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build
+name: quants
+
+x-logging: &logging
+  driver: json-file
+  options: { max-size: "10m", max-file: "5" }
+
+x-app: &app
+  image: quants-app:${IMAGE_TAG:-latest}
+  env_file: ["${ENV_FILE:-.env.production}"]
+  environment:
+    DATABASE_URL: postgres://${POSTGRES_USER:?}:${POSTGRES_PASSWORD:?}@postgres:5432/${POSTGRES_DB:?}
+  logging: *logging
+  restart: unless-stopped
+  depends_on:
+    migrate: { condition: service_completed_successfully }
+
+services:
+  postgres:
+    image: postgres:18.0
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?}
+      POSTGRES_DB: ${POSTGRES_DB:?}
+    # postgres 18 keeps its data in a versioned directory under /var/lib/postgresql
+    volumes: ["pgdata:/var/lib/postgresql"]
+    shm_size: 256mb
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    logging: *logging
+    restart: unless-stopped
+
+  migrate:
+    <<: *app
+    build:
+      context: .
+      args:
+        NEXT_PUBLIC_RPC_URL: ${NEXT_PUBLIC_RPC_URL:?}
+        NEXT_PUBLIC_OURTOKEN_MINT: ${NEXT_PUBLIC_OURTOKEN_MINT:?}
+        NEXT_PUBLIC_OURTOKEN_SYMBOL: ${NEXT_PUBLIC_OURTOKEN_SYMBOL:-QUANTS}
+        NEXT_PUBLIC_OURTOKEN_GRADUATION: ${NEXT_PUBLIC_OURTOKEN_GRADUATION:?}
+        NEXT_PUBLIC_SOL_GRADUATION: ${NEXT_PUBLIC_SOL_GRADUATION:-}
+        NEXT_PUBLIC_X_URL: ${NEXT_PUBLIC_X_URL:-}
+    command: ["bun", "src/db/migrate.ts"]
+    restart: "no"
+    depends_on:
+      postgres: { condition: service_healthy }
+
+  web:
+    <<: *app
+    pull_policy: never
+    command: ["bun", "--bun", "next", "start", "-H", "0.0.0.0", "-p", "3000"]
+    expose: ["3000"]
+    healthcheck:
+      test: ["CMD", "bun", "-e", "const r = await fetch('http://127.0.0.1:3000/api/health'); process.exit(r.ok ? 0 : 1)"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  indexer:
+    <<: *app
+    pull_policy: never
+    command: ["bun", "src/indexer/main.ts"]
+
+  keeper:
+    <<: *app
+    pull_policy: never
+    command: ["bun", "src/keeper/main.ts"]
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:?}:${POSTGRES_PASSWORD:?}@postgres:5432/${POSTGRES_DB:?}
+      KEEPER_KEYPAIR_PATH: /run/secrets/keeper
+      SPILL_KEYPAIR_PATH: /run/secrets/spill
+    secrets: [keeper, spill]
+
+  caddy:
+    image: caddy:2.10.2-alpine
+    environment:
+      SITE_HOST: ${SITE_HOST:?}
+    ports: ["80:80", "443:443", "443:443/udp"]
+    volumes:
+      - ./deploy/docker/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      web: { condition: service_healthy }
+    logging: *logging
+    restart: unless-stopped
+
+  backup:
+    build:
+      context: deploy/docker
+      dockerfile: backup.Dockerfile
+    image: quants-backup:latest
+    environment:
+      PGHOST: postgres
+      PGUSER: ${POSTGRES_USER:?}
+      PGPASSWORD: ${POSTGRES_PASSWORD:?}
+      PGDATABASE: ${POSTGRES_DB:?}
+      BACKUP_HOUR_UTC: ${BACKUP_HOUR_UTC:-3}
+      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-7}
+      BACKUP_S3_URI: ${BACKUP_S3_URI:-}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+      AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION:-us-east-1}
+    volumes: ["./backups:/backups"]
+    depends_on:
+      postgres: { condition: service_healthy }
+    logging: *logging
+    restart: unless-stopped
+
+secrets:
+  keeper: { file: ./secrets/keeper.json }
+  spill: { file: ./secrets/spill.json }
+
+volumes:
+  pgdata:
+  caddy_data:
+  caddy_config:

@@ -41,6 +41,7 @@ while (true) {
     }
     void alert("keeper-fatal", `run failed: ${String(e)}`);
   }
-  const { keeperIntervalSeconds } = await loadLatestSettings(sql);
+  // A fresh database has no settings until the admin page saves them; wait for that instead of exiting.
+  const { keeperIntervalSeconds } = await loadLatestSettings(sql).catch(() => ({ keeperIntervalSeconds: 60 }));
   await Bun.sleep(Math.max(0, keeperIntervalSeconds * 1000 - (Date.now() - started)));
 }

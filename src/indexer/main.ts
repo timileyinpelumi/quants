@@ -41,12 +41,15 @@ const deps = {
 
 const alert = makeAlerter({ url: e.ALERT_WEBHOOK_URL || undefined, source: "indexer", store: sqlThrottle(sql) });
 const addressStreaks = new Streaks(5);
+// The first pass always logs, so a deploy can see the indexer reach the RPC and the database.
+let first = true;
 
 while (true) {
   const started = Date.now();
   try {
     const { checked, ...r } = await indexOnce(deps);
-    if (r.trades || r.skipped || r.errors.length) console.log(JSON.stringify({ at: new Date().toISOString(), ...r }));
+    if (first || r.trades || r.skipped || r.errors.length) console.log(JSON.stringify({ at: new Date().toISOString(), checked: checked.length, ...r }));
+    first = false;
     indexerPassAlerts(alert, addressStreaks, { ...r, checked });
   } catch (err) {
     console.error(JSON.stringify({ at: new Date().toISOString(), error: String(err) }));
