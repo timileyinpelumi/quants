@@ -76,7 +76,6 @@ const configKeys: Record<string, string> = JSON.parse(e.CONFIG_KEYS ?? readFileS
 const deps = {
   sql, chain, meteora, jupiter, staking,
   wallets: { keeper: keeper.publicKey.toBase58(), spill: spill.publicKey.toBase58(), treasury: e.TREASURY_ADDRESS! },
-  ourtokenMint: e.OURTOKEN_MINT!,
 };
 
 if (!state.wallets) {

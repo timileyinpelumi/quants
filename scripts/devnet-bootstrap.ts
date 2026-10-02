@@ -263,10 +263,6 @@ const env: Record<string, string> = {
   DEVNET_TOKENS: JSON.stringify(devnetTokens),
   // The browser's RPC is public: keep API keys (DEVNET_RPC_URL) server side.
   NEXT_PUBLIC_RPC_URL: "https://api.devnet.solana.com",
-  NEXT_PUBLIC_OURTOKEN_MINT: quants.mint,
-  NEXT_PUBLIC_OURTOKEN_SYMBOL: QUANTS.symbol,
-  NEXT_PUBLIC_SOL_GRADUATION: String(solGraduation),
-  NEXT_PUBLIC_OURTOKEN_GRADUATION: String(graduations.QUANTS),
 };
 const dotenv = (o: Record<string, string>) => Object.entries(o).map(([k, v]) => `${k}='${v}'`).join("\n") + "\n";
 await Bun.write("config-keys.devnet.json", JSON.stringify(configKeys, null, 2));

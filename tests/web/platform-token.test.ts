@@ -6,7 +6,7 @@ import { DexScreener, pairStats, platformCard, platformLinks } from "../../src/w
 
 const NOW = Date.parse("2026-10-01T12:00:00Z");
 const Q = "mint-QUANTS";
-const COINS = [{ mint: Q, symbol: "QUANTS", name: "quants", decimals: 6, graduation: 1, iconMint: null, platform: true, payoutMin: 0n, kind: "crypto" as const, tradingOnly: false }];
+const COINS = [{ mint: Q, symbol: "QUANTS", name: "quants", decimals: 6, graduation: 1, iconMint: null, platform: true, payoutMin: 0n, kind: "crypto" as const, tradingOnly: false, enabled: true }];
 let n = 0;
 
 async function launch(sql: SQL, symbol: string, quote = Q) {
@@ -27,7 +27,7 @@ const dexBody = [
 
 test("pair stats count QUANTS pairs, their volume and the fees they sent to stakers", async () => {
   const sql = await freshDb();
-  const v = await saveSettings(sql, defaultSettings("OURS"), "t");
+  const v = await saveSettings(sql, defaultSettings("OURS1111111111111111111111111111111111111111"), "t");
   const a = await launch(sql, "AAA");
   const b = await launch(sql, "BBB");
   const sol = await launch(sql, "SOLPAIR", "So11111111111111111111111111111111111111112");

@@ -17,6 +17,8 @@ export type UnsignedTx = { base64: string; versioned: boolean };
 // A first buy in any pair token other than SOL is paid in SOL: a Jupiter swap runs first and the curve buy is capped at the swap's slippage floor.
 export async function prepareWithSwap(ctx: WebContext, raw: unknown) {
   const { devBuySol, ...rest } = Body.parse(raw);
+  const { slippageBps, launchesPaused } = await loadLatestSettings(ctx.sql);
+  if (launchesPaused) throw new LaunchError("launches_paused", "New launches are paused for now. Trading and staking carry on as normal. Try again later.");
   // Labels and decimals shown to stakers come from Jupiter's verified list, never from the request.
   rest.basket = await Promise.all(rest.basket.map(async (b) => {
     const t = (await ctx.jupiter.searchVerified(b.mint)).find((x) => x.mint === b.mint);
@@ -26,7 +28,6 @@ export async function prepareWithSwap(ctx: WebContext, raw: unknown) {
   const transactions: UnsignedTx[] = [];
   let devBuyQuoteAmount = sol;
   if (rest.quoteMint !== NATIVE_MINT && sol > 0n) {
-    const { slippageBps } = await loadLatestSettings(ctx.sql);
     const q = await ctx.jupiter.quote(NATIVE_MINT, rest.quoteMint, sol, slippageBps);
     if (!q) throw new LaunchError("invalid_input", "No route to buy the pair token right now. Try again, or launch without a first buy.");
     devBuyQuoteAmount = (q.outAmount * BigInt(10_000 - slippageBps)) / 10_000n;

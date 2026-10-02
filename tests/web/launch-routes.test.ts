@@ -30,7 +30,7 @@ test("OURTOKEN launch with a first buy puts the Jupiter swap first and caps the 
 });
 
 const STOCK = "Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh";
-const stock = { mint: STOCK, symbol: "NVDAx", name: "NVIDIA xStock", decimals: 8, graduation: 50, iconMint: STOCK, platform: false, payoutMin: 0n, kind: "xstocks" as const, tradingOnly: true };
+const stock = { mint: STOCK, symbol: "NVDAx", name: "NVIDIA xStock", decimals: 8, graduation: 50, iconMint: STOCK, platform: false, payoutMin: 0n, kind: "xstocks" as const, tradingOnly: true, enabled: true };
 
 test("with STOCK_PAIRS=1 a stock pair from the registry launches trading only, with no basket", async () => {
   process.env.STOCK_PAIRS = "1";

@@ -1,9 +1,11 @@
 import type { WebContext } from "./context";
-import { quoteCoins, stockPairsEnabled, stockQuotes, type QuoteCoin } from "@/domain/quotes";
+import { quoteCoins, stockQuotes, type QuoteCoin } from "@/domain/quotes";
+import { cachedSettings } from "@/domain/settings";
 import { iconsFor } from "./icons";
 
 /** Crypto pairs and approved stock pairs; if the stock registry fails, the last stock list this process loaded. */
-export async function allQuotes(ctx: Pick<WebContext, "stocks">): Promise<QuoteCoin[]> {
+export async function allQuotes(ctx: Pick<WebContext, "stocks" | "sql">): Promise<QuoteCoin[]> {
+  await cachedSettings(ctx.sql);
   const stocks = await ctx.stocks.list().catch((e) => {
     console.error(JSON.stringify({ at: new Date().toISOString(), stocksFailed: String(e) }));
     return stockQuotes();
@@ -11,11 +13,11 @@ export async function allQuotes(ctx: Pick<WebContext, "stocks">): Promise<QuoteC
   return [...quoteCoins(), ...stocks];
 }
 
-/** Pairs a new launch can use: curve configs exist on this network, and stocks only when STOCK_PAIRS=1. */
-export async function launchableQuotes(ctx: Pick<WebContext, "stocks" | "configKeys">, quotes?: QuoteCoin[]): Promise<QuoteCoin[]> {
+/** Pairs a new launch can use: enabled on the admin page with curve configs on this network, and stocks only with the stock pairs switch on. */
+export async function launchableQuotes(ctx: Pick<WebContext, "stocks" | "configKeys" | "sql">, quotes?: QuoteCoin[]): Promise<QuoteCoin[]> {
   const keyed = new Set(Object.keys(ctx.configKeys).map((k) => k.split(":")[0]));
-  const stocks = stockPairsEnabled();
-  return (quotes ?? await allQuotes(ctx)).filter((c) => keyed.has(c.mint) && (stocks || !c.tradingOnly));
+  const { stockPairs } = await cachedSettings(ctx.sql);
+  return (quotes ?? await allQuotes(ctx)).filter((c) => keyed.has(c.mint) && (c.tradingOnly ? stockPairs : c.enabled && c.graduation > 0));
 }
 
 /** Jupiter logos first; a stock Jupiter has no logo for falls back to its issuer's. */

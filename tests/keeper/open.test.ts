@@ -23,7 +23,7 @@ async function setup(quote = NATIVE_MINT) {
   await f.sql`insert into baskets values (${id}, 'ZEC', 10000)`;
   await f.sql`insert into stake_pools values (${id}, 'kamino', 3000, 'SpillAta', 'pending')`;
   await f.sql`insert into stake_tiers (launch_id, tier_id, lock_seconds, multiplier_bps) values (${id}, ${TIER.id}, ${TIER.lockSeconds}, ${TIER.multiplierBps})`;
-  const launch = async () => (await loadLaunches(f.sql, OURS)).find((l) => l.id === id)!;
+  const launch = async () => (await loadLaunches(f.sql)).find((l) => l.id === id)!;
   const seed = async (mint: string, amount: bigint) => {
     const r = await beginStep(f.sql, { launchId: id, idemKey: `seed:${crypto.randomUUID()}`, kind: "split", settingsVersion: 1, detail: {} });
     await confirmStep(f.sql, r, [{ bucket: "basket", mint, amount }]);

@@ -32,7 +32,8 @@ export const sqlThrottle = (sql: SQL): ThrottleStore => ({
 const MAX_TEXT = 1900; // Discord rejects messages over 2000 characters
 
 export interface AlerterOptions {
-  url: string | undefined;
+  /** A function is read on every alert, so a webhook changed on the admin page applies without a restart. */
+  url: string | undefined | (() => string | undefined);
   source: string;
   fetch?: typeof fetch;
   store?: ThrottleStore;
@@ -52,7 +53,8 @@ export function makeAlerter(o: AlerterOptions): Alert {
   const fallback = memoryThrottle();
   const log = o.log ?? ((e) => console.error(JSON.stringify({ at: new Date().toISOString(), alertFailed: String(e) })));
   return async (key, text) => {
-    if (!o.url) return;
+    const url = typeof o.url === "function" ? o.url() : o.url;
+    if (!url) return;
     try {
       let send: boolean;
       try {
@@ -62,7 +64,7 @@ export function makeAlerter(o: AlerterOptions): Alert {
         send = await fallback.claim(key, windowMs);
       }
       if (!send) return;
-      const res = await f(o.url, {
+      const res = await f(url, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ text: `quants ${o.source}: ${text}`.slice(0, MAX_TEXT) }),

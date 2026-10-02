@@ -20,16 +20,18 @@ const deps = {
   jupiter: swapPortFor(process.env, chain),
   staking: new KaminoBackend(chain, env.RPC_URL, env.KAMINO_GLOBAL_CONFIG),
   wallets: { keeper: keeper.publicKey.toBase58(), spill: spill.publicKey.toBase58(), treasury: env.TREASURY_ADDRESS },
-  ourtokenMint: env.OURTOKEN_MINT,
 };
 
-const alert = makeAlerter({ url: env.ALERT_WEBHOOK_URL, source: "keeper", store: sqlThrottle(sql) });
+// The webhook is an admin setting (seeded from ALERT_WEBHOOK_URL); each run refreshes it.
+let webhook: string | undefined = env.ALERT_WEBHOOK_URL;
+const alert = makeAlerter({ url: () => webhook, source: "keeper", store: sqlThrottle(sql) });
 const launchStreaks = new Streaks(3);
 
 // A ReconcileError exits so a supervisor restart loop is visible and no funds move while the ledger is wrong.
 while (true) {
   const started = Date.now();
   try {
+    webhook = (await loadLatestSettings(sql)).alertWebhookUrl || undefined;
     const r = await runKeeper(deps);
     console.log(JSON.stringify({ at: new Date().toISOString(), ...r }));
     keeperRunAlerts(alert, launchStreaks, r);
@@ -41,7 +43,6 @@ while (true) {
     }
     void alert("keeper-fatal", `run failed: ${String(e)}`);
   }
-  // A fresh database has no settings until the admin page saves them; wait for that instead of exiting.
   const { keeperIntervalSeconds } = await loadLatestSettings(sql).catch(() => ({ keeperIntervalSeconds: 60 }));
   await Bun.sleep(Math.max(0, keeperIntervalSeconds * 1000 - (Date.now() - started)));
 }

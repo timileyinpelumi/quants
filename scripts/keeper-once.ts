@@ -20,7 +20,6 @@ const r = await runKeeper({
   jupiter: e.LOCAL_REWARD_MINTS ? localJupiter(chain, e.LOCAL_REWARD_MINTS.split(",")) : swapPortFor(e, chain),
   staking: new KaminoBackend(chain, e.RPC_URL!, e.KAMINO_GLOBAL_CONFIG!),
   wallets: { keeper: keeper.publicKey.toBase58(), spill: spill.publicKey.toBase58(), treasury: e.TREASURY_ADDRESS! },
-  ourtokenMint: e.OURTOKEN_MINT!,
 });
 console.log(JSON.stringify(r));
 process.exit(0);

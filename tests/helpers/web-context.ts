@@ -56,7 +56,6 @@ export async function makeWebContext(over: Partial<WebContext> = {}) {
     configKeys: { [`${NATIVE_MINT}:200`]: "CfgSol200", [`${OURS}:200`]: "CfgOurs200" },
     keeperAddress: "Keeper1111111111111111111111111111111111111",
     spillWallet: Keypair.generate().publicKey,
-    ourtokenMint: OURS,
     adminCodeHash: ADMIN_HASH,
     platformAddresses: {},
     sessionSecret: crypto.getRandomValues(new Uint8Array(32)),

@@ -12,12 +12,10 @@ import { signAndSendAll, SendError, type UnsignedTx } from "@/web/wallet/send";
 import { BasketPicker, basketTotal, type BasketItem } from "./BasketPicker";
 import { PairPicker, type PairOption } from "./PairPicker";
 import { launchCost } from "@/domain/launch-cost";
-import { FEE_TIERS_BPS } from "@/domain/fees";
 import { useUsd, usdText } from "@/web/ui/usd";
 
 const SOL = "So11111111111111111111111111111111111111112";
 export type QuoteOption = PairOption;
-const FEES: readonly number[] = FEE_TIERS_BPS;
 
 type Tier = { id: string; lockSeconds: number; multiplierBps: number };
 type Status = "idle" | "uploading" | "preparing" | "signing" | "confirming";
@@ -44,8 +42,10 @@ async function postJson<T>(url: string, body: unknown): Promise<T> {
   return j as T;
 }
 
-export function LaunchForm({ split, tiers, maxPenaltyBps, quotes, initialPair }: {
+export function LaunchForm({ split, tiers, maxPenaltyBps, quotes, initialPair, feeTiers, paused }: {
   quotes: QuoteOption[];
+  feeTiers: number[];
+  paused: boolean;
   initialPair?: string;
   split: { basketBps: number; platformBps: number; creatorBps: number };
   tiers: Tier[];
@@ -62,7 +62,7 @@ export function LaunchForm({ split, tiers, maxPenaltyBps, quotes, initialPair }:
   const [name, setName] = useState("");
   const [symbol, setSymbol] = useState("");
   const [pair, setPair] = useState<string>(initialPair ?? quotes[0]?.mint ?? SOL);
-  const [fee, setFee] = useState(200);
+  const [fee, setFee] = useState(feeTiers.includes(200) ? 200 : feeTiers[0]!);
   const [mode, setMode] = useState<"pair" | "basket">("basket");
   const [picked, setBasket] = useState<BasketItem[]>([]);
   const [devBuy, setDevBuy] = useState("");
@@ -182,7 +182,7 @@ export function LaunchForm({ split, tiers, maxPenaltyBps, quotes, initialPair }:
     }
   }
 
-  const action = busy ? LABELS[status] : pending ? "Check launch status" : wallet.publicKey ? `Launch ${symbol || "token"}` : "Connect wallet";
+  const action = paused ? "Launches paused" : busy ? LABELS[status] : pending ? "Check launch status" : wallet.publicKey ? `Launch ${symbol || "token"}` : "Connect wallet";
   const section = "grid grid-cols-1 md:grid-cols-[56px_minmax(0,1fr)] gap-4 md:gap-6 py-7 border-t line";
   const num = "hidden md:block font-display font-bold text-[15px] text-faint";
 
@@ -192,6 +192,11 @@ export function LaunchForm({ split, tiers, maxPenaltyBps, quotes, initialPair }:
         <div className="flex flex-col gap-3.5">
           <h1 className="m-0 font-display font-black text-[40px] md:text-[56px] leading-[1.02] tracking-[-0.03em]">Launch a token</h1>
           <p className="m-0 text-lg text-muted max-w-[560px] leading-normal">Pick up to ten reward tokens. Trading fees on your token buy them and pay them to its stakers. Longer locks earn a bigger share.</p>
+          {paused && (
+            <p role="status" data-launches-paused className="m-0 rounded-2xl border border-burn/40 bg-burn/10 px-5 py-4 text-[15px] font-medium max-w-[560px]">
+              New launches are paused for now. Trading and staking carry on as normal. Check back soon.
+            </p>
+          )}
         </div>
 
         <div className="flex flex-col">
@@ -224,7 +229,7 @@ export function LaunchForm({ split, tiers, maxPenaltyBps, quotes, initialPair }:
               <PairPicker quotes={quotes} value={pair} onChange={setPair} />
               <div className="flex flex-col gap-3">
                 <span className="text-[13px] text-muted">Trading fee</span>
-                <Segmented label="Trading fee" value={fee} onChange={setFee} options={FEES.map((f) => ({ value: f, label: `${f / 100}%` }))} />
+                <Segmented label="Trading fee" value={fee} onChange={setFee} options={feeTiers.map((f) => ({ value: f, label: `${f / 100}%` }))} />
               </div>
             </div>
           </div>
@@ -342,7 +347,7 @@ export function LaunchForm({ split, tiers, maxPenaltyBps, quotes, initialPair }:
         </div>
 
         {error && <p role="alert" className="max-md:hidden m-0 text-sm text-burn">{error}</p>}
-        <Button size="lg" onClick={launch} disabled={busy} className="max-md:hidden">{action}</Button>
+        <Button size="lg" onClick={launch} disabled={busy || paused} className="max-md:hidden">{action}</Button>
       </aside>
 
       <div data-phone-bars className="md:hidden fixed inset-x-0 bottom-0 z-30 bg-ground/95 backdrop-blur border-t line px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] flex flex-col gap-2">
@@ -354,7 +359,7 @@ export function LaunchForm({ split, tiers, maxPenaltyBps, quotes, initialPair }:
               {devBuyLamports && devBuyLamports > 0n ? `First buy ${solText(devBuyLamports)}${usdOf(devBuyLamports) ? `, ${usdOf(devBuyLamports)}` : ""}` : "No first buy"}
             </span>
           </span>
-          <Button onClick={launch} disabled={busy} className="shrink-0 max-w-[55%] truncate">{action}</Button>
+          <Button onClick={launch} disabled={busy || paused} className="shrink-0 max-w-[55%] truncate">{action}</Button>
         </div>
       </div>
     </main>

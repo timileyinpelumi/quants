@@ -61,7 +61,7 @@ export async function runKeeper(deps: KeeperDeps) {
   await sweepPreparedLaunches(deps).catch((e) => console.error("sweep failed", e));
   const settings = await loadLatestSettings(deps.sql);
   const runId = crypto.randomUUID();
-  const launches = await loadLaunches(deps.sql, deps.ourtokenMint);
+  const launches = await loadLaunches(deps.sql);
   const errors: { launchId: number; error: string }[] = [];
   // A launch with a transaction still in flight is skipped: its balances are not final until that step resolves.
   const inFlight = await launchesWithSentSteps(deps.sql);

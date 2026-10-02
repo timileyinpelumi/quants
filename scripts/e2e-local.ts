@@ -100,7 +100,6 @@ const deps = {
   sql, chain, meteora, jupiter,
   staking: new KaminoBackend(chain, RPC, gc.publicKey.toBase58()),
   wallets: { keeper: keeper.publicKey.toBase58(), spill: spill.publicKey.toBase58(), treasury: treasury.publicKey.toBase58() },
-  ourtokenMint: ours.toBase58(),
 };
 
 const show = async (label: string) => {

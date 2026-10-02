@@ -30,6 +30,22 @@ test("prepares a transaction against the right config key with no launch fee", a
   expect(Object.keys(meteora.launches[0]!).filter((k) => /fee/i.test(k))).toEqual([]);
 });
 
+test("paused launches are refused with a clear message", async () => {
+  const { deps, sql } = await setup();
+  await saveSettings(sql, { ...defaultSettings(OURS), launchesPaused: true }, "test");
+  const e = await prepareLaunch(deps, valid).catch((x) => x);
+  expect(e).toBeInstanceOf(LaunchError);
+  expect(e.code).toBe("launches_paused");
+  expect(e.message).toContain("paused");
+});
+
+test("only the fee tiers offered in settings are accepted", async () => {
+  const { deps, sql } = await setup();
+  await saveSettings(sql, { ...defaultSettings(OURS), feeTiersBps: [150, 300] }, "test");
+  const e = await prepareLaunch(deps, valid).catch((x) => x);
+  expect(e.message).toContain("Trading fee must be 1.5% or 3%");
+});
+
 test("rejects bad input", async () => {
   const { deps } = await setup();
   const bad = [

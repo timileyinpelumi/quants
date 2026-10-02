@@ -4,7 +4,7 @@ import { GET } from "../../src/app/api/wallet/[owner]/route";
 import { TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID } from "@solana/spl-token";
 
 const OWNER = (await import("@solana/web3.js")).Keypair.generate().publicKey.toBase58();
-process.env.NEXT_PUBLIC_OURTOKEN_SYMBOL = "QUANTS";
+process.env.OURTOKEN_SYMBOL = "QUANTS";
 
 test("lists SOL and held tokens with names for known mints, biggest known first", async () => {
   const c = await makeWebContext();

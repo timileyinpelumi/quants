@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { WalletButton } from "@/web/wallet/WalletButton";
 import { PhoneNav } from "./PhoneNav";
-import { XIcon, xUrl } from "./XIcon";
+import { XIcon } from "./XIcon";
+import { siteXUrl } from "@/web/server/site";
 
 const links = [
   { href: "/", label: "Home", key: "home" },
@@ -26,9 +27,9 @@ function Search({ className }: { className: string }) {
   );
 }
 
-export function Header({ active }: { active: HeaderKey }) {
+export async function Header({ active }: { active: HeaderKey }) {
   const cls = (k: string) => (active === k ? "text-ink" : "text-muted hover:text-ink");
-  const x = xUrl();
+  const x = await siteXUrl();
   return (
     <header className="border-b line">
       <div className="wrap flex items-center gap-3 md:gap-8 py-3 md:py-5">

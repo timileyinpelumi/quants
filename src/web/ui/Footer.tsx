@@ -1,8 +1,9 @@
 import Link from "next/link";
-import { XIcon, xUrl } from "./XIcon";
+import { XIcon } from "./XIcon";
+import { siteXUrl } from "@/web/server/site";
 
-export function Footer() {
-  const x = xUrl();
+export async function Footer() {
+  const x = await siteXUrl();
   return (
     <footer data-site-footer className="mt-auto border-t line">
       <div className="wrap py-10 flex flex-col md:flex-row gap-6 md:items-center justify-between">

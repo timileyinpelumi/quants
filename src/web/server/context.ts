@@ -32,7 +32,6 @@ export interface WebContext {
   configKeys: Record<string, string>;
   keeperAddress: string;
   spillWallet: PublicKey;
-  ourtokenMint: string;
   /** argon2id PHC string of the admin access code. */
   adminCodeHash: string;
   /** Public addresses of the platform HD wallet roles, from PLATFORM_ADDRESSES. Never the seed. */
@@ -81,7 +80,6 @@ export function getContext(): WebContext {
     configKeys,
     keeperAddress: e.KEEPER_ADDRESS!,
     spillWallet: new PublicKey(e.SPILL_ADDRESS!),
-    ourtokenMint: e.OURTOKEN_MINT!,
     adminCodeHash: decodeCodeHash(e.ADMIN_CODE_HASH),
     platformAddresses: parsePlatformAddresses(e.PLATFORM_ADDRESSES),
     sessionSecret: new TextEncoder().encode(e.ADMIN_SESSION_SECRET!),
