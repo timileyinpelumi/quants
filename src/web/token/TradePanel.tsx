@@ -5,7 +5,7 @@ import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 import { Button } from "@/web/ui/Button";
 import { fmtAmount } from "@/web/ui/format";
-import { signAndSendAll } from "@/web/wallet/send";
+import { sendOne } from "@/web/wallet/send";
 import { tokenBalance } from "@/web/wallet/balance";
 import { rawToUi, uiToRaw } from "@/web/ui/scaled";
 import { StakeForm } from "@/web/stake/StakeForm";
@@ -116,7 +116,7 @@ export function TradePanel({ mint, symbol, quoteMint, quoteSymbol, quoteDecimals
       });
       const j = await r.json();
       if (!r.ok) throw new Error(j.error?.message ?? "Something went wrong. Try again.");
-      await signAndSendAll(wallet, connection, [j.transaction]);
+      await sendOne(wallet, connection, j.transaction);
       setMsg({ ok: true, text: `${side === "buy" ? "Bought" : "Sold"}. Balances updated.` });
       setAmount("");
       await loadBalances();

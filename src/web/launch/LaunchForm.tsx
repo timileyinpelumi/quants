@@ -8,7 +8,7 @@ import { Button } from "@/web/ui/Button";
 import { Field, Suffixed, TextArea, TextInput, inputClass } from "@/web/ui/Field";
 import { Segmented } from "@/web/ui/Segmented";
 import { fmtAmount, lockLabel, lockShort } from "@/web/ui/format";
-import { signAndSendAll, SendError, type UnsignedTx } from "@/web/wallet/send";
+import { sendSequence, SendError, type UnsignedTx } from "@/web/wallet/send";
 import { BasketPicker, basketTotal, type BasketItem } from "./BasketPicker";
 import { PairPicker, type PairOption } from "./PairPicker";
 import { launchCost } from "@/domain/launch-cost";
@@ -164,7 +164,8 @@ export function LaunchForm({ split, tiers, maxPenaltyBps, quotes, initialPair, f
       });
 
       setStatus("signing");
-      const sigs = await signAndSendAll(wallet, connection, prepared.transactions);
+      const txs = prepared.transactions;
+      const sigs = await sendSequence(wallet, connection, async (done) => txs[done.length] ?? null);
 
       await settle({ mint: prepared.mint, sig: sigs[sigs.length - 1]! });
     } catch (e) {

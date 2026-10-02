@@ -3,7 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { PublicKey } from "@solana/web3.js";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { useWalletModal } from "@solana/wallet-adapter-react-ui";
-import { signAndSendAll } from "@/web/wallet/send";
+import { sendOne } from "@/web/wallet/send";
 import { tokenBalance } from "@/web/wallet/balance";
 
 export type Tier = { id: string; lockSeconds: number; multiplierBps: number };
@@ -54,7 +54,7 @@ export function useStake(mint: string) {
       const r = await fetch(`/api/stake/${action}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ mint, tierId, owner, ...body }) });
       const j = await r.json();
       if (!r.ok) throw new Error(j.error?.message ?? "Something went wrong. Try again.");
-      await signAndSendAll(wallet, connection, [j.transaction]);
+      await sendOne(wallet, connection, j.transaction);
       await refresh();
       return true;
     } catch (e) {
