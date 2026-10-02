@@ -144,7 +144,6 @@ const env = {
   KAMINO_GLOBAL_CONFIG: gc.publicKey.toBase58(),
   DAMM_V2_MIGRATION_CONFIG: DAMM_CUSTOM,
   CONFIG_KEYS_PATH: "config-keys.json",
-  PINATA_JWT: "stub",
   DEV_UPLOADS_BASE: "http://localhost:3000/api/dev-uploads",
   ALLOW_LOCAL_URIS: "1",
   ADMIN_WALLETS: [admin.publicKey.toBase58(), tester.publicKey.toBase58()].join(","),

@@ -3,10 +3,12 @@ import { fetchMint } from "../chain/mints";
 import { db } from "../db/client";
 import { RpcHistory } from "./history";
 import { JupiterPrices } from "./prices";
+import { applyClusterDefaults } from "../cluster";
+import { pricesFor } from "../jupiter/select";
 import { indexOnce } from "./run";
 import { makeAlerter, sqlThrottle, Streaks, indexerPassAlerts } from "../ops/alerts";
 
-const e = process.env;
+const e = applyClusterDefaults(process.env);
 if (!e.DATABASE_URL || !e.RPC_URL) throw new Error("DATABASE_URL and RPC_URL are required");
 const sql = db(e.DATABASE_URL);
 // No built-in 429 retry and a hard timeout: a slow or throttled address fails this pass and is retried on the next.
@@ -15,7 +17,7 @@ const conn = new Connection(e.RPC_URL, {
   disableRetryOnRateLimit: true,
   fetch: ((url, init) => fetch(url, { ...init, signal: AbortSignal.timeout(20_000) })) as typeof fetch,
 });
-const prices = new JupiterPrices(e.JUPITER_PRICE_URL ?? "https://api.jup.ag/price/v3", e.JUPITER_API_KEY);
+const prices = pricesFor(e, conn, new JupiterPrices(e.JUPITER_PRICE_URL ?? "https://api.jup.ag/price/v3", e.JUPITER_API_KEY));
 const decimals = new Map<string, number>();
 const intervalMs = Number(e.INDEXER_INTERVAL_SECONDS ?? 5) * 1000;
 

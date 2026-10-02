@@ -30,6 +30,7 @@ test("remote images go through the resizing proxy, local ones do not", () => {
   expect(imgSrc("/brand/quants-mark.svg", 40)).toBe("/brand/quants-mark.svg");
   expect(imgSrc("http://localhost:3000/api/dev-uploads/abc", 40)).toBe("http://localhost:3000/api/dev-uploads/abc");
   expect(imgSrc("data:image/png;base64,AAA", 40)).toBe("data:image/png;base64,AAA");
+  expect(imgSrc("https://res.cloudinary.com/demo/image/upload/v1/quants/abc.png", 40)).toBe("https://res.cloudinary.com/demo/image/upload/w_80,h_80,c_fill,f_webp/v1/quants/abc.png");
 });
 
 test("the icon cache holds at most maxEntries mints", async () => {

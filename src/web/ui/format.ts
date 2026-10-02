@@ -50,9 +50,11 @@ export function fmtAgo(iso: string, now = Date.now()): string {
   return `${Math.floor(s / 86_400)}d ago`;
 }
 
-/** Remote logos are served resized through wsrv.nl so pages never download full size token art. */
+/** Remote logos are served resized through wsrv.nl so pages never download full size token art; Cloudinary resizes its own. */
 export function imgSrc(url: string, px: number): string {
   if (!/^https:\/\//.test(url) || /^https:\/\/(localhost|127\.0\.0\.1)/.test(url)) return url;
+  const cld = /^(https:\/\/res\.cloudinary\.com\/[^/]+\/image\/upload\/)(.+)$/.exec(url);
+  if (cld) return `${cld[1]}w_${px * 2},h_${px * 2},c_fill,f_webp/${cld[2]}`;
   return `https://wsrv.nl/?url=${encodeURIComponent(url)}&w=${px * 2}&h=${px * 2}&fit=cover&output=webp`;
 }
 

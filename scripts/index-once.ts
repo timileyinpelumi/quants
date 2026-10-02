@@ -3,16 +3,18 @@ import { fetchMint } from "../src/chain/mints";
 import { db } from "../src/db/client";
 import { RpcHistory } from "../src/indexer/history";
 import { JupiterPrices } from "../src/indexer/prices";
+import { applyClusterDefaults } from "../src/cluster";
+import { pricesFor } from "../src/jupiter/select";
 import { indexOnce } from "../src/indexer/run";
 
-const e = process.env;
+const e = applyClusterDefaults(process.env);
 // No built-in 429 retry and a hard timeout: a slow or throttled address fails this pass and is retried on the next.
 const conn = new Connection(e.RPC_URL!, {
   commitment: "confirmed",
   disableRetryOnRateLimit: true,
   fetch: ((url, init) => fetch(url, { ...init, signal: AbortSignal.timeout(20_000) })) as typeof fetch,
 });
-const prices = new JupiterPrices(e.JUPITER_PRICE_URL ?? "https://api.jup.ag/price/v3", e.JUPITER_API_KEY);
+const prices = pricesFor(e, conn, new JupiterPrices(e.JUPITER_PRICE_URL ?? "https://api.jup.ag/price/v3", e.JUPITER_API_KEY));
 const r = await indexOnce({
   sql: db(e.DATABASE_URL),
   history: new RpcHistory(conn),

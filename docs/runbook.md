@@ -132,8 +132,7 @@ On top of the keeper variables above, the web app needs:
 |---|---|
 | `KEEPER_ADDRESS` | Keeper public key, listed on the docs page |
 | `SPILL_ADDRESS` | Spill public key; stake pools send penalties to its token accounts |
-| `PINATA_JWT` | Pinata API JWT for image and metadata uploads |
-| `PINATA_GATEWAY` | Your Pinata gateway domain (optional, else ipfs.io links) |
+| `CLOUDINARY_URL` | `cloudinary://<api key>:<api secret>@<cloud name>` from the Cloudinary console, for launch images and metadata JSON. Or set `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY` and `CLOUDINARY_API_SECRET` |
 | `ADMIN_WALLETS` | Comma separated wallet addresses allowed into `/admin` |
 | `ADMIN_SESSION_SECRET` | At least 32 random bytes, hex |
 | `CONFIG_KEYS_PATH` | Path to `config-keys.json` |
@@ -143,7 +142,9 @@ On top of the keeper variables above, the web app needs:
 | `SITE_URL` | Public origin, e.g. `https://quants.example`; the admin sign in message names its domain |
 | `TRUST_PROXY` | `1` behind Caddy or on Vercel so rate limits key on `x-forwarded-for`; leave unset when the app is reachable directly |
 
-Never set these in production: `NEXT_PUBLIC_TEST_WALLET_SECRET`, `PINATA_JWT=stub`, `DEV_UPLOADS_BASE`, `ALLOW_LOCAL_URIS`, `LOCAL_TOKEN_LIST`, `LOCAL_REWARD_MINTS`. They exist for the local seed and end to end run only. The web app and keeper refuse to start when `PINATA_JWT=stub`, `DEV_UPLOADS_BASE`, `ALLOW_LOCAL_URIS`, `LOCAL_TOKEN_LIST` or `LOCAL_REWARD_MINTS` is set and `RPC_URL` is not localhost or 127.0.0.1. The Vercel preview runs against a tunnelled local validator with `PINATA_JWT=stub` and `LOCAL_TOKEN_LIST`, so it sets `ALLOW_DEV_SWITCHES=1`; nothing else should.
+Uploads are signed server side: images go to Cloudinary as image uploads and metadata JSON as raw uploads under the `quants` folder, named by a hash of their content, and the token URI and image are the returned `https://res.cloudinary.com/...` links. The API secret never reaches the browser. Without Cloudinary set, `/api/metadata` refuses uploads, except in local development where `DEV_UPLOADS_BASE` keeps files in `.dev-uploads` and serves them from `/api/dev-uploads`. Launches made before the switch keep their IPFS links.
+
+Never set these in production: `NEXT_PUBLIC_TEST_WALLET_SECRET`, `PINATA_JWT=stub`, `DEV_UPLOADS_BASE`, `ALLOW_LOCAL_URIS`, `LOCAL_TOKEN_LIST`, `LOCAL_REWARD_MINTS`. They exist for the local seed and end to end run only. The web app and keeper refuse to start when `PINATA_JWT=stub`, `DEV_UPLOADS_BASE`, `ALLOW_LOCAL_URIS`, `LOCAL_TOKEN_LIST` or `LOCAL_REWARD_MINTS` is set and `RPC_URL` is not localhost or 127.0.0.1. The Vercel preview runs against a tunnelled local validator with `PINATA_JWT=stub` and `LOCAL_TOKEN_LIST`, so it sets `ALLOW_DEV_SWITCHES=1`; nothing else should. (`PINATA_JWT=stub` now only turns on local uploads, like `DEV_UPLOADS_BASE`.)
 
 `ADMIN_SESSION_SECRET` must be at least 64 hex characters (`openssl rand -hex 32`); the web app refuses to start otherwise.
 
@@ -175,3 +176,89 @@ bun run warm                                  # compiles every route once; a fir
 # Do not run `bun run build` while the dev server is running: both write to .next.
 set -a; source .env.local; set +a; bun run e2e
 ```
+
+## Devnet
+
+`CLUSTER` picks the network: `localnet` (the default, everything above), `devnet` or `mainnet`. It sets the RPC default when `RPC_URL` is unset (devnet: `DEVNET_RPC_URL`, else `https://api.devnet.solana.com`), the config keys file (`config-keys.devnet.json` on devnet unless `CONFIG_KEYS_PATH` is set), the swap adapter and the token list. Nothing else changes between networks.
+
+Jupiter does not serve devnet and the real reward tokens do not exist there, so on devnet:
+
+- **Swaps** (keeper reward swaps, rent swaps, and a first buy in QUANTS) go through DAMM v2 pools of stand-in tokens against SOL, as real on-chain swaps with a minimum out from the slippage cap. The keeper refuses a swap transaction that does anything other than a DAMM v2 swap on one of those pools into its own accounts, compute budget, its token accounts and wrapping its own SOL. Only SOL to token and token to SOL have a route: a QUANTS launch buys rewards only with the SOL left after its rent swap, and a USDC launch cannot open staking (there is no USDC pool).
+- **Token search** and the popular list return the stand-ins (dZEC, dJUP, dBONK, dWIF, dCATE) and QUANTS, from `DEVNET_TOKENS`.
+- **Prices**: SOL and devnet USDC use their mainnet Jupiter prices; stand-ins and QUANTS are their pool price times SOL.
+
+### Bootstrap
+
+The keeper key lives in `~/.config/quants/devnet-keeper.json`. Check the plan and the budget first; this only reads the chain:
+
+```bash
+bun scripts/devnet-bootstrap.ts --dry-run
+```
+
+It lists each step as `done` or `todo`, the SOL each part costs (about 2.5 SOL with the defaults, almost all of it the 0.3 SOL a side seeded into six pools) and what `scripts/devnet-run.ts` needs after it (about 3.8 SOL, about half of which comes back at the end). Fund the keeper (https://faucet.solana.com, or `solana airdrop` against devnet), then run it:
+
+```bash
+DEVNET_RPC_URL='https://devnet.helius-rpc.com/?api-key=<key>' bun scripts/devnet-bootstrap.ts
+```
+
+It stops before sending anything if the keeper holds less than the steps left need. Options: `--liquidity-sol 0.3` per pool side, `--sol-graduation 2`, `--usdc-graduation 300`, `--quants-per-sol 1000000` (the QUANTS pool price; the QUANTS graduation defaults to the SOL target times this), `--quants-graduation <units>`, `--rpc`, `--keeper`, `--state`.
+
+It creates the QUANTS mint (6 decimals) and five stand-ins with Metaplex metadata (the keeper is mint and update authority and holds the supply), one DAMM v2 pool per token against SOL, the Kamino global config (treasury fee 0), DBC config keys for SOL, devnet USDC (`4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU`) and QUANTS at each fee tier, a spill and a treasury keypair in `~/.config/quants/` (the treasury is funded to the rent-exempt minimum). Every address goes into `devnet-state.json` before its transaction is sent and every step checks the chain first, so after a failure run it again and it carries on. Config keys keep the graduation target they were created with.
+
+It writes three gitignored files:
+
+- `config-keys.devnet.json`
+- `devnet.env`: `CLUSTER=devnet`, the keeper, spill and treasury addresses, `OURTOKEN_*`, `KAMINO_GLOBAL_CONFIG`, `DAMM_V2_MIGRATION_CONFIG`, `QUOTE_MINTS` (devnet USDC), `QUOTE_GRADUATIONS`, `CONFIG_KEYS_PATH` and `CONFIG_KEYS`, `DEVNET_TOKENS` and the `NEXT_PUBLIC_*` values. `NEXT_PUBLIC_RPC_URL` is the public devnet RPC, because the browser sees it; keep a keyed RPC in `DEVNET_RPC_URL`.
+- `devnet.secrets.env`: `KEEPER_KEYPAIR` and `SPILL_KEYPAIR`. Keeper only; never give these to the web app.
+
+### Env merge
+
+Use a database of its own for devnet, so devnet launches never mix with local ones:
+
+```bash
+psql postgres://quants:quants@localhost:5434/quants -c 'create database quants_devnet'
+cat devnet.env devnet.secrets.env > .env.devnet
+cat >> .env.devnet <<'ENV'
+DATABASE_URL=postgres://quants:quants@localhost:5434/quants_devnet
+DEVNET_RPC_URL=https://devnet.helius-rpc.com/?api-key=<key>
+ADMIN_WALLETS=<your wallet>
+ADMIN_SESSION_SECRET=<openssl rand -hex 32>
+CLOUDINARY_URL=cloudinary://<key>:<secret>@<cloud>
+SITE_URL=http://localhost:3000
+ENV
+bun --env-file=.env.devnet run migrate
+```
+
+Do not put the local dev switches (`LOCAL_*`, `DEV_UPLOADS_BASE`, `ALLOW_LOCAL_URIS`, `PINATA_JWT=stub`) in it: they refuse to start against a remote RPC.
+
+### Indexer, keeper and web app on devnet
+
+```bash
+bun --env-file=.env.devnet run indexer                 # keep running
+bun --env-file=.env.devnet run keeper                  # or once: bun --env-file=.env.devnet scripts/keeper-once.ts
+bun --env-file=.env.devnet run dev                     # web app against devnet, connect a real wallet set to devnet
+```
+
+Next reads `.env.local` on its own and adds every variable from it that is not already set, which brings back the local dev switches and the test wallet. Move it aside while the web app runs on devnet (`mv .env.local .env.local.off`), or run devnet from a separate checkout. Bun with `--env-file` reads only the file given, so the keeper, indexer and scripts are not affected.
+
+All three read `RPC_URL` from `DEVNET_RPC_URL` when `RPC_URL` is unset. The keeper's first run needs settings saved (the run below does it, or the admin page). On devnet raise the slippage cap to 5% (`slippageBps: 500`), since the stand-in pools are small.
+
+### Lifecycle run
+
+```bash
+bun --env-file=.env.devnet scripts/devnet-run.ts
+```
+
+It generates two wallets, funds them from the keeper and drives one launch through its life, running the keeper in process between steps: a SOL launch at 3% with a dZEC/dJUP/dBONK basket, buy and sell round trips until the stakers' share pays for the farms (a keeper pass every 5 round trips), a keeper pass for swaps and funding, a stake from each wallet (1d and 7d), an early exit from the 7d stake, the keeper collecting and burning the penalty, the creator payout, buys until the curve fills, migration to DAMM v2, a sale on DAMM v2 and a keeper pass after graduation, and finally the wallets' SOL sent back to the keeper. Each transaction is printed with an explorer link, and `docs/devnet-readiness.md` is rewritten after every step with the steps, results, transaction counts, fees and what differed from localnet.
+
+Devnet drops transactions, so every step is kept in `devnet-run-state.json` (wallet keys included) and a second run skips what is done; a failed step is tried again from its start. Sends resend until the blockhash expires and each step retries at most 4 times. To start a new launch, delete `devnet-run-state.json`. Options: `--round-trip-sol 0.5`, `--max-round-trips 60`, `--state`.
+
+### Vercel preview on devnet
+
+Set these on the preview environment (`vercel env add <name> preview`), from `devnet.env`:
+
+- Everything in `devnet.env` (including `CONFIG_KEYS`, since `config-keys.devnet.json` is not committed, and `DEVNET_TOKENS`).
+- `DATABASE_URL` (a Neon database migrated with `bun --env-file=<neon env> run migrate`), `DEVNET_RPC_URL`, `ADMIN_WALLETS`, `ADMIN_SESSION_SECRET`, `CLOUDINARY_URL`, `SITE_URL=https://<preview domain>`, `TRUST_PROXY=1`.
+- Remove the tunnel setup: `RPC_URL` and `NEXT_PUBLIC_RPC_URL` pointing at the tunnel, `ALLOW_DEV_SWITCHES`, `PINATA_JWT`, `LOCAL_TOKEN_LIST`, `ALLOW_LOCAL_URIS`, `DEV_UPLOADS_BASE` and `NEXT_PUBLIC_TEST_WALLET_SECRET` (the build refuses the test wallet with a non-local RPC).
+
+Never put `KEEPER_KEYPAIR` or `SPILL_KEYPAIR` on Vercel. Run the keeper and indexer from your machine or the VPS with `.env.devnet`, then redeploy the preview so the `NEXT_PUBLIC_*` values are built in.
