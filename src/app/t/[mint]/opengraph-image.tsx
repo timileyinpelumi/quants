@@ -10,13 +10,13 @@ export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 export const dynamic = "force-dynamic";
 
-const INK = "#F4F2EE", MUTED = "#9A97A8", BLUE = "#4C9DFF", UP = "#2EBD85", DOWN = "#F6465D";
+const INK = "#F4F2EE", MUTED = "#9A97A8", BLUE = "#1896FD", UP = "#2EBD85", DOWN = "#F6465D";
 
 export default async function Image({ params }: { params: Promise<{ mint: string }> }) {
   const { mint } = await params;
   const [t, mark] = await Promise.all([
     tokenShare(getContext().sql, mint).catch(() => null),
-    readFile(join(process.cwd(), "public/brand/quants-mark.svg"), "utf8"),
+    readFile(join(process.cwd(), "public/brand/quants-icon.svg"), "utf8"),
   ]);
   const markSrc = `data:image/svg+xml;base64,${Buffer.from(mark).toString("base64")}`;
   const symbol = t?.symbol ?? "quants";

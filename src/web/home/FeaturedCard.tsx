@@ -31,7 +31,7 @@ export function FeaturedCard({ c, links }: { c: PlatformCard; links: { buy: stri
     <section aria-label="Featured" data-featured className="rounded-[28px] overflow-hidden grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)] border border-accent">
       <div className="flex flex-col gap-6 bg-accent text-ground p-6 md:p-8">
         <div className="flex items-center gap-4 min-w-0">
-          <img src="/brand/quants-mark.svg" alt="" width={64} height={64} className="w-14 h-14 md:w-16 md:h-16 rounded-2xl shrink-0" />
+          <img src="/brand/quants-icon.svg" alt="" width={64} height={64} className="w-14 h-14 md:w-16 md:h-16 rounded-2xl shrink-0" />
           <span className="flex flex-col gap-1.5 min-w-0">
             <span className="flex items-center gap-2.5 min-w-0">
               <span className="font-display font-black text-[32px] md:text-[40px] leading-none tracking-tight truncate">{c.symbol}</span>

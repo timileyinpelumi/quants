@@ -35,7 +35,7 @@ export class TokenIcons {
   }
 }
 
-const PLATFORM_ICON = "/brand/quants-mark.svg";
+const PLATFORM_ICON = "/brand/quants-icon.svg";
 
 /** Icons for any mix of mints; quote coins resolve through their mainnet mint so local stand-ins still get real logos. */
 export async function iconsFor(icons: TokenIcons, mints: string[], quotes: { mint: string; iconMint: string | null; platform: boolean }[]) {

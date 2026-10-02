@@ -7,7 +7,7 @@ export function Footer() {
     <footer data-site-footer className="mt-auto border-t line">
       <div className="wrap py-10 flex flex-col md:flex-row gap-6 md:items-center justify-between">
       <div className="flex items-center gap-3">
-        <img src="/brand/quants-mark.svg" alt="" width={28} height={28} />
+        <img src="/brand/quants-icon.svg" alt="" width={28} height={28} className="rounded-md" />
         <span className="text-sm text-muted">Trading fees, paid to stakers.</span>
       </div>
       <nav aria-label="Footer" className="flex flex-wrap gap-x-6 gap-y-2 text-sm">
