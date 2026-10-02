@@ -9,6 +9,9 @@ const symbol = `E${Math.random().toString(36).slice(2, 8).toUpperCase().replace(
 
 const isPhone = (page: Page) => (page.viewportSize()?.width ?? 1280) < 768;
 
+type WalletCalls = { signAndSend: number; sign: number; mostPerPrompt: number };
+const walletCalls = (page: Page) => page.evaluate(() => ({ ...(window as unknown as { __testWalletCalls: WalletCalls }).__testWalletCalls }));
+
 async function connect(page: Page) {
   const btn = page.getByRole("button", { name: "Connect wallet" }).first();
   if (await btn.isVisible()) {
@@ -35,6 +38,11 @@ test("launch, trade until staking opens, stake, exit early and see the burn", as
   await expect(page.getByText("Launch fee")).toHaveCount(0);
   await page.getByPlaceholder("0").first().fill("1");
   await page.getByRole("button", { name: `Launch ${symbol}` }).click();
+  await expect.poll(async () => (await walletCalls(page)).sign, { timeout: 120_000 }).toBeGreaterThan(0);
+  // The launch carries the mint's signature, so the wallet only signs it and signs first; one transaction per prompt.
+  const launchCalls = await walletCalls(page);
+  expect(launchCalls.mostPerPrompt).toBe(1);
+  expect(launchCalls.sign).toBe(1);
   await page.waitForURL(/\/t\/[1-9A-HJ-NP-Za-km-z]{32,44}$/, { timeout: 120_000 });
   const mint = page.url().split("/t/")[1]!;
   if (isPhone(page)) await page.getByRole("tab", { name: "Rewards" }).click();
@@ -63,6 +71,8 @@ test("launch, trade until staking opens, stake, exit early and see the burn", as
   await page.getByRole("button", { name: "Max" }).click();
   await page.getByRole("button", { name: "Stake for 30 days" }).click();
   await expect(page.getByText(/30 days, unlocks/)).toBeVisible();
+  // A wallet only transaction goes through signAndSendTransaction, as Phantom wants.
+  expect(await walletCalls(page)).toMatchObject({ signAndSend: 1, sign: 0, mostPerPrompt: 1 });
 
   await page.getByRole("button", { name: "Exit early" }).click();
   await expect(page.getByText("You get back")).toBeVisible();

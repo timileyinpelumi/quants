@@ -10,6 +10,10 @@ const CHAINS = ["solana:mainnet", "solana:devnet", "solana:localnet"] as const;
 // Like Phantom it signs and sends wallet only transactions itself, and only signs ones that carry other signers.
 export function registerTestWallet(secret: Uint8Array, rpcUrl: string) {
   const conn = new Connection(rpcUrl, "confirmed");
+  // Read by the e2e specs: how many prompts of each kind, and the most transactions any one prompt carried.
+  const calls = { signAndSend: 0, sign: 0, mostPerPrompt: 0 };
+  (window as unknown as { __testWalletCalls: typeof calls }).__testWalletCalls = calls;
+  const prompt = (kind: "signAndSend" | "sign", n: number) => { calls[kind]++; calls.mostPerPrompt = Math.max(calls.mostPerPrompt, n); };
   const kp = Keypair.fromSecretKey(secret);
   const account: WalletAccount = {
     address: kp.publicKey.toBase58(),
@@ -39,12 +43,16 @@ export function registerTestWallet(secret: Uint8Array, rpcUrl: string) {
       "solana:signTransaction": {
         version: "1.0.0",
         supportedTransactionVersions: ["legacy", 0],
-        signTransaction: async (...inputs: { transaction: Uint8Array }[]) => inputs.map((i) => ({ signedTransaction: sign(i.transaction) })),
+        signTransaction: async (...inputs: { transaction: Uint8Array }[]) => {
+          prompt("sign", inputs.length);
+          return inputs.map((i) => ({ signedTransaction: sign(i.transaction) }));
+        },
       },
       "solana:signAndSendTransaction": {
         version: "1.0.0",
         supportedTransactionVersions: ["legacy", 0],
         signAndSendTransaction: async (...inputs: { transaction: Uint8Array; options?: { preflightCommitment?: "processed" | "confirmed" | "finalized"; skipPreflight?: boolean; maxRetries?: number } }[]) => {
+          prompt("signAndSend", inputs.length);
           const out: { signature: Uint8Array }[] = [];
           for (const i of inputs) {
             const signed = sign(i.transaction);

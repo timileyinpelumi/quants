@@ -43,6 +43,9 @@ test("a token paired with a stock launches trading only", async ({ page }) => {
   await expect(page.getByText(/You get about\s*[\d,.]+ /)).toBeVisible();
   await page.getByRole("button", { name: `Buy ${symbol}` }).click();
   await expect(page.getByText("Bought. Balances updated.")).toBeVisible();
+  // A trade is wallet only: one signAndSendTransaction prompt, one transaction.
+  const calls = await page.evaluate(() => ({ ...(window as unknown as { __testWalletCalls: { signAndSend: number; mostPerPrompt: number } }).__testWalletCalls }));
+  expect(calls).toMatchObject({ signAndSend: 1, mostPerPrompt: 1 });
 
   // The keeper claims the fee in the stock token, splits it with no basket and pays the treasury, all with Token-2022 transfers.
   const run = JSON.parse(execSync("bun --env-file=.env.local scripts/keeper-once.ts", { stdio: "pipe", timeout: 180_000 }).toString().trim().split("\n").at(-1)!);
