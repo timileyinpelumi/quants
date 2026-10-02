@@ -9,6 +9,8 @@ import { clusterOf } from "@/cluster";
 import { HomeGrid } from "@/web/home/HomeGrid";
 import { BuyTicker } from "@/web/home/BuyTicker";
 import { FeaturedCard } from "@/web/home/FeaturedCard";
+import { PrelaunchCard } from "@/web/home/PrelaunchCard";
+import { cachedSettings, fillSymbol, xUrlOf } from "@/domain/settings";
 
 export const dynamic = "force-dynamic";
 
@@ -17,9 +19,12 @@ const usd = (n: number | null) => (n === null ? "No price" : `$${fmtCompact(n)}`
 export default async function HomePage() {
   const ctx = getContext();
   const now = Date.now();
+  const s = await cachedSettings(ctx.sql);
+  const p = s.platformToken;
+  const text = (t: string) => fillSymbol(t, p.symbol);
   const [d, card] = await Promise.all([
     landing(ctx.sql, now, async (m) => quoteIcons(ctx, m, await allQuotes(ctx))),
-    platformCardFor(ctx, now).catch(() => null),
+    p.mint ? platformCardFor(ctx, now).catch(() => null) : null,
   ]);
   const launchedHere = card ? (await ctx.sql`select 1 from launches where mint = ${card.mint}`).length > 0 : false;
   return (
@@ -57,7 +62,8 @@ export default async function HomePage() {
           </div>
         </section>
 
-        {card && <FeaturedCard c={card} links={platformLinks(card.mint, clusterOf(), launchedHere)} />}
+        {card && <FeaturedCard c={card} links={platformLinks(card.mint, clusterOf(), launchedHere)} headline={text(s.featured.headline)} body={text(s.featured.body)} />}
+        {!p.mint && <PrelaunchCard symbol={p.symbol} headline={text(s.featured.headline)} body={text(s.featured.body)} message={text(s.featured.prelaunch)} xUrl={xUrlOf(s)} />}
 
         <HomeGrid tabs={HOME_TABS} initial={d.tokens} nextOffset={d.nextOffset} />
       </main>

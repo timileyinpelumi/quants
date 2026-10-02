@@ -13,7 +13,7 @@ function Stat({ label, children }: { label: string; children: React.ReactNode })
   );
 }
 
-export function FeaturedCard({ c, links }: { c: PlatformCard; links: { buy: string; buyExternal: boolean; launch: string } }) {
+export function FeaturedCard({ c, links, headline, body }: { c: PlatformCard; links: { buy: string; buyExternal: boolean; launch: string }; headline: string; body: string }) {
   const market: [string, React.ReactNode][] = [];
   if (c.priceUsd !== null) market.push(["Price", `$${fmtPrice(c.priceUsd)}`]);
   if (c.mcapUsd !== null) market.push(["Market cap", money(c.mcapUsd)]);
@@ -41,10 +41,8 @@ export function FeaturedCard({ c, links }: { c: PlatformCard; links: { buy: stri
           </span>
         </div>
         <div className="flex flex-col gap-2">
-          <p className="m-0 font-display font-black text-[24px] md:text-[30px] leading-[1.08] tracking-[-0.02em]">Every buy of a {c.symbol} pair is a buy of {c.symbol}.</p>
-          <p className="m-0 text-[15px] leading-relaxed font-medium opacity-80 max-w-lg">
-            Launch with {c.symbol} as the pair and your curve fills in {c.symbol}. Hold it and you hold what every one of those launches trades against.
-          </p>
+          <p className="m-0 font-display font-black text-[24px] md:text-[30px] leading-[1.08] tracking-[-0.02em]">{headline}</p>
+          {body && <p className="m-0 text-[15px] leading-relaxed font-medium opacity-80 max-w-lg">{body}</p>}
         </div>
         <div className="flex flex-wrap gap-2.5 mt-auto">
           {links.buyExternal
