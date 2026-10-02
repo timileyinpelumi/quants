@@ -3,6 +3,8 @@ import { Avatar } from "@/web/ui/Avatar";
 import { Flame } from "@/web/ui/Flame";
 import { fmtAgo, fmtAmount, fmtCompact, lockLabel, shortAddr } from "@/web/ui/format";
 import { StakingOpens } from "@/web/stake/StakingOpens";
+import { TabPanel } from "@/web/ui/MobileTabs";
+import { StakeNowButton } from "./PhoneBars";
 import type { FeeSummary, LaunchDetail } from "@/web/server/reads";
 
 type Quote = { symbol: string; decimals: number; usd: number | null };
@@ -40,10 +42,13 @@ export function RewardsStaking({ mint, symbol, d, fees, icons, px, quote, tokenU
   const burnedUsd = usdOf(whole(d.burned, 6), tokenUsd);
 
   return (
+    <TabPanel show="rewards info">
     <section className="flex flex-col gap-8" aria-labelledby="rewards-staking">
+      <TabPanel show="rewards">
       <div className="flex justify-between items-baseline gap-4">
         <h2 id="rewards-staking" className="m-0 font-display font-black text-2xl md:text-[28px] tracking-tight">Rewards and staking</h2>
-        <Link href={`/t/${mint}/stake`} className="font-semibold text-[15px] text-stake-light min-h-11 flex items-center shrink-0">{d.stakeReady ? "Stake now" : "See lock tiers"}</Link>
+        <Link href={`/t/${mint}/stake`} className="font-semibold text-[15px] text-stake-light min-h-11 hidden md:flex items-center shrink-0">{d.stakeReady ? "Stake now" : "See lock tiers"}</Link>
+        <StakeNowButton label={d.stakeReady ? "Stake now" : "Staking progress"} />
       </div>
 
       <div className="flex flex-col gap-3">
@@ -69,9 +74,10 @@ export function RewardsStaking({ mint, symbol, d, fees, icons, px, quote, tokenU
       </div>
 
       {!d.stakeReady && <StakingOpens initial={d.stakingOpens} />}
+      </TabPanel>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-12">
-        <div className="flex flex-col">
+        <TabPanel show="rewards" className="flex flex-col">
           <div className="flex justify-between items-baseline pb-3 gap-4">
             <h3 className="m-0 font-display font-bold text-lg">Lock tiers</h3>
             <span className="text-[13px] text-muted text-right">Share of rewards now</span>
@@ -89,10 +95,10 @@ export function RewardsStaking({ mint, symbol, d, fees, icons, px, quote, tokenU
               <span className="font-mono text-[15px] text-right">{t.sharePct}%</span>
             </div>
           ))}
-        </div>
+        </TabPanel>
 
         <div className="flex flex-col gap-6">
-          <div className="flex flex-col gap-3">
+          <TabPanel show="info" className="flex flex-col gap-3">
             <h3 className="m-0 font-display font-bold text-lg">Where every fee goes</h3>
             <div className="flex h-3 rounded-full overflow-hidden gap-[3px] bg-white/[0.07]">
               {total > 0n && split.map((s) => <span key={s.key} className={s.color} style={{ width: `${Number((BigInt(s.amount) * 10_000n) / total) / 100}%` }} />)}
@@ -108,8 +114,9 @@ export function RewardsStaking({ mint, symbol, d, fees, icons, px, quote, tokenU
             <span className="text-[13px] text-muted leading-normal">
               All time, after Meteora&apos;s 20% of each trading fee{BigInt(fees.meteora) > 0n ? `, about ${q(fees.meteora)}` : ""}. Fees not yet split are counted in fees earned only.
             </span>
-          </div>
+          </TabPanel>
 
+          <TabPanel show="rewards">
           <div className="flex items-center gap-3.5 px-5 py-4 rounded-[22px] bg-burn/[0.08] border border-burn/25">
             <Flame />
             <span className="flex flex-col gap-0.5">
@@ -117,8 +124,10 @@ export function RewardsStaking({ mint, symbol, d, fees, icons, px, quote, tokenU
               <span className="text-[13px] text-muted">From early exits. Burned tokens are gone for good.</span>
             </span>
           </div>
+          </TabPanel>
         </div>
       </div>
     </section>
+    </TabPanel>
   );
 }

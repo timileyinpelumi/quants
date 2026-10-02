@@ -2,7 +2,7 @@ import Link from "next/link";
 
 export function Footer() {
   return (
-    <footer className="mt-auto border-t line">
+    <footer data-site-footer className="mt-auto border-t line">
       <div className="wrap py-10 flex flex-col md:flex-row gap-6 md:items-center justify-between">
       <div className="flex items-center gap-3">
         <img src="/brand/quants-mark.svg" alt="" width={28} height={28} />

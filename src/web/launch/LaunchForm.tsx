@@ -181,11 +181,12 @@ export function LaunchForm({ split, tiers, maxPenaltyBps, quotes }: {
     }
   }
 
+  const action = busy ? LABELS[status] : pending ? "Check launch status" : wallet.publicKey ? `Launch ${symbol || "token"}` : "Connect wallet";
   const section = "grid grid-cols-1 md:grid-cols-[56px_minmax(0,1fr)] gap-4 md:gap-6 py-7 border-t line";
   const num = "hidden md:block font-display font-bold text-[15px] text-faint";
 
   return (
-    <main className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_440px] gap-10 lg:gap-16 wrap pt-10 md:pt-14 pb-16">
+    <main className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_440px] gap-10 lg:gap-16 wrap pt-8 md:pt-14 pb-[calc(7.5rem+env(safe-area-inset-bottom))] md:pb-16">
       <section className="flex flex-col gap-10 min-w-0">
         <div className="flex flex-col gap-3.5">
           <h1 className="m-0 font-display font-black text-[40px] md:text-[56px] leading-[1.02] tracking-[-0.03em]">Launch a token</h1>
@@ -339,11 +340,22 @@ export function LaunchForm({ split, tiers, maxPenaltyBps, quotes }: {
           <span className="flex justify-between py-1.5"><span className="text-muted">Supply</span><span className="font-mono">1,000,000,000</span></span>
         </div>
 
-        {error && <p role="alert" className="m-0 text-sm text-burn">{error}</p>}
-        <Button size="lg" onClick={launch} disabled={busy}>
-          {busy ? LABELS[status] : pending ? "Check launch status" : wallet.publicKey ? `Launch ${symbol || "token"}` : "Connect wallet"}
-        </Button>
+        {error && <p role="alert" className="max-md:hidden m-0 text-sm text-burn">{error}</p>}
+        <Button size="lg" onClick={launch} disabled={busy} className="max-md:hidden">{action}</Button>
       </aside>
+
+      <div data-phone-bars className="md:hidden fixed inset-x-0 bottom-0 z-30 bg-ground/95 backdrop-blur border-t line px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] flex flex-col gap-2">
+        {error && <p role="alert" className="m-0 text-[13px] text-burn">{error}</p>}
+        <div className="flex items-center gap-3">
+          <span className="flex flex-1 flex-col min-w-0">
+            <span className="font-display font-bold truncate">{symbol || "Your token"} / {pairLabel} · {fee / 100}% fee</span>
+            <span className="text-[13px] text-muted truncate">
+              {devBuyLamports && devBuyLamports > 0n ? `First buy ${solText(devBuyLamports)}${usdOf(devBuyLamports) ? `, ${usdOf(devBuyLamports)}` : ""}` : "No first buy"}
+            </span>
+          </span>
+          <Button onClick={launch} disabled={busy} className="shrink-0 max-w-[55%] truncate">{action}</Button>
+        </div>
+      </div>
     </main>
   );
 }

@@ -12,7 +12,7 @@ export function MarketStats({ quoteSymbol }: { quoteSymbol: string }) {
   const vol = m && (m.volume24hUsd !== null ? `$${fmtCompact(m.volume24hUsd)}` : `${fmtCompact(m.volume24h)} ${quoteSymbol}`);
   return (
     <>
-      <div className="flex flex-col gap-1.5">
+      <div className="max-md:hidden flex flex-col gap-1.5">
         <span className="text-[13px] text-muted">Price</span>
         <span className="font-display font-bold text-2xl md:text-[30px]">{m ? price : dash}</span>
         {m && <span className={`font-mono text-sm ${changeTone(m.change24h)}`}>{fmtChange(m.change24h)} today</span>}
@@ -54,5 +54,20 @@ export function GraduationBar({ initial, quoteSymbol, quoteDecimals }: { initial
       <span className="h-3 rounded-full bg-white/[0.07] overflow-hidden flex"><span className="rounded-full transition-[width] duration-700" style={{ width: `${c.progress}%`, background: "linear-gradient(90deg, #9D8CFF, #4C9DFF)" }} /></span>
       <span className="font-mono text-[13px] text-muted">{whole(c.reserve)} of {whole(c.threshold)} {quoteSymbol}{live?.quoteUsd ? ` · $${fmtCompact(Number(BigInt(c.threshold)) / 10 ** quoteDecimals * live.quoteUsd)} target` : ""}</span>
     </>
+  );
+}
+
+/** Price, day change and market cap for the compact phone header. */
+export function PhoneQuote({ quoteSymbol }: { quoteSymbol: string }) {
+  const m = useTokenLive()?.market ?? null;
+  if (!m) return <span className="text-sm text-faint">No trades yet</span>;
+  const price = m.priceUsd !== null ? `$${fmtPrice(m.priceUsd)}` : `${fmtPrice(m.price)} ${quoteSymbol}`;
+  const cap = m.fdvUsd !== null ? `$${fmtCompact(m.fdvUsd)}` : `${fmtCompact(m.price * 1e9)} ${quoteSymbol}`;
+  return (
+    <span className="flex items-baseline gap-x-2.5 gap-y-0.5 flex-wrap min-w-0">
+      <span className="font-display font-bold text-xl">{price}</span>
+      <span className={`font-mono text-[13px] ${changeTone(m.change24h)}`}>{fmtChange(m.change24h)}</span>
+      <span className="font-mono text-[12px] text-muted whitespace-nowrap">MC {cap}</span>
+    </span>
   );
 }

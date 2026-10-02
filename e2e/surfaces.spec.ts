@@ -3,6 +3,9 @@ import { execSync } from "node:child_process";
 
 const CAT = process.env.SEED_CAT_MINT!;
 
+// Below md the token page shows one section at a time and trades from a bottom sheet.
+const isPhone = (page: Page) => (page.viewportSize()?.width ?? 1280) < 768;
+
 async function connect(page: Page) {
   const btn = page.getByRole("button", { name: "Connect wallet" }).first();
   if (await btn.isVisible()) {
@@ -15,6 +18,7 @@ async function connect(page: Page) {
 test("trade widget buys and sells", async ({ page }) => {
   await page.goto(`/t/${CAT}`);
   await connect(page);
+  if (isPhone(page)) await page.getByRole("button", { name: "Buy", exact: true }).click();
   await page.getByRole("button", { name: "0.1", exact: true }).click();
   await expect(page.getByText(/You get about/).locator("..").getByText(/ CAT/)).toBeVisible();
   await page.getByRole("button", { name: "Buy CAT" }).click();
@@ -24,6 +28,33 @@ test("trade widget buys and sells", async ({ page }) => {
   await page.getByRole("button", { name: "25%" }).click();
   await page.getByRole("button", { name: "Sell CAT" }).click();
   await expect(page.getByText("Sold. Balances updated.")).toBeVisible();
+});
+
+test("token page tabs and trade sheet on a phone", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto(`/t/${CAT}`);
+  await expect(page.getByRole("tab", { name: "Chart" })).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByRole("heading", { name: "Rewards and staking" })).toBeHidden();
+  // the tab bar only responds once the page hydrates
+  await expect(async () => {
+    await page.getByRole("tab", { name: "Rewards" }).click();
+    await expect(page).toHaveURL(/#rewards$/, { timeout: 1000 });
+  }).toPass();
+  await expect(page.getByRole("heading", { name: "Rewards and staking" })).toBeVisible();
+  await page.getByRole("button", { name: /^(Stake now|Staking progress)$/ }).click();
+  const sheet = page.getByRole("dialog", { name: "Trade CAT" });
+  await expect(sheet.getByRole("button", { name: "stake", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await page.keyboard.press("Escape");
+  await expect(sheet).toHaveCount(0);
+  await expect(page).toHaveURL(/#rewards$/);
+  await page.getByRole("button", { name: "Sell", exact: true }).click();
+  await expect(sheet.getByRole("button", { name: "sell", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await sheet.getByRole("button", { name: "Close" }).click();
+  await expect(sheet).toHaveCount(0);
+  await page.getByRole("tab", { name: "Trades" }).click();
+  await expect(page.getByRole("button", { name: "Top traders" })).toBeVisible();
+  await page.goBack();
+  await expect(page.getByRole("heading", { name: "Rewards and staking" })).toBeVisible();
 });
 
 test("indexed trades fill the home page and the token chart", async ({ page }) => {

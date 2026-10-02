@@ -36,6 +36,7 @@ test("a token paired with a stock launches trading only", async ({ page }) => {
   await expect(page.getByText(`${symbol} / NVDAx`)).toBeVisible();
   await expect(page.getByRole("button", { name: "Stake", exact: true })).toHaveCount(0);
   await expect(page.getByText(`Stake ${symbol}, earn`)).toHaveCount(0);
+  if ((page.viewportSize()?.width ?? 1280) < 768) await page.getByRole("button", { name: "Buy", exact: true }).click();
   await expect(page.getByText(/Balance [\d,.]+ NVDAx/)).toBeVisible();
 
   await page.getByLabel("Amount of NVDAx").fill("5");

@@ -12,6 +12,7 @@ import { StakeForm } from "@/web/stake/StakeForm";
 import { useUsd, usdText } from "@/web/ui/usd";
 import type { Tier } from "@/web/stake/useStake";
 import type { StakingOpens } from "@/web/server/reads";
+import { useTradeSheet } from "./PhoneBars";
 
 const SOL = "So11111111111111111111111111111111111111112";
 const FEE_RESERVE = 10_000_000n;
@@ -43,6 +44,16 @@ export function TradePanel({ mint, symbol, quoteMint, quoteSymbol, quoteDecimals
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const owner = wallet.publicKey?.toBase58();
+  const phone = useTradeSheet();
+  const opened = phone?.sheet ?? null;
+  const canStake = !!stake;
+
+  useEffect(() => {
+    if (!opened) return;
+    setTab(opened === "stake" && !canStake ? "buy" : opened);
+    setAmount("");
+    setMsg(null);
+  }, [opened, canStake]);
 
   const inDecimals = side === "buy" ? quoteDecimals : 6;
   const outDecimals = side === "buy" ? 6 : quoteDecimals;
@@ -117,7 +128,18 @@ export function TradePanel({ mint, symbol, quoteMint, quoteSymbol, quoteDecimals
   }
 
   return (
-    <div className="panel flex flex-col gap-4 p-5 md:p-6 min-w-0">
+    <div
+      role={opened ? "dialog" : undefined} aria-modal={opened ? true : undefined} aria-label={opened ? `Trade ${symbol}` : undefined}
+      className={`panel flex flex-col gap-4 p-5 md:p-6 min-w-0 ${phone ? `max-md:fixed max-md:inset-x-0 max-md:bottom-0 max-md:z-50 max-md:max-h-[88dvh] max-md:overflow-y-auto max-md:overscroll-contain max-md:rounded-b-none max-md:pt-2 max-md:pb-[calc(1.25rem+env(safe-area-inset-bottom))] ${opened ? "" : "max-md:hidden"}` : ""}`}
+    >
+      {phone && (
+        <div className="md:hidden relative flex items-center justify-center min-h-11">
+          <span aria-hidden className="h-1.5 w-10 rounded-full bg-white/20" />
+          <button type="button" onClick={phone.close} aria-label="Close" className="absolute right-0 top-0 w-11 h-11 flex items-center justify-center rounded-full text-muted hover:text-ink cursor-pointer">
+            <svg aria-hidden width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M6 6l12 12M18 6 6 18" /></svg>
+          </button>
+        </div>
+      )}
       <div role="group" aria-label={stake ? "Buy, sell or stake" : "Buy or sell"} className={`grid ${stake ? "grid-cols-3" : "grid-cols-2"} gap-1.5 p-1.5 bg-ground rounded-full`}>
         {(["buy", "sell", "stake"] as const).filter((s) => s !== "stake" || stake).map((s) => (
           <button
@@ -157,7 +179,7 @@ export function TradePanel({ mint, symbol, quoteMint, quoteSymbol, quoteDecimals
           <span className="text-muted">Max slippage</span>
           <span className="flex gap-1">
             {[50, 100, 300].map((b) => (
-              <button key={b} type="button" aria-pressed={slippageBps === b} onClick={() => setSlippage(b)} className={`font-mono text-[13px] px-2.5 min-h-9 rounded-full cursor-pointer ${slippageBps === b ? "bg-raised-2 border border-white/15 text-ink" : "text-muted"}`}>{b / 100}%</button>
+              <button key={b} type="button" aria-pressed={slippageBps === b} onClick={() => setSlippage(b)} className={`font-mono text-[13px] px-2.5 min-w-10 md:min-w-0 min-h-10 md:min-h-9 rounded-full cursor-pointer ${slippageBps === b ? "bg-raised-2 border border-white/15 text-ink" : "text-muted"}`}>{b / 100}%</button>
             ))}
           </span>
         </span>

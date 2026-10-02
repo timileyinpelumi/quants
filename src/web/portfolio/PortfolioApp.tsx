@@ -8,6 +8,7 @@ import { Button } from "@/web/ui/Button";
 import { Jazzicon } from "@/web/ui/Jazzicon";
 import { fmtAmount, fmtCompact, shortAddr, lockLabel } from "@/web/ui/format";
 import { useUsd, usdText } from "@/web/ui/usd";
+import { MobileTabs, TabPanel, TabRow } from "@/web/ui/MobileTabs";
 
 type Position = {
   tierId: string; multiplierBps: number; lockSeconds: number; staked: string; unlocksAt: number; locked: boolean;
@@ -54,6 +55,8 @@ export function PortfolioApp() {
   }, [owner]);
 
   useEffect(() => { load(); }, [load]);
+  const SOL_MINT = "So11111111111111111111111111111111111111112";
+  const px = useUsd([SOL_MINT, ...(holdings?.tokens.map((t) => t.mint) ?? []), ...(stakes ?? []).flatMap((l) => [l.mint, ...l.positions.flatMap((p) => p.pending.map((r) => r.mint))])]);
 
   if (!owner) {
     return (
@@ -69,8 +72,6 @@ export function PortfolioApp() {
 
   const skeleton = <div className="flex flex-col gap-2">{[0, 1].map((i) => <div key={i} className="h-16 rounded-2xl bg-white/[0.03] animate-pulse" />)}</div>;
   const stakeCount = stakes?.reduce((a, l) => a + l.positions.length, 0);
-  const SOL_MINT = "So11111111111111111111111111111111111111112";
-  const px = useUsd([SOL_MINT, ...(holdings?.tokens.map((t) => t.mint) ?? []), ...(stakes ?? []).flatMap((l) => [l.mint, ...l.positions.flatMap((p) => p.pending.map((r) => r.mint))])]);
   const usdOf = (base: string, decimals: number, mint: string) => usdText(Number(BigInt(base)) / 10 ** decimals, px[mint]);
   const worth = (base: string, decimals: number, mint: string) => (Number(BigInt(base)) / 10 ** decimals) * (px[mint] ?? 0);
   const total = holdings && px[SOL_MINT] != null
@@ -78,8 +79,12 @@ export function PortfolioApp() {
       + (stakes ?? []).reduce((a, l) => a + l.positions.reduce((b, p) => b + worth(p.staked, 6, l.mint), 0), 0)
     : null;
 
+  const launchedCount = holdings ? holdings.tokens.filter((t) => t.kind === "launch").length : undefined;
+  const heldCount = holdings ? holdings.tokens.filter((t) => t.kind !== "launch").length + 1 : undefined;
+
   return (
-    <main className="flex flex-col gap-12 wrap pt-10 md:pt-14 pb-16">
+    <MobileTabs ids={["holdings", "launched", "stakes"]}>
+    <main className="flex flex-col gap-8 md:gap-12 wrap pt-8 md:pt-14 pb-16">
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
         <div className="flex items-center gap-4">
           <Jazzicon address={owner} size={64} />
@@ -95,8 +100,11 @@ export function PortfolioApp() {
         </div>
       </div>
 
+      <TabRow label="Portfolio sections" tabs={[["holdings", "Holdings", heldCount], ["launched", "Launched", launchedCount], ["stakes", "Stakes", stakeCount]]} />
+
       {error && <p role="alert" className="m-0 text-burn">{error} <button type="button" onClick={load} className="underline cursor-pointer">Try again</button></p>}
 
+      <TabPanel show="holdings">
       <Section title="Native">
         {holdings ? (
           <div className="grid grid-cols-[44px_minmax(0,1fr)_auto] gap-4 items-center py-4 border-t line">
@@ -106,11 +114,19 @@ export function PortfolioApp() {
           </div>
         ) : !error && skeleton}
       </Section>
+      </TabPanel>
 
       {GROUPS.map(([kind, title]) => {
         const rows = holdings?.tokens.filter((t) => t.kind === kind) ?? [];
-        if (holdings && rows.length === 0) return null;
+        if (holdings && rows.length === 0) {
+          return kind === "launch" ? (
+            <TabPanel key={kind} show="launched" className="md:hidden">
+              <p className="m-0 py-6 border-t line text-muted">No tokens launched here in this wallet.</p>
+            </TabPanel>
+          ) : null;
+        }
         return (
+          <TabPanel key={kind} show={kind === "launch" ? "launched" : "holdings"}>
           <Section key={kind} title={title} count={holdings ? rows.length : undefined}>
             {!holdings ? !error && skeleton : rows.map((t) => {
               const inner = (
@@ -129,9 +145,11 @@ export function PortfolioApp() {
                 : <div key={t.mint} className={cls}>{inner}</div>;
             })}
           </Section>
+          </TabPanel>
         );
       })}
 
+      <TabPanel show="stakes">
       <Section title="Stakes" count={stakeCount}>
         {stakes === null ? !error && skeleton : stakes.length === 0 ? (
           <div className="flex flex-col items-start gap-4 py-8 border-t line">
@@ -169,6 +187,8 @@ export function PortfolioApp() {
           </div>
         )}
       </Section>
+      </TabPanel>
     </main>
+    </MobileTabs>
   );
 }
