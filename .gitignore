@@ -18,3 +18,6 @@ devnet.env
 devnet.secrets.env
 config-keys.devnet.json
 *.json.tmp
+!.env.production.example
+secrets/
+backups/
