@@ -2,7 +2,7 @@ import { test, expect } from "bun:test";
 import type { SQL } from "bun";
 import { freshDb } from "../helpers/db";
 import { defaultSettings, saveSettings } from "../../src/domain/settings";
-import { overview, series, topTokens, windowOf, type AnalyticsDeps } from "../../src/web/server/analytics";
+import { feeFlow, overview, series, topTokens, windowOf, type AnalyticsDeps } from "../../src/web/server/analytics";
 
 const NOW = Date.parse("2026-10-01T12:00:00Z");
 const H = 3_600_000;
@@ -127,6 +127,22 @@ test("top tokens rank by volume in the range with fees, traders and staking stat
     { mint: "mint-CCC", symbol: "CCC", name: null, status: "live", volumeUsd: 100, trades: 1, traders: 1, feesUsd: 100, staking: { state: "trading", percent: null } },
   ]);
   expect(await topTokens(sql, windowOf("7d", NOW), 1)).toHaveLength(1);
+});
+
+test("fee flow splits what was collected into rewards bought, rent, creator, treasury and what is held", async () => {
+  const { sql, a, b } = await seed();
+  await step(sql, a, "rent", 15 * H, { amount: "100000000" });
+  await step(sql, a, "swap", 14 * H, { inputMint: SOL, outputMint: "jup", amountIn: "300000000" });
+  await step(sql, a, "swap", 14 * H, { direct: true, inputMint: SOL, outputMint: SOL, amountIn: "50000000" });
+  await step(sql, a, "swap", 16 * H, { inputMint: SOL, outputMint: SOL, amountIn: "999000000000", toBucket: "basket" });
+  await step(sql, b, "rent", 8 * D, { amount: "500000000" });
+  await sql`insert into escrow (launch_id, bucket, mint, amount) values
+    (${a}, 'unsplit', ${SOL}, 100000000), (${a}, 'reward', 'jup', 4000000), (${b}, 'creator', ${SOL}, 200000000), (${b}, 'penalty', ${"mint-BBB"}, 7)`;
+  const f = await feeFlow(deps(sql), windowOf("7d", NOW));
+  const r = (o: Record<string, number>) => Object.fromEntries(Object.entries(o).map(([k, v]) => [k, round(v)]));
+  expect(round(f.collectedUsd)).toBe(200);
+  expect(r(f.flow)).toEqual({ bought: 35, rent: 10, creator: 87.5, treasury: 52.5, held: 15 });
+  expect(r(f.escrow)).toEqual({ unsplit: 10, basket: 0, reward: 2, creator: 20, treasury: 0 });
 });
 
 test("all time has no previous period", async () => {

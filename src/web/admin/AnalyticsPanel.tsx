@@ -1,6 +1,6 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
-import type { Overview, Range, Report, Stat, TopToken } from "@/web/server/analytics";
+import type { FeeFlow, Overview, Range, Report, Stat, TopToken } from "@/web/server/analytics";
 import { Segmented } from "@/web/ui/Segmented";
 import { Button } from "@/web/ui/Button";
 import { fmtChange, fmtCompact, shortAddr } from "@/web/ui/format";
@@ -140,6 +140,64 @@ function Tokens({ rows }: { rows: TopToken[] }) {
   );
 }
 
+const FLOW: { key: keyof FeeFlow["flow"]; label: string; color: string }[] = [
+  { key: "bought", label: "Stakers' basket bought", color: "var(--color-stake)" },
+  { key: "rent", label: "Rent for farms", color: "var(--color-stake-light)" },
+  { key: "creator", label: "Creators", color: "var(--color-violet)" },
+  { key: "treasury", label: "Treasury", color: "var(--color-accent)" },
+  { key: "held", label: "Held for stakers", color: "var(--color-faint)" },
+];
+const ESCROW: { key: keyof FeeFlow["escrow"]; label: string }[] = [
+  { key: "unsplit", label: "Not split yet" },
+  { key: "basket", label: "Stakers' share not spent" },
+  { key: "reward", label: "Rewards bought, not paid" },
+  { key: "creator", label: "Owed to creators" },
+  { key: "treasury", label: "Owed to treasury" },
+];
+
+function Fees({ f }: { f: FeeFlow }) {
+  const total = FLOW.reduce((s, x) => s + f.flow[x.key], 0);
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-10 gap-y-8">
+      <div className="flex flex-col gap-4">
+        <div className="flex items-baseline justify-between gap-3">
+          <span className="text-[13px] text-muted">Collected in this range</span>
+          <span className="font-mono text-xl">{fmtUsd(f.collectedUsd)}</span>
+        </div>
+        <div className="flex h-3 w-full overflow-hidden rounded-full bg-white/[0.04]" role="img" aria-label="Where fees went">
+          {total > 0 && FLOW.map((x) => f.flow[x.key] > 0 && (
+            <span key={x.key} style={{ width: `${(f.flow[x.key] / total) * 100}%`, background: x.color }} title={`${x.label}: ${fmtUsd(f.flow[x.key])}`} />
+          ))}
+        </div>
+        <div className="flex flex-col text-sm">
+          {FLOW.map((x) => (
+            <div key={x.key} className="grid grid-cols-[12px_minmax(0,1fr)_auto_56px] items-center gap-3 py-2.5 border-t line">
+              <span className="size-2.5 rounded-full" style={{ background: x.color }} />
+              <span className="truncate">{x.label}</span>
+              <span className="font-mono text-right">{fmtUsd(f.flow[x.key])}</span>
+              <span className="font-mono text-right text-muted">{total > 0 ? `${Math.round((f.flow[x.key] / total) * 100)}%` : ""}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+      <div className="flex flex-col gap-4">
+        <div className="flex items-baseline justify-between gap-3">
+          <span className="text-[13px] text-muted">In escrow right now</span>
+          <span className="font-mono text-xl">{fmtUsd(ESCROW.reduce((s, x) => s + f.escrow[x.key], 0))}</span>
+        </div>
+        <div className="flex flex-col text-sm">
+          {ESCROW.map((x) => (
+            <div key={x.key} className="flex justify-between gap-3 py-2.5 border-t line">
+              <span className="truncate">{x.label}</span>
+              <span className="font-mono">{fmtUsd(f.escrow[x.key])}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function Section({ title, note, children }: { title: string; note?: string; children: React.ReactNode }) {
   return (
     <section className="flex flex-col gap-4">
@@ -189,6 +247,9 @@ export function AnalyticsPanel() {
           </Section>
           <Section title="Top tokens" note="By volume in this range, up to 20.">
             <Tokens rows={shown.tokens} />
+          </Section>
+          <Section title="Fee flow" note="Fees split in this range and where they went. Held is the stakers' share not yet spent on rent or rewards in the range.">
+            <Fees f={shown.fees} />
           </Section>
         </>
       )}

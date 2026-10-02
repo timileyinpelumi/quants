@@ -4,6 +4,7 @@ import { usdPrices } from "./prices";
 import { platformWallets } from "./platform-wallets";
 import { ttlCache } from "@/domain/lru";
 import { stakingOpens } from "./reads";
+import { NATIVE_MINT } from "@/domain/types";
 
 export type Range = "24h" | "7d" | "30d" | "all";
 export const RANGES = ["24h", "7d", "30d", "all"] as const satisfies readonly Range[];
@@ -196,12 +197,59 @@ export async function topTokens(sql: SQL, w: Window, limit = TOP_TOKENS): Promis
   });
 }
 
-export type Report = { range: Range; from: string; to: string; unit: Unit; overview: Overview; series: Point[]; tokens: TopToken[] };
+export type FeeFlow = {
+  collectedUsd: number;
+  /** Where the fees split in the range went; held is the stakers' share not yet spent on rent or rewards. */
+  flow: { bought: number; rent: number; creator: number; treasury: number; held: number };
+  /** Balances still in escrow right now, whatever range is picked. */
+  escrow: { unsplit: number; basket: number; reward: number; creator: number; treasury: number };
+};
+
+export async function feeFlow(d: AnalyticsDeps, w: Window): Promise<FeeFlow> {
+  const { sql } = d;
+  const sol = (await d.usd([NATIVE_MINT]).catch(() => ({} as Record<string, number | null>)))[NATIVE_MINT] ?? null;
+  const [[split], [spent], escrow] = await Promise.all([
+    sql`select coalesce(sum(s.amt * px.usd), 0)::float8 as amt, coalesce(sum(s.creator * px.usd), 0)::float8 as creator,
+          coalesce(sum(s.platform * px.usd), 0)::float8 as platform, coalesce(sum(s.basket * px.usd), 0)::float8 as basket
+        from (${splitShares(sql, w.from, w.to, null)}) s ${pxJoin(sql, sql`s.launch_id`)}`,
+    sql`select coalesce(sum(v.usd) filter (where x.k = 'rent'), 0)::float8 as rent, coalesce(sum(v.usd) filter (where x.k = 'buy'), 0)::float8 as bought
+        from (
+          select launch_id, 'rent' as k, ${NATIVE_MINT}::text as mint, sum((detail->>'amount')::float8) as amt from distributions
+          where kind = 'rent' and status = 'confirmed' and updated_at >= ${w.from} and updated_at < ${w.to} group by 1
+          union all
+          select launch_id, 'buy', detail->>'inputMint', sum((detail->>'amountIn')::float8) from distributions
+          where kind = 'swap' and status = 'confirmed' and updated_at >= ${w.from} and updated_at < ${w.to}
+            and detail->>'toBucket' is null and detail ? 'amountIn' group by 1, 3
+        ) x join launches l on l.id = x.launch_id ${pxJoin(sql, sql`x.launch_id`)}
+        cross join lateral (select case when x.mint = l.quote_mint then x.amt * px.usd else x.amt / 1e9 * ${sol}::float8 end as usd) v`,
+    sql`select e.bucket, e.mint, sum(e.amount::float8 * px.usd) filter (where e.mint = l.quote_mint) as quote_usd,
+          sum(e.amount::float8) filter (where e.mint <> l.quote_mint) as other,
+          (select decimals from baskets where reward_mint = e.mint and decimals is not null limit 1) as decimals
+        from escrow e join launches l on l.id = e.launch_id ${pxJoin(sql, sql`e.launch_id`)}
+        where e.bucket <> 'penalty' and e.amount > 0 group by 1, 2 limit 1000`,
+  ]);
+  const others = [...new Set<string>(escrow.filter((r: any) => r.other).map((r: any) => r.mint as string))];
+  const px = others.length ? await d.usd(others).catch(() => ({} as Record<string, number | null>)) : {};
+  const held = { unsplit: 0, basket: 0, reward: 0, creator: 0, treasury: 0 };
+  for (const r of escrow as any[]) {
+    const dec = r.mint === NATIVE_MINT ? 9 : r.decimals ?? 0;
+    const usd = Number(r.quote_usd ?? 0) + (r.other ? (Number(r.other) / 10 ** dec) * (px[r.mint] ?? 0) : 0);
+    if (r.bucket in held) held[r.bucket as keyof typeof held] += usd;
+  }
+  const rent = Number(spent.rent), bought = Number(spent.bought);
+  return {
+    collectedUsd: Number(split.amt),
+    flow: { bought, rent, creator: Number(split.creator), treasury: Number(split.platform), held: Math.max(0, Number(split.basket) - rent - bought) },
+    escrow: held,
+  };
+}
+
+export type Report = { range: Range; from: string; to: string; unit: Unit; overview: Overview; series: Point[]; tokens: TopToken[]; fees: FeeFlow };
 
 export async function report(d: AnalyticsDeps, range: Range, now = Date.now()): Promise<Report> {
   const w = windowOf(range, now);
-  const [ov, pts, tokens] = await Promise.all([overview(d, w), series(d.sql, w), topTokens(d.sql, w)]);
-  return { range, from: w.from.toISOString(), to: w.to.toISOString(), unit: w.unit, overview: ov, series: pts, tokens };
+  const [ov, pts, tokens, fees] = await Promise.all([overview(d, w), series(d.sql, w), topTokens(d.sql, w), feeFlow(d, w)]);
+  return { range, from: w.from.toISOString(), to: w.to.toISOString(), unit: w.unit, overview: ov, series: pts, tokens, fees };
 }
 
 export function contextDeps(ctx: WebContext): AnalyticsDeps {
