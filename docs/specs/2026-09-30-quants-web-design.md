@@ -55,7 +55,7 @@ Lists are flat divider rows, never cards. Copy is plain and has no hyphens or da
 
 Numbered sections as in the canvas: token (image, name, symbol), pair and fee, reward basket, first buy, then links (website, X, Telegram) and description. A summary panel shows the fee split, lock tiers, the farm setup the stakers' share pays before staking opens, graduation target and the Launch button. There is no launch fee.
 
-Flow: upload image and metadata (`POST /api/metadata`) → `POST /api/launch/prepare` → wallet signs (with a Jupiter SOL to OURTOKEN swap first when the pair is OURTOKEN and there is a first buy; both signed in one approval) → send → `POST /api/launch/confirm` → go to the token page.
+Flow: upload image and metadata (`POST /api/metadata`) → `POST /api/launch/prepare` returns one step at a time (config key setup when the pair has none, then a Jupiter SOL swap when the pair is not SOL and there is a first buy, then the launch); each is simulated on the server, approved in the wallet on its own and confirmed before the client asks for the next → `POST /api/launch/confirm` → go to the token page. Wallet only transactions go through `sendTransaction` (Phantom signAndSendTransaction); ones with server signers (the mint, a new config key) are signed by the wallet first, then get the server signatures and are sent by the app.
 
 Basket token picker: search the Jupiter token list, verified tokens only, classic SPL only (the server checks too).
 

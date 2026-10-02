@@ -1,5 +1,6 @@
 import type { StakingAdapter } from "../../src/staking/adapter";
 import type { FakeChain } from "./fake-chain";
+import { fakeTx } from "./fake-tx";
 
 export class FakeStaking implements StakingAdapter {
   readonly backend = "kamino" as const;
@@ -43,8 +44,8 @@ export class FakeStaking implements StakingAdapter {
   userFarmList: string[] = [];
   async userFarms(_owner: string, farms: string[]) { return this.userFarmList.filter((f) => farms.includes(f)); }
   async position(owner: string, farm: string) { return this.positions.get(`${owner}:${farm}`) ?? null; }
-  async buildStakeTx(owner: string, farm: string, _m: string, amount: bigint) { this.built.push({ action: "stake", owner, farm, amount }); return "dHg="; }
-  async buildClaimTx(owner: string, farm: string) { this.built.push({ action: "claim", owner, farm }); return "dHg="; }
-  async buildExitTx(owner: string, farm: string) { this.built.push({ action: "exit", owner, farm }); return "dHg="; }
-  async buildWithdrawTx(owner: string, farm: string) { this.built.push({ action: "withdraw", owner, farm }); return "dHg="; }
+  async buildStakeTx(owner: string, farm: string, _m: string, amount: bigint) { this.built.push({ action: "stake", owner, farm, amount }); return fakeTx(owner); }
+  async buildClaimTx(owner: string, farm: string) { this.built.push({ action: "claim", owner, farm }); return fakeTx(owner); }
+  async buildExitTx(owner: string, farm: string) { this.built.push({ action: "exit", owner, farm }); return fakeTx(owner); }
+  async buildWithdrawTx(owner: string, farm: string) { this.built.push({ action: "withdraw", owner, farm }); return fakeTx(owner); }
 }

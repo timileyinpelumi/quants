@@ -6,6 +6,7 @@ import { NATIVE_MINT } from "@/domain/types";
 import { allQuotes, launchableQuotes } from "./quotes";
 import { resolveConfig, seedConfigKeys } from "@/launch/config-keys";
 import { keeperTopUp } from "./keeper-topup";
+import { checkTx, walletTx, type WalletTx } from "./tx-check";
 
 const g = globalThis as { __quantsConfigSeed?: Promise<number> };
 
@@ -23,17 +24,26 @@ function seedOnce(ctx: WebContext) {
 
 const Body = z.object({
   devBuySol: z.string().regex(/^\d+$/, "First buy must be a whole number of lamports").default("0"),
+  /** Pair token base units an earlier swap step bought for the first buy; when set no swap is built again. */
+  quoteBought: z.string().regex(/^\d+$/, "Bought amount must be a whole number").optional(),
   quoteMint: z.string(),
   creator: z.string().regex(/^[1-9A-HJ-NP-Za-km-z]{32,44}$/, "Creator wallet address is not valid"),
   basket: z.array(z.object({ mint: z.string() }).passthrough()).max(10).default([]),
 }).passthrough();
 
-/** `optional`: the launch goes on if it fails (a config key another launch created first). */
-export type UnsignedTx = { base64: string; versioned: boolean; optional?: boolean };
+export type LaunchStep =
+  | { step: "config"; transaction: WalletTx }
+  | { step: "swap"; transaction: WalletTx; quoteBought: string }
+  | { step: "launch"; transaction: WalletTx; mint: string; pool: string; settingsVersion: number };
 
-// A first buy in any pair token other than SOL is paid in SOL: a Jupiter swap runs first and the curve buy is capped at the swap's slippage floor.
-export async function prepareWithSwap(ctx: WebContext, raw: unknown) {
-  const { devBuySol, ...rest } = Body.parse(raw);
+/**
+ * One wallet prompt per call, in order: create the config key when the pair and fee have none yet, swap SOL to the
+ * pair token for a first buy in a pair other than SOL, then the launch. The client calls again after each step
+ * confirmed (with `quoteBought` after the swap), so every transaction is built and simulated against current state.
+ * A first buy in a pair other than SOL is capped at the swap's slippage floor.
+ */
+export async function prepareWithSwap(ctx: WebContext, raw: unknown): Promise<LaunchStep> {
+  const { devBuySol, quoteBought, ...rest } = Body.parse(raw);
   const prefix = ctx.uploadPrefix;
   for (const [field, label] of [["uri", "Metadata"], ["image", "Image"]] as const) {
     const v = (rest as Record<string, unknown>)[field];
@@ -49,14 +59,12 @@ export async function prepareWithSwap(ctx: WebContext, raw: unknown) {
     return { ...b, symbol: t?.symbol, decimals: t?.decimals };
   }));
   const sol = BigInt(devBuySol);
-  const transactions: UnsignedTx[] = [];
-  let devBuyQuoteAmount = sol;
-  if (rest.quoteMint !== NATIVE_MINT && sol > 0n) {
-    const q = await ctx.jupiter.quote(NATIVE_MINT, rest.quoteMint, sol, slippageBps);
-    if (!q) throw new LaunchError("invalid_input", "No route to buy the pair token right now. Try again, or launch without a first buy.");
-    devBuyQuoteAmount = (q.outAmount * BigInt(10_000 - slippageBps)) / 10_000n;
-    transactions.push({ base64: (await ctx.jupiter.buildUnsignedSwap(q, rest.creator)).base64, versioned: true });
-  }
+  const paired = rest.quoteMint !== NATIVE_MINT;
+  const swap = paired && sol > 0n && quoteBought === undefined
+    ? await ctx.jupiter.quote(NATIVE_MINT, rest.quoteMint, sol, slippageBps)
+    : undefined;
+  if (swap === null) throw new LaunchError("invalid_input", "No route to buy the pair token right now. Try again, or launch without a first buy.");
+  const devBuyQuoteAmount = !paired ? sol : swap ? (swap.outAmount * BigInt(10_000 - slippageBps)) / 10_000n : BigInt(quoteBought ?? "0");
   const quotes = await allQuotes(ctx);
   const launchable = await launchableQuotes(ctx, quotes);
   await seedOnce(ctx);
@@ -72,8 +80,21 @@ export async function prepareWithSwap(ctx: WebContext, raw: unknown) {
       isVerified: (m) => ctx.jupiter.isVerified(m), tokenProgramOf: ctx.tokenProgramOf,
     },
     { ...rest, devBuyQuoteAmount: devBuyQuoteAmount.toString(), devBuyMinOut: "0" },
+    { stopBeforeLaunch: swap !== undefined },
   );
-  if (p.setupTransaction) transactions.unshift({ base64: p.setupTransaction, versioned: false, optional: true });
-  transactions.push({ base64: p.transaction, versioned: false });
-  return { mint: p.mint, pool: p.pool, settingsVersion: p.settingsVersion, transactions };
+  if (p.step === "config") {
+    // Optional: when another launch created the same config key first, this one fails and the launch goes on.
+    const transaction = walletTx(p.transaction, { optional: true });
+    await checkTx(ctx.conn, transaction);
+    return { step: "config", transaction };
+  }
+  if (p.step === "ready") {
+    if (!swap) throw new Error("ready without a swap");
+    const transaction: WalletTx = { base64: (await ctx.jupiter.buildUnsignedSwap(swap, rest.creator)).base64, versioned: true };
+    await checkTx(ctx.conn, transaction);
+    return { step: "swap", transaction, quoteBought: devBuyQuoteAmount.toString() };
+  }
+  const transaction = walletTx(p.transaction);
+  await checkTx(ctx.conn, transaction);
+  return { step: "launch", transaction, mint: p.mint, pool: p.pool, settingsVersion: p.settingsVersion };
 }

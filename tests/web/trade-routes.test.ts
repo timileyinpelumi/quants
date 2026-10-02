@@ -52,6 +52,16 @@ test("rejects bad input with readable errors", async () => {
 test("builds an unsigned swap for the owner", async () => {
   const c = await setup();
   const r = await (await swap({ mint: "CATmint", side: "buy", amount: "5", minOut: "4", owner: OWNER })).json();
-  expect(r.transaction).toEqual({ base64: "c3dhcA==", versioned: false });
+  expect(r.transaction.versioned).toBe(false);
+  expect(r.transaction.signatures).toBeUndefined();
   expect((c as any).trade.built[0]).toMatchObject({ side: "buy", amountIn: 5n, minOut: 4n, owner: OWNER });
+  expect(c.simulated.length).toBe(1);
+});
+
+test("a swap that would fail on chain is refused before it reaches the wallet", async () => {
+  const c = await setup();
+  c.conn.simulateTransaction = async () => ({ context: { slot: 1 }, value: { err: { InstructionError: [2, { Custom: 1 }] }, logs: ["Program log: Error: insufficient funds"], accounts: null, unitsConsumed: 0, returnData: null } });
+  const r = await swap({ mint: "CATmint", side: "buy", amount: "5", minOut: "4", owner: OWNER });
+  expect(r.status).toBe(400);
+  expect((await r.json()).error).toEqual({ code: "simulation_failed", message: "Your wallet does not have enough balance for this. Lower the amount and try again." });
 });

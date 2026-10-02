@@ -1,5 +1,6 @@
 import type { JupiterPort, SwapQuote } from "../../src/jupiter/port";
 import type { FakeChain } from "./fake-chain";
+import { fakeV0Tx } from "./fake-tx";
 
 export class FakeJupiter implements JupiterPort {
   rates = new Map<string, number>();
@@ -18,5 +19,5 @@ export class FakeJupiter implements JupiterPort {
   async isVerified() { return true; }
   async searchVerified() { return []; }
   async popularVerified() { return []; }
-  async buildUnsignedSwap() { return { base64: "c3dhcA==", lastValidBlockHeight: 1n }; }
+  async buildUnsignedSwap(_q: SwapQuote, user: string) { return { base64: fakeV0Tx(user), lastValidBlockHeight: 1n }; }
 }

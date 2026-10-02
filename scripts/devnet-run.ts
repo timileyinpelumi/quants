@@ -20,7 +20,7 @@ import { KaminoBackend } from "../src/staking/kamino";
 import { swapPortFor } from "../src/jupiter/select";
 import { poolTokens } from "../src/jupiter/damm";
 import { defaultSettings, loadLatestSettings, saveSettings } from "../src/domain/settings";
-import { prepareLaunch } from "../src/launch/prepare";
+import { prepareLaunch, launchOnly } from "../src/launch/prepare";
 import { confirmLaunch } from "../src/launch/confirm";
 import { runKeeper, ReconcileError } from "../src/keeper/run";
 import { NATIVE_MINT } from "../src/domain/types";
@@ -202,12 +202,12 @@ await step("launch", async () => {
     } catch (err) {
       note(`Launch metadata was not uploaded (${String(err).slice(0, 120)}); the launch uses a placeholder URI.`);
     }
-    const p = await prepareLaunch(
+    const p = launchOnly(await prepareLaunch(
       { sql, meteora, configFor: staticConfigs(configKeys), quoteMints: [NATIVE_MINT], isVerified: (m) => jupiter.isVerified(m),
         tokenProgramOf: async (m) => (await conn.getAccountInfo(new PublicKey(m)))?.owner.toBase58() ?? "" },
       { name: "Devnet Cat", symbol: "DCAT", uri, creator: A.publicKey.toBase58(), quoteMint: NATIVE_MINT, feeTierBps: FEE_TIER_BPS,
         basket: basket.map(([s, w]) => ({ mint: pick(s).mint, symbol: s, decimals: pick(s).decimals, weightBps: w })), devBuyQuoteAmount: String(0.05 * LAMPORTS_PER_SOL) },
-    );
+    ));
     const tx = fromBase64(p.transaction);
     tx.partialSign(A);
     state.prepared = { mint: p.mint, pool: p.pool, sig: bs58.encode(tx.signature!) };

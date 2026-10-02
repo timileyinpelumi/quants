@@ -3,7 +3,7 @@ import { freshDb } from "../helpers/db";
 import { FakeChain } from "../helpers/fake-chain";
 import { FakeMeteora } from "../helpers/fake-meteora";
 import { markConfigLive, resolveConfig, seedConfigKeys, thresholdOf } from "../../src/launch/config-keys";
-import { prepareLaunch } from "../../src/launch/prepare";
+import { prepareLaunch, launchOnly } from "../../src/launch/prepare";
 import { defaultSettings, saveSettings } from "../../src/domain/settings";
 import { NATIVE_MINT } from "../../src/domain/types";
 
@@ -78,17 +78,32 @@ test("config keys from the env are recorded with their on-chain threshold and re
   expect(await resolveConfig(deps, { mint: STOCK, decimals: 8, graduation: 50, tradingOnly: true }, 300)).toBeNull();
 });
 
-test("prepare with a config to create quotes the first buy from its parameters and returns the setup transaction", async () => {
+test("a launch on a pair with no config key yet returns the config step alone; once it is on chain the next call returns the launch", async () => {
   const { sql, meteora, deps } = await setup();
-  const r = await prepareLaunch({
-    sql, meteora, quoteMints: [NATIVE_MINT], configFor: (q, f) => resolveConfig(deps, { ...SOL, mint: q }, f),
+  const prepDeps = {
+    sql, meteora, quoteMints: [NATIVE_MINT], configFor: (q: string, f: number) => resolveConfig(deps, { ...SOL, mint: q }, f),
     isVerified: async () => true, tokenProgramOf: async () => "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
-  }, {
+  };
+  const input = {
     name: "Cat", symbol: "CAT", uri: "https://x.test/cat.json", creator: "Creator111111111111111111111111111111111111",
     quoteMint: NATIVE_MINT, feeTierBps: 200, devBuyQuoteAmount: "1000", basket: [{ mint: "Zec1111111111111111111111111111111111111111", weightBps: 10000 }],
-  });
-  expect(typeof r.setupTransaction).toBe("string");
+  };
+  const first = await prepareLaunch(prepDeps, input);
+  expect(first.step).toBe("config");
+  if (first.step !== "config") return;
   expect(meteora.firstBuyQuotes[0]!.configKey).toBe("new:200");
-  const [p] = await sql`select config_key from prepared_launches`;
-  expect(p.config_key).toBe(meteora.launches[0]!.configKey);
+  expect(meteora.launches).toEqual([]);
+  expect(meteora.configTxs[0]!.create.config.publicKey.toBase58()).toBe(first.configKey);
+  expect((await sql`select mint from prepared_launches`).length).toBe(0);
+  // asking again before it lands builds the same config key, never a second one
+  const again = await prepareLaunch(prepDeps, input);
+  expect(again).toMatchObject({ step: "config", configKey: first.configKey });
+
+  meteora.configs.set(first.configKey, { feeClaimer: KEEPER, quoteMint: NATIVE_MINT, threshold: 85_000_000_000n });
+  const launch = launchOnly(await prepareLaunch(prepDeps, input));
+  expect(meteora.launches[0]!.configKey).toBe(first.configKey);
+  const [p] = await sql`select config_key from prepared_launches where mint = ${launch.mint}`;
+  expect(p.config_key).toBe(first.configKey);
+  const [row] = await sql`select status from config_keys where address = ${first.configKey}`;
+  expect(row.status).toBe("live");
 });

@@ -13,7 +13,7 @@ import type { JupiterPort, SwapQuote } from "../src/jupiter/port";
 import { buildQuantsConfig, configKeyName } from "../src/meteora/config";
 import { migrate } from "../src/db/migrate";
 import { defaultSettings, saveSettings } from "../src/domain/settings";
-import { prepareLaunch } from "../src/launch/prepare";
+import { prepareLaunch, launchOnly } from "../src/launch/prepare";
 import { confirmLaunch } from "../src/launch/confirm";
 import { runKeeper } from "../src/keeper/run";
 import { NATIVE_MINT } from "../src/domain/types";
@@ -55,12 +55,12 @@ await saveSettings(sql, defaultSettings(ours.toBase58()), "e2e");
 log("3. database migrated, default settings saved");
 
 const meteora = new MeteoraLive(chain, DAMM_CUSTOM);
-const prepared = await prepareLaunch(
+const prepared = launchOnly(await prepareLaunch(
   { sql, meteora, configFor: staticConfigs(configKeys), quoteMints: [NATIVE_MINT, ours.toBase58()], isVerified: async () => true,
     tokenProgramOf: async (m: string) => (await conn.getAccountInfo(new PublicKey(m)))!.owner.toBase58() },
   { name: "Cat", symbol: "CAT", uri: "https://example.com/cat.json", creator: creator.publicKey.toBase58(), quoteMint: NATIVE_MINT, feeTierBps: 200,
     basket: [{ mint: zec.toBase58(), weightBps: 10_000 }], devBuyQuoteAmount: "100000000" },
-);
+));
 const launchTx = Transaction.from(Buffer.from(prepared.transaction, "base64"));
 launchTx.partialSign(creator);
 const launchSig = await conn.sendRawTransaction(launchTx.serialize());
