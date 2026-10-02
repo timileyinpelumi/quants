@@ -136,3 +136,12 @@ test("a failed simulation is readable and nothing is sent", async () => {
   expect(err.code).toBe("simulation_failed");
   expect(calls.sent.length).toBe(0);
 });
+
+test("a shortage of SOL found after the wallet signed says how much the launch needs", async () => {
+  const sql = await freshDb();
+  const { mint, base64 } = issued();
+  const w = await issueCosign(sql, walletTx(base64), [mint], 50_000_000n);
+  const { conn } = fakeConn([{ InsufficientFundsForRent: { account_index: 0 } }]);
+  const err = await cosignAndSend({ sql, conn }, { id: w.cosign!, transaction: walletSigned(w.base64) }).catch((e) => e);
+  expect(err.message).toBe("Your wallet needs about 0.05 SOL for this launch. Add SOL and try again.");
+});

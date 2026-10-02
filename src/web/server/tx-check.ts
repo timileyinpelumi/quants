@@ -1,10 +1,12 @@
 import { VersionedTransaction, type Connection, type TransactionError } from "@solana/web3.js";
 import { LaunchError } from "@/launch/prepare";
+import { needSolMessage, SHORT_OF_SOL } from "@/domain/launch-cost";
 
 /** What the wallet gets. `cosign`: the server signs after the wallet, through /api/launch/cosign with this id. */
 export type WalletTx = { base64: string; versioned: boolean; cosign?: string };
 
 export const TX_LIMIT = 1232;
+
 
 /** Drops any signatures already on the transaction: the wallet signs first, server signers sign after it through cosign. */
 export function walletTx(base64: string, opts: { versioned?: boolean } = {}): WalletTx {
@@ -13,8 +15,9 @@ export function walletTx(base64: string, opts: { versioned?: boolean } = {}): Wa
   return { base64: Buffer.from(tx.serialize()).toString("base64"), versioned: opts.versioned ?? false };
 }
 
-function readable(err: TransactionError, logs: string[], _need?: bigint): string {
+function readable(err: TransactionError, logs: string[], need?: bigint): string {
   const text = `${JSON.stringify(err)}\n${logs.join("\n")}`;
+  if (need !== undefined && SHORT_OF_SOL.test(text)) return needSolMessage(need);
   if (err === "AccountNotFound") return "Your wallet has no SOL yet. Add SOL for network fees and try again.";
   if (err === "InsufficientFundsForFee") return "Your wallet does not have enough SOL for the network fee.";
   if (/InsufficientFundsForRent/.test(text)) return "Your wallet does not have enough SOL to cover the account rent for this.";
@@ -28,7 +31,7 @@ function readable(err: TransactionError, logs: string[], _need?: bigint): string
  * Refuses a transaction that is over the size limit or does not simulate on its own against current chain state.
  * The RPC swaps in its own blockhash, so a node a few slots behind the one that built it cannot fail the check.
  */
-export async function checkTx(conn: Pick<Connection, "simulateTransaction">, t: { base64: string }): Promise<void> {
+export async function checkTx(conn: Pick<Connection, "simulateTransaction">, t: { base64: string }, need?: bigint): Promise<void> {
   const bytes = Buffer.from(t.base64, "base64");
   if (bytes.length > TX_LIMIT) throw new LaunchError("tx_too_large", "This transaction is too large to send. Try a shorter name or symbol.");
   const tx = VersionedTransaction.deserialize(bytes);
@@ -39,7 +42,7 @@ export async function checkTx(conn: Pick<Connection, "simulateTransaction">, t: 
     throw new LaunchError("simulation_failed", "Could not check this transaction with the network right now. Try again in a moment.");
   }
   if (!res.value.err) return;
-  throw simulationError(res.value.err, res.value.logs ?? []);
+  throw simulationError(res.value.err, res.value.logs ?? [], need);
 }
 
 export function simulationError(err: TransactionError, logs: string[], need?: bigint): LaunchError {

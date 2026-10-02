@@ -74,7 +74,7 @@ test("a launch that would fail on chain is refused with a readable error and nev
   c.conn.simulateTransaction = async () => ({ context: { slot: 1 }, value: { err: "AccountNotFound", logs: [], accounts: null, unitsConsumed: 0, returnData: null } }) as any;
   const r = await post(prepare, body({ devBuySol: "1000000000" }));
   expect(r.status).toBe(400);
-  expect((await r.json()).error).toEqual({ code: "simulation_failed", message: "Your wallet has no SOL yet. Add SOL for network fees and try again." });
+  expect((await r.json()).error).toEqual({ code: "simulation_failed", message: "Your wallet needs about 1.03 SOL for this launch. Add SOL and try again." });
 });
 
 const STOCK = "Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh";

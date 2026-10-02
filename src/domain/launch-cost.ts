@@ -23,6 +23,25 @@ export function launchCost(s: Pick<Settings, "tiers">, rewardCount: number, o: {
   return { rent };
 }
 
+// Rent a launcher pays: a DBC config key (about 1,050 bytes), and for the launch the pool, mint, two vaults,
+// token metadata and the first buy's token account. Rounded up; the wallet shows the exact amount.
+export const CONFIG_RENT = 8_000_000n;
+export const LAUNCH_RENT = 20_000_000n;
+// Network and priority fees for up to three transactions.
+export const LAUNCH_FEES = 1_000_000n;
+
+/** Lamports a launcher's wallet needs for the whole launch: config rent when the pair has no key yet, launch rent, the first buy, fees and any keeper top up. */
+export function walletNeed(o: { config: boolean; firstBuy: bigint; keeperTopUp?: bigint }): bigint {
+  return (o.config ? CONFIG_RENT : 0n) + LAUNCH_RENT + o.firstBuy + LAUNCH_FEES + (o.keeperTopUp ?? 0n);
+}
+
+/** Errors that mean the wallet is short of SOL, from a simulation or a wallet's own send. */
+export const SHORT_OF_SOL = /AccountNotFound|InsufficientFundsForFee|InsufficientFundsForRent|insufficient lamports|insufficient funds|no record of a prior credit/i;
+
+/** `need` is rounded up to 0.01 SOL. */
+export const needSolMessage = (need: bigint) =>
+  `Your wallet needs about ${(Number((need + 9_999_999n) / 10_000_000n) / 100).toFixed(2)} SOL for this launch. Add SOL and try again.`;
+
 /** Percent of the farm rent the stakers' share covers, floored so it reads 100 only once staking can open. */
 export function opensAt(p: { valueLamports: bigint; rentLamports: bigint }): number {
   if (p.rentLamports <= 0n) return 100;

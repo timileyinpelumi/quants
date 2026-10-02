@@ -59,6 +59,21 @@ test("a failed simulation is a readable error", async () => {
   }
 });
 
+test("during a launch, any shortage of SOL says how much the launch needs", async () => {
+  const cases: object[] = [
+    { err: "AccountNotFound", logs: [] },
+    { err: "InsufficientFundsForFee", logs: [] },
+    { err: { InsufficientFundsForRent: { account_index: 0 } }, logs: [] },
+    { err: { InstructionError: [0, { Custom: 1 }] }, logs: ["Transfer: insufficient lamports 4900000, need 8000000"] },
+  ];
+  for (const value of cases) {
+    const err = await checkTx(sim(value).conn, walletTx(presigned().serialize({ requireAllSignatures: false }).toString("base64")), 41_000_000n).catch((e) => e);
+    expect(err.message).toBe("Your wallet needs about 0.05 SOL for this launch. Add SOL and try again.");
+  }
+  const other = await checkTx(sim({ err: { InstructionError: [1, { Custom: 42 }] }, logs: [] }).conn, walletTx(presigned().serialize({ requireAllSignatures: false }).toString("base64")), 41_000_000n).catch((e) => e);
+  expect(other.message).toContain("would fail on chain");
+});
+
 test("an RPC that cannot simulate is a readable error, not a transaction sent blind", async () => {
   const conn = { simulateTransaction: async () => { throw new Error("fetch failed"); } } as any;
   await expect(checkTx(conn, walletTx(presigned().serialize({ requireAllSignatures: false }).toString("base64")))).rejects.toMatchObject({ code: "simulation_failed" });
