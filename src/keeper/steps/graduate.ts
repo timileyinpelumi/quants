@@ -18,7 +18,7 @@ export async function graduateStep(deps: KeeperDeps, launch: LaunchRow, s: Versi
   }
   const pos = await deps.meteora.findGraduatedPosition(launch.configKey, launch.mint, launch.quoteMint);
   if (!pos) return launch;
-  await deps.sql`update launches set status = 'graduated', damm_pool = ${pos.dammPool}, damm_position = ${pos.position},
+  await deps.sql`update launches set status = 'graduated', graduated_at = coalesce(graduated_at, now()), damm_pool = ${pos.dammPool}, damm_position = ${pos.position},
     damm_position_nft_account = ${pos.positionNftAccount} where id = ${launch.id}`;
   return { ...launch, status: "graduated", dammPool: pos.dammPool, dammPosition: pos.position, dammPositionNftAccount: pos.positionNftAccount };
 }

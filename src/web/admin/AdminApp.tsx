@@ -7,6 +7,7 @@ import { shortAddr } from "@/web/ui/format";
 import { LoadMore } from "@/web/ui/LoadMore";
 import { CopyButton } from "@/web/ui/CopyButton";
 import { SettingsEditor, type AdminSettings, type Pair } from "./SettingsEditor";
+import { AnalyticsPanel } from "./AnalyticsPanel";
 
 type Settings = AdminSettings;
 type WalletRow = { role: string; index: number; path: string; address: string | null; solscan: string | null; lamports: string | null; low: boolean };
@@ -28,7 +29,7 @@ export function AdminApp({ pairs }: { pairs: Pair[] }) {
   const [signedIn, setSignedIn] = useState<boolean | null>(null);
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
-  const [tab, setTab] = useState<"settings" | "keeper" | "wallets" | "baskets" | "votes">("settings");
+  const [tab, setTab] = useState<"settings" | "analytics" | "keeper" | "wallets" | "baskets" | "votes">("settings");
   const [wallets, setWallets] = useState<WalletRow[] | null>(null);
   const [votes, setVotes] = useState<VoteRow[] | null>(null);
   const [settings, setSettings] = useState<Settings | null>(null);
@@ -146,7 +147,7 @@ export function AdminApp({ pairs }: { pairs: Pair[] }) {
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
         <h1 className="m-0 font-display font-black text-[40px] md:text-[56px] tracking-[-0.03em] leading-none">Admin</h1>
         <div className="flex flex-wrap items-center gap-3">
-          <Segmented label="Section" value={tab} onChange={setTab} options={[{ value: "settings", label: "Settings" }, { value: "keeper", label: "Keeper" }, { value: "wallets", label: "Wallets" }, { value: "baskets", label: "Baskets" }, { value: "votes", label: "Votes" }]} />
+          <Segmented label="Section" value={tab} onChange={setTab} options={[{ value: "settings", label: "Settings" }, { value: "analytics", label: "Analytics" }, { value: "keeper", label: "Keeper" }, { value: "wallets", label: "Wallets" }, { value: "baskets", label: "Baskets" }, { value: "votes", label: "Votes" }]} />
           <Button variant="ghost" onClick={signOut}>Sign out</Button>
         </div>
       </div>
@@ -155,6 +156,8 @@ export function AdminApp({ pairs }: { pairs: Pair[] }) {
       {tab === "settings" && settings && version !== null && (
         <SettingsEditor initial={settings} version={version} pairs={pairs} onSave={save} />
       )}
+
+      {tab === "analytics" && <AnalyticsPanel />}
 
       {tab === "keeper" && status && (
         <section className="flex flex-col gap-8">
