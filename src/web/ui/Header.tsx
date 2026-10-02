@@ -34,7 +34,7 @@ export async function Header({ active }: { active: HeaderKey }) {
     <header className="border-b line">
       <div className="wrap flex items-center gap-3 md:gap-8 py-3 md:py-5">
         <Link href="/" className="flex items-center gap-2.5 shrink-0 min-h-11" aria-label="quants home">
-          <img src="/brand/quants-icon.svg" alt="" width={32} height={32} className="w-8 h-8 rounded-lg" />
+          <img src="/brand/quants-icon.svg" alt="" width={32} height={32} className="w-10 h-10 md:w-8 md:h-8 rounded-lg" />
           <span className="font-display font-black text-xl md:text-2xl tracking-tight max-[359px]:hidden">quants</span>
         </Link>
         <nav aria-label="Main" className="hidden xl:flex gap-7 text-[15px] font-medium shrink-0">
