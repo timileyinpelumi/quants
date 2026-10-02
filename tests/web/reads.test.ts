@@ -80,7 +80,7 @@ test("launchDetail sums paid out and burned, and weights tier shares by multipli
 test("feeSummary totals every split by its settings, plus what is held for stakers and when they were last paid", async () => {
   const c = await makeWebContext();
   const a = await launch(c, "CAT");
-  expect(await feeSummary(c.sql, a.id)).toEqual({ earned: "0", stakers: "0", creator: "0", platform: "0", meteora: "0", held: "0", lastPaidAt: null });
+  expect(await feeSummary(c.sql, a.id)).toEqual({ earned: "0", stakers: "0", creator: "0", platform: "0", lp: "0", meteora: "0", held: "0", lastPaidAt: null });
   await step(c, a.id, "s1", "split", { amount: "1000" });
   await step(c, a.id, "s2", "split", { amount: "2000" });
   const held = await beginStep(c.sql, { launchId: a.id, idemKey: "h", kind: "split", settingsVersion: 1, detail: { amount: "0" } });

@@ -117,6 +117,7 @@ export default async function DocsPage() {
               ["Creator", f(kept * s.split.creatorBps / 10_000)],
             ];
           })()} />
+          <P>After graduation, pool LP fees go to the platform. The graduated pool&apos;s liquidity is locked forever in a position quants holds, and the fees that position earns are paid to the platform treasury in full. The split above applies to the bonding curve&apos;s trading fees.</P>
           <P>Fees are collected every few minutes. The creator share is sent to the creator once it passes {fmtAmount(s.creatorPayoutMin[SOL] ?? 0n, 9)} SOL. Until staking opens, the stakers&apos; share is held for the token and first pays for its staking farms.</P>
 
           <H2 id="basket">The reward basket</H2>
@@ -142,7 +143,7 @@ export default async function DocsPage() {
           <P>Rewards already earned stay yours. 100% of every penalty is burned. quants never receives any of it.</P>
 
           <H2 id="graduation">Graduation</H2>
-          <P>New tokens trade on a bonding curve. When the curve has raised the amount below in its pair token, the token graduates to a Meteora DAMM v2 pool with permanently locked liquidity. Trading, fees, rewards and staking continue as before.</P>
+          <P>New tokens trade on a bonding curve. When the curve has raised the amount below in its pair token, the token graduates to a Meteora DAMM v2 pool with permanently locked liquidity. Trading and staking continue, and rewards already bought keep streaming to stakers. After graduation, pool LP fees go to the platform.</P>
           <Table head={["Paired with", "Graduates at"]} rows={pairs.filter((c) => c.graduation > 0).map((c) => [c.name === "quants" ? `${c.symbol} (platform token)` : `${c.symbol} (${c.name})`, `${c.graduation.toLocaleString("en-US")} ${c.symbol}`])} />
 
           {s.stockPairs && <>
@@ -158,18 +159,14 @@ export default async function DocsPage() {
           <P>Launched tokens are volatile and most lose value. Reward tokens can lose value too. Smart contracts can have bugs. Only use money you can afford to lose. Read the <Link href="/terms" className="text-accent">terms and risks</Link>.</P>
 
           <H2 id="wallets">Wallets and programs</H2>
-          <P>Every fee quants collects moves through these wallets, and every launch, trade and stake runs on these programs. Each links to its record on Solscan.</P>
-          <Table text head={["Address", "What it does"]} rows={[
-            ...([
-              [ctx.keeperAddress, "Keeper. Collects trading fees, buys reward tokens, funds the farms and pays creators"],
-              [ctx.spillWallet.toBase58(), "Penalty wallet. Receives early exit penalties, which the keeper burns"],
-              ...(process.env.TREASURY_ADDRESS ? [[process.env.TREASURY_ADDRESS, "Treasury. Receives the platform share"]] : []),
-              ["dbcij3LWUppWqq96dh6gJWwBifmcGfLSB5D4DuSMaqN", "Meteora Dynamic Bonding Curve program"],
-              ["cpamdpZCGKUy5JxQXB4dcpGPiikHawvSWAd6mEn1sGG", "Meteora DAMM v2 program, where graduated tokens trade"],
-              ["FarmsPZpWu9i7Kky8tPN37rs2TpmMrAZrC7S7vJa91Hr", "Kamino Farms program, where stakes and rewards live"],
-            ] as [string, string][]).map(([a, what]) => [
-              <a key={a} href={`https://solscan.io/account/${a}`} target="_blank" rel="noreferrer" className="font-mono text-accent">{a.slice(0, 4)}…{a.slice(-4)}</a>, what,
-            ]),
+          <P>Every fee quants collects moves through these wallets, and every launch, trade and stake runs on these programs.</P>
+          <Table text head={["Wallet or program", "What it does"]} rows={[
+            ["Keeper", "Collects trading fees, buys reward tokens, funds the farms and pays creators"],
+            ["Penalty wallet", "Receives early exit penalties, which the keeper burns"],
+            ["Treasury", "Receives the platform share and the LP fees of graduated pools"],
+            ["Meteora Dynamic Bonding Curve", "Where new tokens trade until they graduate"],
+            ["Meteora DAMM v2", "Where graduated tokens trade"],
+            ["Kamino Farms", "Where stakes and rewards live"],
           ]} />
 
           <H2 id="faq">Questions</H2>
@@ -179,6 +176,7 @@ export default async function DocsPage() {
             ["Why at most ten reward tokens?", "Kamino farms hold ten reward tokens each. Fewer tokens also means bigger payouts per token."],
             ["What if a reward token cannot be bought?", "Its share waits and is bought on a later run. The other basket tokens are unaffected."],
             ["Where does the platform share go?", "To the platform treasury. It pays for infrastructure and development."],
+            ["Who gets the fees after a token graduates?", "The curve's trading fees stop and the token trades in a Meteora pool. The LP fees of that pool go to the platform."],
           ].map(([q, a]) => (
             <div key={q} className="flex flex-col gap-1.5 py-4 border-t line">
               <h3 className="m-0 font-display font-bold text-lg">{q}</h3>

@@ -47,7 +47,13 @@ What stays in the env and why: database, RPC and Jupiter URLs and keys, Cloudina
 
 - **Keeper.** Fee claimer on every DBC config, owner of every graduated LP position, admin of every Kamino farm. Holds claimed fees between keeper runs and pays rent for farms. That rent comes out of each launch's stakers' share (see Staking opens), so the ledger moves it out of the basket before the keeper spends it. Keep at least 1 SOL above what the ledger says it owes for transaction fees and retries.
 - **Spill.** Only receives early-exit penalties from farms. The keeper burns from it. It should never hold anything else.
-- **Treasury.** Receives the platform share. Receive only. It must already exist on-chain (hold at least the rent-exempt minimum of SOL), or small SOL payouts to it fail.
+- **Treasury.** Receives the platform share of bonding curve fees and all LP fees of graduated pools. Receive only.
+
+Public pages never show these addresses. The admin Wallets tab does.
+
+### Graduated pool LP fees
+
+After graduation, pool LP fees go to the platform. The keeper claims the fees of each graduated launch's locked DAMM v2 position (step `claim:<id>:damm`) into the `lp` bucket in `escrow`, separate from `unsplit`, which holds the bonding curve's partner fees. The split step moves the whole `lp` balance to `treasury` in its own `split` row with `detail.lp = true`; only `unsplit` is split between basket, creator and treasury. Payout then sends `treasury` as usual. Both buckets are keeper balances, so reconcile counts them like any other. The token page's fee summary counts LP fees in Platform and reports them as `lp`. It must already exist on-chain (hold at least the rent-exempt minimum of SOL), or small SOL payouts to it fail.
 
 ## One-time setup
 

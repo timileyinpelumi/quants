@@ -7,7 +7,7 @@ import type { DeltaResolver } from "../../ledger/ledger";
 export const claimResolver = (deps: KeeperDeps): DeltaResolver => async (row, sig) => {
   const mint = row.detail.quoteMint as string;
   const amount = row.detail.source === "dbc" ? BigInt(row.detail.amount) : await deps.chain.received(sig, deps.wallets.keeper, mint);
-  return amount > 0n ? [{ bucket: "unsplit", mint, amount }] : [];
+  return amount > 0n ? [{ bucket: row.detail.source === "damm" ? "lp" : "unsplit", mint, amount }] : [];
 };
 
 // DBC partner fees only grow, so claiming with maxQuoteAmount = amount transfers exactly amount.

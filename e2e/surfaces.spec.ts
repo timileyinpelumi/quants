@@ -101,6 +101,7 @@ test("docs, terms, portfolio and 404 render", async ({ page }) => {
   await page.goto("/docs");
   await expect(page.getByRole("heading", { name: "Leaving early" })).toBeVisible();
   await expect(page.getByText(/100% of every penalty is burned/)).toBeVisible();
+  await expect(page.locator('a[href*="solscan.io/account"]')).toHaveCount(0);
   await page.goto("/terms");
   await expect(page.getByRole("heading", { name: "Terms and risks", level: 1 })).toBeVisible();
   await page.goto("/portfolio");

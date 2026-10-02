@@ -82,28 +82,35 @@ export async function launchDetail(ctx: WebContext, mint: string): Promise<Launc
   };
 }
 
-/** All in the launch's quote token, base units. `earned` is what reached quants after Meteora's cut, including fees not yet split. */
-export type FeeSummary = { earned: string; stakers: string; creator: string; platform: string; meteora: string; held: string; lastPaidAt: string | null };
+/**
+ * All in the launch's quote token, base units. `earned` is what reached quants after Meteora's cut, including fees not yet split.
+ * `lp`: fees from the graduated pool's locked LP position, which all go to the platform; `platform` includes them.
+ */
+export type FeeSummary = { earned: string; stakers: string; creator: string; platform: string; lp: string; meteora: string; held: string; lastPaidAt: string | null };
 
 export async function feeSummary(sql: SQL, launchId: number): Promise<FeeSummary> {
   const splits = await sql`
-    select d.detail->>'amount' as amount, s.data->'split' as split
+    select d.detail->>'amount' as amount, (d.detail->>'lp') = 'true' as lp, s.data->'split' as split
     from distributions d join settings s on s.version = d.settings_version
     where d.launch_id = ${launchId} and d.kind = 'split' and d.status = 'confirmed'`;
-  let stakers = 0n, creator = 0n, platform = 0n;
+  let stakers = 0n, creator = 0n, platform = 0n, lp = 0n;
   for (const r of splits) {
+    if (r.lp) { lp += BigInt(r.amount ?? "0"); continue; }
     const split = typeof r.split === "string" ? JSON.parse(r.split) : r.split;
     const f = splitFees(BigInt(r.amount ?? "0"), split);
     stakers += f.basket; creator += f.creator; platform += f.platform;
   }
   const [e] = await sql`
     select coalesce(sum(e.amount) filter (where e.bucket = 'unsplit'), 0)::text as unsplit,
+      coalesce(sum(e.amount) filter (where e.bucket = 'lp'), 0)::text as lp_unsplit,
       coalesce(sum(e.amount) filter (where e.bucket = 'basket'), 0)::text as held,
       (select max(updated_at) from distributions where launch_id = ${launchId} and kind = 'fund' and status = 'confirmed') as last_paid
     from escrow e join launches l on l.id = e.launch_id and e.mint = l.quote_mint where e.launch_id = ${launchId}`;
+  lp += BigInt(e?.lp_unsplit ?? "0");
+  platform += lp;
   const earned = stakers + creator + platform + BigInt(e?.unsplit ?? "0");
   return {
-    earned: earned.toString(), stakers: stakers.toString(), creator: creator.toString(), platform: platform.toString(),
+    earned: earned.toString(), stakers: stakers.toString(), creator: creator.toString(), platform: platform.toString(), lp: lp.toString(),
     meteora: ((earned * 20n) / 80n).toString(), held: e?.held ?? "0", lastPaidAt: e?.last_paid ? new Date(e.last_paid).toISOString() : null,
   };
 }

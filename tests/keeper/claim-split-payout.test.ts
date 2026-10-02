@@ -8,6 +8,8 @@ import { payoutStep } from "../../src/keeper/steps/payout";
 import { getBalance } from "../../src/ledger/ledger";
 import { saveSettings } from "../../src/domain/settings";
 import { NATIVE_MINT } from "../../src/domain/types";
+import { reconcile } from "../../src/keeper/run";
+import { feeSummary } from "../../src/web/server/reads";
 
 test("claim credits the exact pending partner fee, then split moves it by the settings", async () => {
   const { sql, meteora, deps, settings } = await keeperFixture();
@@ -62,7 +64,7 @@ test("payout sends treasury every run and creator only above the minimum", async
   expect(await getBalance(sql, id, "creator", NATIVE_MINT)).toBe(0n);
 });
 
-test("graduated launches claim from the DAMM position and credit the measured amount", async () => {
+test("graduated launches claim from the DAMM position and credit the measured amount to the LP bucket", async () => {
   const { sql, chain, deps, settings } = await keeperFixture();
   const id = await insertLaunch(sql, { pool: "P5", status: "graduated" });
   await sql`update launches set damm_pool = 'D5', damm_position = 'Pos5', damm_position_nft_account = 'Nft5' where id = ${id}`;
@@ -70,7 +72,8 @@ test("graduated launches claim from the DAMM position and credit the measured am
   const orig = chain.tx.bind(chain);
   chain.tx = (label) => { const t = orig(label); chain.receipts.set(t.signature, 777n); return t; };
   expect(await claimStep(deps, launch!, settings, "r1")).toBe("confirmed");
-  expect(await getBalance(sql, id, "unsplit", NATIVE_MINT)).toBe(777n);
+  expect(await getBalance(sql, id, "lp", NATIVE_MINT)).toBe(777n);
+  expect(await getBalance(sql, id, "unsplit", NATIVE_MINT)).toBe(0n);
 });
 
 test("a graduated launch still claims partner fee left on the bonding curve", async () => {
@@ -82,5 +85,48 @@ test("a graduated launch still claims partner fee left on the bonding curve", as
   chain.tx = (label) => { const t = orig(label); if (label?.startsWith("claimpos")) chain.receipts.set(t.signature, 100n); return t; };
   const [launch] = await loadLaunches(sql);
   await claimStep(deps, launch!, settings, "r1");
-  expect(await getBalance(sql, id, "unsplit", NATIVE_MINT)).toBe(600n);
+  expect(await getBalance(sql, id, "unsplit", NATIVE_MINT)).toBe(500n);
+  expect(await getBalance(sql, id, "lp", NATIVE_MINT)).toBe(100n);
+});
+
+test("LP fees go 100% to the treasury while curve fees keep the normal split, then payout sends them and the ledger reconciles", async () => {
+  const { sql, chain, meteora, deps, settings } = await keeperFixture();
+  const id = await insertLaunch(sql, { pool: "P7", status: "graduated" });
+  await sql`update launches set damm_pool = 'D7', damm_position = 'Pos7', damm_position_nft_account = 'Nft7' where id = ${id}`;
+  meteora.partnerFee.set("P7", 1_000_000n);
+  const orig = chain.tx.bind(chain);
+  chain.tx = (label) => { const t = orig(label); if (label?.startsWith("claimpos")) chain.receipts.set(t.signature, 400_000n); return t; };
+  const [launch] = await loadLaunches(sql);
+  await claimStep(deps, launch!, settings, "r1");
+  // what the keeper wallet holds after both claims
+  chain.balances.set(`${deps.wallets.keeper}:${NATIVE_MINT}`, 1_400_000n);
+  await reconcile(deps);
+  expect(await splitStep(deps, launch!, settings, "r1")).toBe(true);
+  expect(await getBalance(sql, id, "lp", NATIVE_MINT)).toBe(0n);
+  expect(await getBalance(sql, id, "unsplit", NATIVE_MINT)).toBe(0n);
+  expect(await getBalance(sql, id, "basket", NATIVE_MINT)).toBe(600_000n);
+  expect(await getBalance(sql, id, "creator", NATIVE_MINT)).toBe(250_000n);
+  expect(await getBalance(sql, id, "treasury", NATIVE_MINT)).toBe(150_000n + 400_000n);
+  await reconcile(deps);
+  const splits = await sql`select detail from distributions where kind = 'split' order by id`;
+  expect(splits.map((r: any) => r.detail)).toEqual([{ amount: "400000", lp: true }, { amount: "1000000" }]);
+  await payoutStep(deps, launch!, settings, "r1");
+  expect(await getBalance(sql, id, "treasury", NATIVE_MINT)).toBe(0n);
+  const [paid] = await sql`select detail from distributions where kind = 'payout' and detail->>'bucket' = 'treasury'`;
+  expect(paid.detail.amount).toBe("550000");
+  const fees = await feeSummary(sql, id);
+  expect(fees).toMatchObject({ lp: "400000", platform: "550000", stakers: "600000", creator: "250000", earned: "1400000" });
+});
+
+test("a trading only launch's LP fees also go to the treasury in full", async () => {
+  const { sql, chain, deps, settings } = await keeperFixture();
+  const id = await insertLaunch(sql, { pool: "P8", status: "graduated" });
+  await sql`update launches set damm_pool = 'D8', damm_position = 'Pos8', damm_position_nft_account = 'Nft8', trading_only = true where id = ${id}`;
+  const orig = chain.tx.bind(chain);
+  chain.tx = (label) => { const t = orig(label); chain.receipts.set(t.signature, 1000n); return t; };
+  const [launch] = await loadLaunches(sql);
+  await claimStep(deps, launch!, settings, "r1");
+  await splitStep(deps, launch!, settings, "r1");
+  expect(await getBalance(sql, id, "treasury", NATIVE_MINT)).toBe(1000n);
+  expect(await getBalance(sql, id, "creator", NATIVE_MINT)).toBe(0n);
 });
