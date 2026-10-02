@@ -151,6 +151,7 @@ const env = {
   ALLOW_LOCAL_URIS: "1",
   ADMIN_CODE_HASH: await hashCode(adminCode),
   ADMIN_SESSION_SECRET: Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString("hex"),
+  NEXT_PUBLIC_X_URL: "https://x.com/launchonquants",
   LOCAL_REWARD_MINTS: Object.values(rewards).map((m) => m.toBase58()).join(","),
   LOCAL_STOCKS: JSON.stringify(localStocks.map((st) => ({ mint: st.mint.toBase58(), issuer: st.issuer, symbol: st.symbol, name: st.name, icon: st.icon }))),
   LOCAL_TOKEN_LIST: JSON.stringify(Object.entries(rewards).map(([symbol, m]) => ({ mint: m.toBase58(), symbol, name: symbol, icon: null, decimals: symbol === "ZEC" ? 8 : 6, tokenProgram: "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA" }))),
