@@ -15,6 +15,8 @@ export interface StakingAdapter {
   buildConfigureFarm(i: { farm: string; stakeMint: string; lockSeconds: number; maxPenaltyBps: number; spillAccount: string }): Promise<SignedTx>;
   farmExists(farm: string): Promise<boolean>;
   totalStaked(farm: string): Promise<bigint>;
+  /** User accounts opened across these farms, read in batches. */
+  farmUsers(farms: string[]): Promise<number>;
   /** Owner of the farm's stake vault token account, used to label staked balances among holders. */
   vaultAuthority(farm: string): Promise<string>;
   rewardState(farm: string, rewardMint: string): Promise<{ available: bigint; rpsDecimals: number; decimals: number }>;

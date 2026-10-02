@@ -46,7 +46,7 @@ export async function createFarmsStep(deps: KeeperDeps, launch: LaunchRow, s: Ve
     await deps.sql`update stake_tiers set farm = ${farm} where launch_id = ${launch.id} and tier_id = ${t.tier_id}`;
   }
   if (!allDone) return "pending";
-  await deps.sql`update stake_pools set status = 'ready' where launch_id = ${launch.id}`;
+  await deps.sql`update stake_pools set status = 'ready', opened_at = coalesce(opened_at, now()) where launch_id = ${launch.id}`;
   return "ready";
 }
 

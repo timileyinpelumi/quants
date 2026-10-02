@@ -86,6 +86,12 @@ export class KaminoBackend implements StakingAdapter {
 
   async totalStaked(farm: string) { return (await this.state(farm)).totalStakedAmount; }
 
+  async farmUsers(farms: string[]) {
+    if (!farms.length) return 0;
+    const states = await this.farms.getAllFarmStatesByPubkeys(farms.map((f) => address(f)));
+    return states.reduce((n, s) => n + Number(s.farmState.numUsers), 0);
+  }
+
   async vaultAuthority(farm: string) { return String((await this.state(farm)).farmVaultsAuthority); }
 
   async rewardState(farm: string, rewardMint: string) {

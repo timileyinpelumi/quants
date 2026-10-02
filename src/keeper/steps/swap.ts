@@ -26,7 +26,7 @@ export async function swapStep(deps: KeeperDeps, launch: LaunchRow, s: Versioned
       const idemKey = `swap:${launch.id}:${runId}:${key}${outputMint}`;
       if (outputMint === input) {
         await runDbStep(deps.sql, {
-          launchId: launch.id, idemKey, kind: "swap", settingsVersion: s.version, detail: { direct: true },
+          launchId: launch.id, idemKey, kind: "swap", settingsVersion: s.version, detail: { direct: true, inputMint: input, outputMint, amountIn: amountIn.toString() },
           deltas: [{ bucket: "basket", mint: input, amount: -amountIn }, { bucket: "reward", mint: input, amount: amountIn }],
         });
         continue;

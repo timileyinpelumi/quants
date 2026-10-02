@@ -35,6 +35,8 @@ export class FakeStaking implements StakingAdapter {
   async farmRewardMints(farm: string) { return this.rewards.get(farm) ?? []; }
   async farmExists(farm: string) { return this.farms.has(farm); }
   async totalStaked(farm: string) { return this.staked.get(farm) ?? 0n; }
+  users = new Map<string, number>();
+  async farmUsers(farms: string[]) { return farms.reduce((n, f) => n + (this.users.get(f) ?? 0), 0); }
   async rewardState(farm: string, mint: string) { return { available: this.available.get(`${farm}:${mint}`) ?? 0n, rpsDecimals: 0, decimals: 6 }; }
   async buildFund(i: { farm: string; rewardMint: string; amount: bigint; rawRps: bigint }) { this.funded.push(i); return this.chain.tx("fund"); }
   async slashedAmount(farm: string) { return this.slashed.get(farm) ?? 0n; }
