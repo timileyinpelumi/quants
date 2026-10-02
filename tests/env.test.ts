@@ -1,5 +1,8 @@
 import { test, expect } from "bun:test";
-import { assertNoDevSwitches, checkWebEnv } from "../src/env";
+import { mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { assertNoDevSwitches, checkWebEnv, readKeypairFiles } from "../src/env";
 
 const SECRET = "ab".repeat(32);
 
@@ -26,4 +29,16 @@ test("the admin session secret must be at least 32 bytes of hex", () => {
 
 test("the web env check also refuses dev switches", () => {
   expect(() => checkWebEnv({ RPC_URL: "https://mainnet.example", ADMIN_SESSION_SECRET: SECRET, PINATA_JWT: "stub" })).toThrow(/dev switches/);
+});
+
+test("keypairs can be read from files", () => {
+  const dir = mkdtempSync(join(tmpdir(), "quants-env-"));
+  writeFileSync(join(dir, "keeper.json"), "[1,2,3]\n");
+  writeFileSync(join(dir, "spill.json"), "[4,5,6]");
+  const env = readKeypairFiles({ KEEPER_KEYPAIR_PATH: join(dir, "keeper.json"), SPILL_KEYPAIR_PATH: join(dir, "spill.json") });
+  expect(env.KEEPER_KEYPAIR).toBe("[1,2,3]");
+  expect(env.SPILL_KEYPAIR).toBe("[4,5,6]");
+  expect(readKeypairFiles({ KEEPER_KEYPAIR: "[7]" }).KEEPER_KEYPAIR).toBe("[7]");
+  expect(() => readKeypairFiles({ KEEPER_KEYPAIR: "[7]", KEEPER_KEYPAIR_PATH: join(dir, "keeper.json") })).toThrow(/not both/);
+  expect(() => readKeypairFiles({ SPILL_KEYPAIR_PATH: join(dir, "missing.json") })).toThrow();
 });
