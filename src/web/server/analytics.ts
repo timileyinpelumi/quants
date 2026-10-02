@@ -125,12 +125,50 @@ export async function overview(d: AnalyticsDeps, w: Window): Promise<Overview> {
   };
 }
 
-export type Report = { range: Range; from: string; to: string; unit: Unit; overview: Overview };
+export type Point = { t: string; launches: number; volumeUsd: number; trades: number; traders: number; feesUsd: number };
+const MAX_POINTS = 1000;
+
+const truncate = (ms: number, unit: Unit) => {
+  const d = new Date(ms);
+  return unit === "hour" ? Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), d.getUTCHours()) : Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+};
+
+/** One point per hour (24h) or UTC day, empty buckets included. All time starts at the first launch. */
+export async function series(sql: SQL, w: Window): Promise<Point[]> {
+  const step = w.unit === "hour" ? HOUR : DAY;
+  let from = w.from;
+  if (w.range === "all") {
+    const [r] = await sql`select min(created_at) as at from launches`;
+    from = r?.at ? new Date(r.at) : w.to;
+  }
+  const end = truncate(w.to.getTime(), w.unit);
+  const start = Math.max(truncate(from.getTime(), w.unit), end - (MAX_POINTS - 1) * step);
+  const lo = new Date(Math.max(from.getTime(), start));
+  const [trades, launches, fees] = await Promise.all([
+    sql`select date_trunc(${w.unit}, block_time, 'UTC') as b, count(*)::int as n, count(distinct trader)::int as traders,
+          coalesce(sum(quote_value * quote_usd), 0)::float8 as vol
+        from trades where block_time >= ${lo} and block_time < ${w.to} group by 1`,
+    sql`select date_trunc(${w.unit}, created_at, 'UTC') as b, count(*)::int as n from launches where created_at >= ${lo} and created_at < ${w.to} group by 1`,
+    sql`select s.b, coalesce(sum(s.amt * px.usd), 0)::float8 as usd from (${splitShares(sql, lo, w.to, w.unit)}) s ${pxJoin(sql, sql`s.launch_id`)} group by 1`,
+  ]);
+  const at = (r: any) => new Date(r.b).getTime();
+  const tm = new Map<number, any>(trades.map((r: any) => [at(r), r]));
+  const lm = new Map<number, number>(launches.map((r: any) => [at(r), r.n as number]));
+  const fm = new Map<number, number>(fees.map((r: any) => [at(r), Number(r.usd)]));
+  const out: Point[] = [];
+  for (let t = start; t <= end; t += step) {
+    const tr = tm.get(t);
+    out.push({ t: new Date(t).toISOString(), launches: lm.get(t) ?? 0, volumeUsd: tr ? Number(tr.vol) : 0, trades: tr?.n ?? 0, traders: tr?.traders ?? 0, feesUsd: fm.get(t) ?? 0 });
+  }
+  return out;
+}
+
+export type Report = { range: Range; from: string; to: string; unit: Unit; overview: Overview; series: Point[] };
 
 export async function report(d: AnalyticsDeps, range: Range, now = Date.now()): Promise<Report> {
   const w = windowOf(range, now);
-  const ov = await overview(d, w);
-  return { range, from: w.from.toISOString(), to: w.to.toISOString(), unit: w.unit, overview: ov };
+  const [ov, pts] = await Promise.all([overview(d, w), series(d.sql, w)]);
+  return { range, from: w.from.toISOString(), to: w.to.toISOString(), unit: w.unit, overview: ov, series: pts };
 }
 
 export function contextDeps(ctx: WebContext): AnalyticsDeps {

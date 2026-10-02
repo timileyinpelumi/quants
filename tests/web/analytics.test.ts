@@ -2,7 +2,7 @@ import { test, expect } from "bun:test";
 import type { SQL } from "bun";
 import { freshDb } from "../helpers/db";
 import { defaultSettings, saveSettings } from "../../src/domain/settings";
-import { overview, windowOf, type AnalyticsDeps } from "../../src/web/server/analytics";
+import { overview, series, windowOf, type AnalyticsDeps } from "../../src/web/server/analytics";
 
 const NOW = Date.parse("2026-10-01T12:00:00Z");
 const H = 3_600_000;
@@ -94,6 +94,27 @@ test("overview counts the range and the period before it, in USD from the latest
     stakingOpened: [1, 0],
     graduated: [1, 0],
   });
+});
+
+test("daily series fill empty days and bucket by UTC day", async () => {
+  const { sql } = await seed();
+  const pts = await series(sql, windowOf("7d", NOW));
+  expect(pts.map((p) => p.t.slice(0, 10))).toEqual(["2026-09-24", "2026-09-25", "2026-09-26", "2026-09-27", "2026-09-28", "2026-09-29", "2026-09-30", "2026-10-01"]);
+  const day = (d: string) => { const p = pts.find((x) => x.t.startsWith(d))!; return { ...p, volumeUsd: round(p.volumeUsd), feesUsd: round(p.feesUsd) }; };
+  expect(day("2026-10-01")).toMatchObject({ launches: 1, trades: 3, traders: 2, volumeUsd: 300, feesUsd: 100 });
+  expect(day("2026-09-30")).toMatchObject({ launches: 0, trades: 1, traders: 1, volumeUsd: 200, feesUsd: 100 });
+  expect(day("2026-09-29")).toMatchObject({ launches: 1, trades: 0, feesUsd: 0 });
+});
+
+test("24h series is hourly and all time starts at the first launch", async () => {
+  const { sql } = await seed();
+  const hours = await series(sql, windowOf("24h", NOW));
+  expect(hours).toHaveLength(25);
+  expect(hours.at(-1)!.t).toBe("2026-10-01T12:00:00.000Z");
+  expect(hours.find((p) => p.t === "2026-10-01T11:00:00.000Z")).toMatchObject({ launches: 1, trades: 1 });
+  const all = await series(sql, windowOf("all", NOW));
+  expect(all[0]!.t).toBe("2026-09-21T00:00:00.000Z");
+  expect(all.reduce((s, p) => s + p.trades, 0)).toBe(5);
 });
 
 test("all time has no previous period", async () => {

@@ -53,6 +53,59 @@ function Tiles({ o, range }: { o: Overview; range: Range }) {
   );
 }
 
+const when = (iso: string, unit: Report["unit"]) => {
+  const d = new Date(iso);
+  return unit === "hour"
+    ? d.toLocaleTimeString("en-US", { hour: "numeric", timeZone: "UTC" })
+    : d.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
+};
+
+function Bars({ title, values, labels, fmt, sum = true }: { title: string; values: number[]; labels: string[]; fmt: (n: number) => string; sum?: boolean }) {
+  const W = 300, H = 96;
+  const max = Math.max(0, ...values);
+  const total = values.reduce((a, b) => a + b, 0);
+  const slot = W / Math.max(1, values.length);
+  const gap = values.length > 60 ? 0 : Math.min(2, slot * 0.25);
+  return (
+    <figure className="m-0 flex flex-col gap-2 border-t line pt-3 min-w-0">
+      <figcaption className="flex items-baseline justify-between gap-3">
+        <span className="text-[13px] text-muted">{title}</span>
+        {sum && <span className="font-mono text-sm">{fmt(total)}</span>}
+      </figcaption>
+      <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="block w-full h-24" role="img" aria-label={`${title} by ${labels.length > 25 ? "day" : "period"}`}>
+        <line x1="0" y1={H - 0.5} x2={W} y2={H - 0.5} stroke="rgba(255,255,255,0.08)" vectorEffect="non-scaling-stroke" />
+        {values.map((v, i) => {
+          const h = max === 0 ? 0 : Math.max(v > 0 ? 1.5 : 0, (v / max) * (H - 4));
+          return (
+            <rect key={i} x={i * slot + gap / 2} y={H - h} width={Math.max(0.5, slot - gap)} height={h} fill="var(--color-accent)" fillOpacity={0.75}>
+              <title>{`${labels[i]}: ${fmt(v)}`}</title>
+            </rect>
+          );
+        })}
+      </svg>
+      <div className="flex justify-between text-[11px] text-faint font-mono">
+        <span>{labels[0]}</span>
+        <span>Peak {fmt(max)}</span>
+        <span>{labels.at(-1)}</span>
+      </div>
+    </figure>
+  );
+}
+
+function Series({ r }: { r: Report }) {
+  const labels = r.series.map((p) => when(p.t, r.unit));
+  const pick = (k: "launches" | "volumeUsd" | "trades" | "traders" | "feesUsd") => r.series.map((p) => p[k]);
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-x-6 gap-y-6">
+      <Bars title="Volume" values={pick("volumeUsd")} labels={labels} fmt={fmtUsd} />
+      <Bars title="Fees collected" values={pick("feesUsd")} labels={labels} fmt={fmtUsd} />
+      <Bars title="Trades" values={pick("trades")} labels={labels} fmt={fmtCount} />
+      <Bars title={r.unit === "hour" ? "Unique traders per hour" : "Unique traders per day"} values={pick("traders")} labels={labels} fmt={fmtCount} sum={false} />
+      <Bars title="Launches" values={pick("launches")} labels={labels} fmt={fmtCount} />
+    </div>
+  );
+}
+
 export function Section({ title, note, children }: { title: string; note?: string; children: React.ReactNode }) {
   return (
     <section className="flex flex-col gap-4">
@@ -96,6 +149,9 @@ export function AnalyticsPanel() {
         <>
           <Section title="Overview" note={range === "all" ? "Everything so far." : `Last ${range} against the ${range} before it. Fees are valued at each token's latest price.`}>
             <Tiles o={shown.overview} range={range} />
+          </Section>
+          <Section title={shown.unit === "hour" ? "By hour" : "By day"} note="UTC. Hover a bar for its value.">
+            <Series r={shown} />
           </Section>
         </>
       )}
