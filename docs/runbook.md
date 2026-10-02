@@ -133,13 +133,13 @@ On top of the keeper variables above, the web app needs:
 | `KEEPER_ADDRESS` | Keeper public key, listed on the docs page |
 | `SPILL_ADDRESS` | Spill public key; stake pools send penalties to its token accounts |
 | `CLOUDINARY_URL` | `cloudinary://<api key>:<api secret>@<cloud name>` from the Cloudinary console, for launch images and metadata JSON. Or set `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY` and `CLOUDINARY_API_SECRET` |
-| `ADMIN_WALLETS` | Comma separated wallet addresses allowed into `/admin` |
-| `ADMIN_SESSION_SECRET` | At least 32 random bytes, hex |
+| `ADMIN_CODE_HASH` | argon2id hash of the admin access code, base64, from `bun scripts/admin-code.ts` (see Admin access) |
+| `ADMIN_SESSION_SECRET` | At least 32 random bytes, hex; signs the admin session cookie |
 | `CONFIG_KEYS_PATH` | Path to `config-keys.json` |
 | `NEXT_PUBLIC_RPC_URL` | RPC the browser uses |
 | `NEXT_PUBLIC_OURTOKEN_MINT`, `NEXT_PUBLIC_OURTOKEN_SYMBOL` | The platform token. Its ticker is `QUANTS`, the default when the symbol is unset |
 | `NEXT_PUBLIC_SOL_GRADUATION`, `NEXT_PUBLIC_OURTOKEN_GRADUATION` | Shown on the launch form; must match what the config keys were created with |
-| `SITE_URL` | Public origin, e.g. `https://quants.example`; the admin sign in message names its domain, and shared token links preview with images from it |
+| `SITE_URL` | Public origin, e.g. `https://quants.example`; admin requests must come from it, and shared token links preview with images from it |
 | `NEXT_PUBLIC_X_URL` | The quants X profile, e.g. `https://x.com/quants`; shown in the header, menu and footer. Unset hides it |
 | `TRUST_PROXY` | `1` behind Caddy or on Vercel so rate limits key on `x-forwarded-for`; leave unset when the app is reachable directly |
 
@@ -147,7 +147,22 @@ Uploads are signed server side: images go to Cloudinary as image uploads and met
 
 Never set these in production: `NEXT_PUBLIC_TEST_WALLET_SECRET`, `PINATA_JWT=stub`, `DEV_UPLOADS_BASE`, `ALLOW_LOCAL_URIS`, `LOCAL_TOKEN_LIST`, `LOCAL_REWARD_MINTS`. They exist for the local seed and end to end run only. The web app and keeper refuse to start when `PINATA_JWT=stub`, `DEV_UPLOADS_BASE`, `ALLOW_LOCAL_URIS`, `LOCAL_TOKEN_LIST` or `LOCAL_REWARD_MINTS` is set and `RPC_URL` is not localhost or 127.0.0.1. The Vercel preview runs against a tunnelled local validator with `PINATA_JWT=stub` and `LOCAL_TOKEN_LIST`, so it sets `ALLOW_DEV_SWITCHES=1`; nothing else should. (`PINATA_JWT=stub` now only turns on local uploads, like `DEV_UPLOADS_BASE`.)
 
-`ADMIN_SESSION_SECRET` must be at least 64 hex characters (`openssl rand -hex 32`); the web app refuses to start otherwise.
+`ADMIN_SESSION_SECRET` must be at least 64 hex characters (`openssl rand -hex 32`) and `ADMIN_CODE_HASH` must be an argon2id hash; the web app refuses to start otherwise.
+
+### Admin access
+
+`/admin` asks for one access code. Create it once per network:
+
+```bash
+bun scripts/admin-code.ts                       # mainnet; --cluster devnet or localnet for the others
+```
+
+It writes the plain code to `~/.config/quants/<cluster>/admin-code.txt` (mode 600, in a mode 700 folder) and prints the `ADMIN_CODE_HASH=` line for the env file. The server only ever sees the hash. The script refuses to overwrite an existing code file; `--rotate` makes a new code, and deploying its hash ends every admin session at once (sessions are tied to the hash they were made with).
+
+- A session lasts 12 hours. The cookie is httpOnly, SameSite=Strict, Secure in production, and signed with `ADMIN_SESSION_SECRET`; the session itself is a row in `admin_sessions`, so Sign out ends it on the server.
+- Five wrong codes from one address in 15 minutes lock that address for the rest of the window. Fifty wrong codes in an hour from anywhere lock sign in for everyone until the hour passes. Every attempt is a row in `admin_logins` and a log line (`adminLogin`). To unlock early: `delete from admin_logins where not ok`.
+- Admin API requests from another origin are refused (Origin and Sec-Fetch-Site checks).
+- Lost the code: run the script with `--rotate`, put the new hash in the env file and deploy.
 
 ## Deploying to a VPS
 
@@ -185,7 +200,7 @@ With `BACKUP_BUCKET=<bucket>` it also gives the instance a role that can write b
 
 Create two A records pointing at the Elastic IP: `quants.wtf` and `www.quants.wtf` (`www` redirects to the bare domain). If the zone is in Route 53, `provision.sh --dns` upserts them. Let's Encrypt only issues a certificate once the A record resolves to the instance, so until DNS has propagated Caddy logs certificate errors and keeps retrying. Check with `dig +short quants.wtf`.
 
-Before DNS is pointed, use sslip.io, which resolves `<ip with dashes>.sslip.io` to that IP: set `SITE_HOST=3-80-12-34.sslip.io` and `SITE_URL=https://3-80-12-34.sslip.io` (the line provision prints). Let's Encrypt issues for it like any other name. Switch both to `quants.wtf` and deploy again once DNS resolves; `SITE_URL` is the domain the admin sign in message names.
+Before DNS is pointed, use sslip.io, which resolves `<ip with dashes>.sslip.io` to that IP: set `SITE_HOST=3-80-12-34.sslip.io` and `SITE_URL=https://3-80-12-34.sslip.io` (the line provision prints). Let's Encrypt issues for it like any other name. Switch both to `quants.wtf` and deploy again once DNS resolves; admin requests are only accepted from `SITE_URL`.
 
 ### Fill .env.production and secrets
 
@@ -313,7 +328,7 @@ cat devnet.env devnet.secrets.env > .env.devnet
 cat >> .env.devnet <<'ENV'
 DATABASE_URL=postgres://quants:quants@localhost:5434/quants_devnet
 DEVNET_RPC_URL=https://devnet.helius-rpc.com/?api-key=<key>
-ADMIN_WALLETS=<your wallet>
+ADMIN_CODE_HASH=<from bun scripts/admin-code.ts --cluster devnet>
 ADMIN_SESSION_SECRET=<openssl rand -hex 32>
 CLOUDINARY_URL=cloudinary://<key>:<secret>@<cloud>
 SITE_URL=http://localhost:3000
@@ -350,7 +365,7 @@ Devnet drops transactions, so every step is kept in `devnet-run-state.json` (wal
 Set these on the preview environment (`vercel env add <name> preview`), from `devnet.env`:
 
 - Everything in `devnet.env` (including `CONFIG_KEYS`, since `config-keys.devnet.json` is not committed, and `DEVNET_TOKENS`).
-- `DATABASE_URL` (a Neon database migrated with `bun --env-file=<neon env> run migrate`), `DEVNET_RPC_URL`, `ADMIN_WALLETS`, `ADMIN_SESSION_SECRET`, `CLOUDINARY_URL`, `SITE_URL=https://<preview domain>`, `TRUST_PROXY=1`.
+- `DATABASE_URL` (a Neon database migrated with `bun --env-file=<neon env> run migrate`), `DEVNET_RPC_URL`, `ADMIN_CODE_HASH`, `ADMIN_SESSION_SECRET`, `CLOUDINARY_URL`, `SITE_URL=https://<preview domain>`, `TRUST_PROXY=1`.
 - Remove the tunnel setup: `RPC_URL` and `NEXT_PUBLIC_RPC_URL` pointing at the tunnel, `ALLOW_DEV_SWITCHES`, `PINATA_JWT`, `LOCAL_TOKEN_LIST`, `ALLOW_LOCAL_URIS`, `DEV_UPLOADS_BASE` and `NEXT_PUBLIC_TEST_WALLET_SECRET` (the build refuses the test wallet with a non-local RPC).
 
 Never put `KEEPER_KEYPAIR` or `SPILL_KEYPAIR` on Vercel. Run the keeper and indexer from your machine or the VPS with `.env.devnet`, then redeploy the preview so the `NEXT_PUBLIC_*` values are built in.

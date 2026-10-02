@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { z } from "zod";
 import { applyClusterDefaults } from "./cluster";
+import { decodeCodeHash } from "./admin-code";
 
 const Env = z.object({
   DATABASE_URL: z.string().url(),
@@ -56,6 +57,9 @@ export function assertNoDevSwitches(env: RawEnv) {
 export function checkWebEnv(env: RawEnv) {
   if (!/^[0-9a-fA-F]{64,}$/.test(env.ADMIN_SESSION_SECRET ?? "")) {
     throw new Error("Refusing to start: ADMIN_SESSION_SECRET must be at least 32 random bytes as hex (64+ hex characters). Generate one with: openssl rand -hex 32");
+  }
+  if (!decodeCodeHash(env.ADMIN_CODE_HASH)) {
+    throw new Error("Refusing to start: ADMIN_CODE_HASH is missing or not an argon2id hash. Generate one with: bun scripts/admin-code.ts");
   }
   assertNoDevSwitches(env);
 }

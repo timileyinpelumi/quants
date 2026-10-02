@@ -14,6 +14,7 @@ import { JupiterPrices, type PricePort } from "@/indexer/prices";
 import { applyClusterDefaults, configKeysPath } from "@/cluster";
 import { pricesFor, swapPortFor } from "@/jupiter/select";
 import { checkWebEnv } from "@/env";
+import { decodeCodeHash } from "@/admin-code";
 import { StockRegistry } from "@/stocks/registry";
 import type { StockListing } from "@/stocks/sources";
 
@@ -31,7 +32,8 @@ export interface WebContext {
   keeperAddress: string;
   spillWallet: PublicKey;
   ourtokenMint: string;
-  adminWallets: Set<string>;
+  /** argon2id PHC string of the admin access code. */
+  adminCodeHash: string;
   sessionSecret: Uint8Array;
   tokenProgramOf(mint: string): Promise<string>;
   stocks: Pick<StockRegistry, "list" | "icons">;
@@ -77,7 +79,7 @@ export function getContext(): WebContext {
     keeperAddress: e.KEEPER_ADDRESS!,
     spillWallet: new PublicKey(e.SPILL_ADDRESS!),
     ourtokenMint: e.OURTOKEN_MINT!,
-    adminWallets: new Set((e.ADMIN_WALLETS ?? "").split(",").map((s) => s.trim()).filter(Boolean)),
+    adminCodeHash: decodeCodeHash(e.ADMIN_CODE_HASH),
     sessionSecret: new TextEncoder().encode(e.ADMIN_SESSION_SECRET!),
     tokenProgramOf: async (mint) => (await conn.getAccountInfo(new PublicKey(mint)))?.owner.toBase58() ?? "",
     // LOCAL_STOCKS (local validator only) lists stand-in stock mints in place of the xStocks and Backpack lists.

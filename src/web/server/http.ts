@@ -20,8 +20,11 @@ function evict(now: number) {
 
 // In-memory and per process. x-forwarded-for is only trusted with TRUST_PROXY=1 (behind Caddy or Vercel);
 // otherwise any client could pick its own bucket, so every request shares one.
+export const clientIp = (req: Request) =>
+  (process.env.TRUST_PROXY === "1" && req.headers.get("x-forwarded-for")?.split(",")[0]?.trim()) || "local";
+
 export function rateLimit(req: Request, bucket: string, limit: number, windowMs = 60_000) {
-  const ip = (process.env.TRUST_PROXY === "1" && req.headers.get("x-forwarded-for")?.split(",")[0]?.trim()) || "local";
+  const ip = clientIp(req);
   const key = `${bucket}:${ip}`;
   const now = Date.now();
   const h = hits.get(key);

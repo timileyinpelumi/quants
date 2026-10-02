@@ -12,9 +12,11 @@ import { resetStakeCache } from "../../src/web/server/stake";
 import type { UploadPort } from "../../src/web/server/uploads";
 import { defaultSettings, saveSettings } from "../../src/domain/settings";
 import { NATIVE_MINT } from "../../src/domain/types";
+import { decodeCodeHash, hashCode } from "../../src/admin-code";
 
 export const OURS = "OURS1111111111111111111111111111111111111111";
-export const ADMIN = Keypair.generate();
+export const ADMIN_CODE = "X7232DDUWJDB369DGWUDHKMN";
+const ADMIN_HASH = decodeCodeHash(await hashCode(ADMIN_CODE));
 export const CLASSIC = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
 
 export class FakeUploads implements UploadPort {
@@ -55,7 +57,7 @@ export async function makeWebContext(over: Partial<WebContext> = {}) {
     keeperAddress: "Keeper1111111111111111111111111111111111111",
     spillWallet: Keypair.generate().publicKey,
     ourtokenMint: OURS,
-    adminWallets: new Set([ADMIN.publicKey.toBase58()]),
+    adminCodeHash: ADMIN_HASH,
     sessionSecret: crypto.getRandomValues(new Uint8Array(32)),
     tokenProgramOf: async () => CLASSIC,
     stocks: { list: async () => [], icons: async () => ({}) },

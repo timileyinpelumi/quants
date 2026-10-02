@@ -1,8 +1,5 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
-import bs58 from "bs58";
-import { useWallet } from "@solana/wallet-adapter-react";
-import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 import { Button } from "@/web/ui/Button";
 import { inputClass } from "@/web/ui/Field";
 import { Segmented } from "@/web/ui/Segmented";
@@ -45,9 +42,9 @@ function Num({ label, value, onChange, suffix }: { label: string; value: number 
 export type Pair = { mint: string; symbol: string; name: string; graduation: number };
 
 export function AdminApp({ pairs }: { pairs: Pair[] }) {
-  const wallet = useWallet();
-  const modal = useWalletModal();
-  const [signedIn, setSignedIn] = useState(false);
+  const [signedIn, setSignedIn] = useState<boolean | null>(null);
+  const [code, setCode] = useState("");
+  const [busy, setBusy] = useState(false);
   const [tab, setTab] = useState<"settings" | "keeper" | "baskets" | "pairs" | "votes">("settings");
   const [votes, setVotes] = useState<VoteRow[] | null>(null);
   const [settings, setSettings] = useState<Settings | null>(null);
@@ -89,19 +86,28 @@ export function AdminApp({ pairs }: { pairs: Pair[] }) {
     }
   }
 
-  async function signIn() {
-    if (!wallet.publicKey) { modal.setVisible(true); return; }
-    if (!wallet.signMessage) { setMsg({ ok: false, text: "This wallet cannot sign messages" }); return; }
+  async function signIn(e: React.FormEvent) {
+    e.preventDefault();
+    if (busy) return;
+    setBusy(true);
     try {
-      const { message } = await call<{ message: string }>("/api/admin/nonce", { method: "POST" });
-      if (!message.startsWith(`${window.location.host} wants you`)) throw new Error("The sign in message is for a different site");
-      const sig = await wallet.signMessage(new TextEncoder().encode(message));
-      await call("/api/admin/session", { method: "POST", body: JSON.stringify({ wallet: wallet.publicKey.toBase58(), signature: bs58.encode(sig) }) });
+      await call("/api/admin/session", { method: "POST", body: JSON.stringify({ code }) });
+      setCode("");
       setMsg(null);
       await load();
-    } catch (e: any) {
-      setMsg({ ok: false, text: e.message ?? "Sign in failed" });
+    } catch (err: any) {
+      setMsg({ ok: false, text: err.message ?? "Sign in failed" });
+    } finally {
+      setBusy(false);
     }
+  }
+
+  async function signOut() {
+    await call("/api/admin/session", { method: "DELETE" }).catch(() => {});
+    setSignedIn(false);
+    setSettings(null);
+    setStatus(null);
+    setMsg(null);
   }
 
   async function save() {
@@ -124,15 +130,22 @@ export function AdminApp({ pairs }: { pairs: Pair[] }) {
     }
   }
 
+  if (signedIn === null) return <main className="wrap pt-14 pb-16" />;
   if (!signedIn) {
     return (
       <main className="wrap pt-14 pb-16">
-        <div className="flex flex-col items-start gap-6 max-w-2xl">
-        <h1 className="m-0 font-display font-black text-[40px] md:text-[56px] tracking-[-0.03em] leading-none">Admin</h1>
-        <p className="m-0 text-muted">Sign a message with an admin wallet to continue. Signing costs nothing.</p>
-        <Button onClick={signIn}>{wallet.publicKey ? "Sign in" : "Connect wallet"}</Button>
-        {msg && <p role="alert" className={`m-0 text-sm ${msg.ok ? "text-accent" : "text-burn"}`}>{msg.text}</p>}
-        </div>
+        <form onSubmit={signIn} className="flex flex-col items-start gap-6 max-w-md">
+          <h1 className="m-0 font-display font-black text-[40px] md:text-[56px] tracking-[-0.03em] leading-none">Admin</h1>
+          <label className="flex flex-col gap-2 text-[13px] text-muted w-full">
+            <span>Access code</span>
+            <input
+              name="code" type="password" autoComplete="current-password" autoCapitalize="characters" spellCheck={false}
+              value={code} onChange={(e) => setCode(e.target.value)} className={small} maxLength={64} required
+            />
+          </label>
+          <Button type="submit" disabled={busy || code.trim().length === 0}>{busy ? "Checking" : "Sign in"}</Button>
+          {msg && <p role="alert" className={`m-0 text-sm ${msg.ok ? "text-accent" : "text-burn"}`}>{msg.text}</p>}
+        </form>
       </main>
     );
   }
@@ -146,7 +159,10 @@ export function AdminApp({ pairs }: { pairs: Pair[] }) {
     <main className="flex flex-col gap-8 wrap pt-10 md:pt-14 pb-16">
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
         <h1 className="m-0 font-display font-black text-[40px] md:text-[56px] tracking-[-0.03em] leading-none">Admin</h1>
-        <Segmented label="Section" value={tab} onChange={setTab} options={[{ value: "settings", label: "Settings" }, { value: "keeper", label: "Keeper" }, { value: "baskets", label: "Baskets" }, { value: "pairs", label: "Pairs" }, { value: "votes", label: "Votes" }]} />
+        <div className="flex flex-wrap items-center gap-3">
+          <Segmented label="Section" value={tab} onChange={setTab} options={[{ value: "settings", label: "Settings" }, { value: "keeper", label: "Keeper" }, { value: "baskets", label: "Baskets" }, { value: "pairs", label: "Pairs" }, { value: "votes", label: "Votes" }]} />
+          <Button variant="ghost" onClick={signOut}>Sign out</Button>
+        </div>
       </div>
       {msg && <p role="status" className={`m-0 text-sm ${msg.ok ? "text-accent" : "text-burn"}`}>{msg.text}</p>}
 

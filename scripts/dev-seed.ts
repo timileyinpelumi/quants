@@ -17,6 +17,7 @@ import { prepareLaunch } from "../src/launch/prepare";
 import { confirmLaunch } from "../src/launch/confirm";
 import { NATIVE_MINT } from "../src/domain/types";
 import { quoteCoins } from "../src/domain/quotes";
+import { generateCode, hashCode } from "../src/admin-code";
 
 const RPC = process.env.RPC_URL ?? "http://127.0.0.1:8899";
 const DB = process.env.SEED_DATABASE_URL ?? "postgres://quants:quants@localhost:5434/quants";
@@ -132,6 +133,7 @@ for (const st of localStocks) {
   await mintTo(conn, keeper, st.mint, acct.address, keeper, 1_000n * 10n ** BigInt(st.decimals), [], undefined, TOKEN_2022_PROGRAM_ID);
 }
 
+const adminCode = generateCode();
 const env = {
   DATABASE_URL: DB,
   RPC_URL: RPC,
@@ -146,7 +148,7 @@ const env = {
   CONFIG_KEYS_PATH: "config-keys.json",
   DEV_UPLOADS_BASE: "http://localhost:3000/api/dev-uploads",
   ALLOW_LOCAL_URIS: "1",
-  ADMIN_WALLETS: [admin.publicKey.toBase58(), tester.publicKey.toBase58()].join(","),
+  ADMIN_CODE_HASH: await hashCode(adminCode),
   ADMIN_SESSION_SECRET: Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString("hex"),
   LOCAL_REWARD_MINTS: Object.values(rewards).map((m) => m.toBase58()).join(","),
   LOCAL_STOCKS: JSON.stringify(localStocks.map((st) => ({ mint: st.mint.toBase58(), issuer: st.issuer, symbol: st.symbol, name: st.name, icon: st.icon }))),
@@ -157,7 +159,7 @@ const env = {
   NEXT_PUBLIC_SOL_GRADUATION: "85",
   NEXT_PUBLIC_OURTOKEN_GRADUATION: "100000",
   NEXT_PUBLIC_TEST_WALLET_SECRET: JSON.stringify(Array.from(tester.secretKey)),
-  E2E_ADMIN_SECRET: JSON.stringify(Array.from(admin.secretKey)),
+  E2E_ADMIN_CODE: adminCode,
   SEED_CAT_MINT: cat.mint,
   SEED_DOG_MINT: dog.mint,
   SEED_STOCK_MINT: stock.mint,
