@@ -212,7 +212,7 @@ bun scripts/hd-wallet.ts export keeper secrets/keeper.json
 bun scripts/hd-wallet.ts export spill secrets/spill.json
 ```
 
-`KEEPER_ADDRESS`, `SPILL_ADDRESS` and `TREASURY_ADDRESS` come from `show`. `CONFIG_KEYS` is the contents of the mainnet `config-keys.json` on one line, in single quotes. `POSTGRES_PASSWORD` must be hex (`openssl rand -hex 24`) because it goes into `DATABASE_URL` as is. The keypairs are mounted read only into the keeper container only (`/run/secrets/keeper` and `/run/secrets/spill`, read through `KEEPER_KEYPAIR_PATH` and `SPILL_KEYPAIR_PATH`); they are never in the image or in `.env.production`. The container user has uid 1000, the same as `ubuntu` on the instance, so the files can stay mode 600.
+`KEEPER_ADDRESS`, `SPILL_ADDRESS` and `TREASURY_ADDRESS` come from `show`. `PLATFORM_ADDRESSES` is the line `bun scripts/hd-wallet.ts env` prints: every role's public address, which the admin Wallets tab lists with its derivation path and SOL balance (the keeper row turns red below 0.01 SOL). The seed phrase never goes to the server. `CONFIG_KEYS` is the contents of the mainnet `config-keys.json` on one line, in single quotes. `POSTGRES_PASSWORD` must be hex (`openssl rand -hex 24`) because it goes into `DATABASE_URL` as is. The keypairs are mounted read only into the keeper container only (`/run/secrets/keeper` and `/run/secrets/spill`, read through `KEEPER_KEYPAIR_PATH` and `SPILL_KEYPAIR_PATH`); they are never in the image or in `.env.production`. The container user has uid 1000, the same as `ubuntu` on the instance, so the files can stay mode 600.
 
 ### Deploy
 

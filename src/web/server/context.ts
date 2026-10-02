@@ -15,6 +15,7 @@ import { applyClusterDefaults, configKeysPath } from "@/cluster";
 import { pricesFor, swapPortFor } from "@/jupiter/select";
 import { checkWebEnv } from "@/env";
 import { decodeCodeHash } from "@/admin-code";
+import { parsePlatformAddresses, type Role } from "@/domain/platform-wallets";
 import { StockRegistry } from "@/stocks/registry";
 import type { StockListing } from "@/stocks/sources";
 
@@ -34,6 +35,8 @@ export interface WebContext {
   ourtokenMint: string;
   /** argon2id PHC string of the admin access code. */
   adminCodeHash: string;
+  /** Public addresses of the platform HD wallet roles, from PLATFORM_ADDRESSES. Never the seed. */
+  platformAddresses: Partial<Record<Role, string>>;
   sessionSecret: Uint8Array;
   tokenProgramOf(mint: string): Promise<string>;
   stocks: Pick<StockRegistry, "list" | "icons">;
@@ -80,6 +83,7 @@ export function getContext(): WebContext {
     spillWallet: new PublicKey(e.SPILL_ADDRESS!),
     ourtokenMint: e.OURTOKEN_MINT!,
     adminCodeHash: decodeCodeHash(e.ADMIN_CODE_HASH),
+    platformAddresses: parsePlatformAddresses(e.PLATFORM_ADDRESSES),
     sessionSecret: new TextEncoder().encode(e.ADMIN_SESSION_SECRET!),
     tokenProgramOf: async (mint) => (await conn.getAccountInfo(new PublicKey(mint)))?.owner.toBase58() ?? "",
     // LOCAL_STOCKS (local validator only) lists stand-in stock mints in place of the xStocks and Backpack lists.

@@ -5,6 +5,7 @@ import { inputClass } from "@/web/ui/Field";
 import { Segmented } from "@/web/ui/Segmented";
 import { shortAddr } from "@/web/ui/format";
 import { LoadMore } from "@/web/ui/LoadMore";
+import { CopyButton } from "@/web/ui/CopyButton";
 
 type Tier = { id: string; lockSeconds: number; multiplierBps: number };
 type Settings = {
@@ -14,6 +15,7 @@ type Settings = {
   maxPenaltyBps: number; rewardPeriodSeconds: number; slippageBps: number;
   devBuyCapBps: number; keeperIntervalSeconds: number; defaultBackend: "kamino";
 };
+type WalletRow = { role: string; index: number; path: string; address: string | null; solscan: string | null; lamports: string | null; low: boolean };
 type VoteRow = { mint: string; symbol: string | null; up: number; down: number; score: number };
 type Status = { lastActivity: string | null; failed: { id: number; mint: string; symbol: string | null; kind: string; error: string; attempts: number; at: string }[]; failedNext: number | null; inFlight: { mint: string; symbol: string | null }[] };
 
@@ -45,7 +47,8 @@ export function AdminApp({ pairs }: { pairs: Pair[] }) {
   const [signedIn, setSignedIn] = useState<boolean | null>(null);
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
-  const [tab, setTab] = useState<"settings" | "keeper" | "baskets" | "pairs" | "votes">("settings");
+  const [tab, setTab] = useState<"settings" | "keeper" | "wallets" | "baskets" | "pairs" | "votes">("settings");
+  const [wallets, setWallets] = useState<WalletRow[] | null>(null);
   const [votes, setVotes] = useState<VoteRow[] | null>(null);
   const [settings, setSettings] = useState<Settings | null>(null);
   const [version, setVersion] = useState<number | null>(null);
@@ -69,6 +72,10 @@ export function AdminApp({ pairs }: { pairs: Pair[] }) {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    if (tab !== "wallets" || !signedIn) return;
+    call<{ wallets: WalletRow[] }>("/api/admin/wallets").then((r) => setWallets(r.wallets), (e) => setMsg({ ok: false, text: e.message }));
+  }, [tab, signedIn]);
   useEffect(() => {
     if (tab !== "votes" || !signedIn) return;
     call<{ tokens: VoteRow[] }>("/api/admin/votes").then((r) => setVotes(r.tokens), (e) => setMsg({ ok: false, text: e.message }));
@@ -160,7 +167,7 @@ export function AdminApp({ pairs }: { pairs: Pair[] }) {
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
         <h1 className="m-0 font-display font-black text-[40px] md:text-[56px] tracking-[-0.03em] leading-none">Admin</h1>
         <div className="flex flex-wrap items-center gap-3">
-          <Segmented label="Section" value={tab} onChange={setTab} options={[{ value: "settings", label: "Settings" }, { value: "keeper", label: "Keeper" }, { value: "baskets", label: "Baskets" }, { value: "pairs", label: "Pairs" }, { value: "votes", label: "Votes" }]} />
+          <Segmented label="Section" value={tab} onChange={setTab} options={[{ value: "settings", label: "Settings" }, { value: "keeper", label: "Keeper" }, { value: "wallets", label: "Wallets" }, { value: "baskets", label: "Baskets" }, { value: "pairs", label: "Pairs" }, { value: "votes", label: "Votes" }]} />
           <Button variant="ghost" onClick={signOut}>Sign out</Button>
         </div>
       </div>
@@ -231,6 +238,32 @@ export function AdminApp({ pairs }: { pairs: Pair[] }) {
             {status.failed.length > 0 && <LoadMore done={status.failedNext === null} state={failedState} onMore={loadFailed} />}
           </div>
           <Button variant="ghost" className="self-start" onClick={load}>Refresh</Button>
+        </section>
+      )}
+
+      {tab === "wallets" && (
+        <section className="flex flex-col gap-5 max-w-5xl">
+          <p className="m-0 text-sm text-muted">Platform wallets from one seed phrase, which stays off the server. Addresses come from PLATFORM_ADDRESSES.</p>
+          {wallets === null ? <p className="m-0 text-muted">Loading</p> : (
+            <div className="flex flex-col text-sm">
+              {wallets.map((w) => (
+                <div key={w.role} className="grid grid-cols-1 md:grid-cols-[150px_150px_minmax(0,1fr)_140px] gap-2 md:gap-4 py-3 border-t line md:items-center">
+                  <span className="font-semibold">{w.index}. {w.role}</span>
+                  <span className="font-mono text-muted">{w.path}</span>
+                  {w.address ? (
+                    <span className="flex items-center gap-2 min-w-0">
+                      <a href={w.solscan!} target="_blank" rel="noreferrer" className="font-mono truncate hover:text-accent">{w.address}</a>
+                      <CopyButton value={w.address} label="Copy" />
+                    </span>
+                  ) : <span className="text-muted">Not set</span>}
+                  <span className={`font-mono md:text-right ${w.low ? "text-burn" : ""}`}>
+                    {w.lamports === null ? (w.address ? "Unavailable" : "") : `${(Number(w.lamports) / 1e9).toLocaleString("en-US", { maximumFractionDigits: 4 })} SOL`}
+                    {w.low && <span className="block text-[12px]">Below 0.01 SOL. Top it up.</span>}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
         </section>
       )}
 

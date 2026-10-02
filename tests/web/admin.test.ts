@@ -4,6 +4,8 @@ import { POST as loginRoute, DELETE as logoutRoute } from "../../src/app/api/adm
 import { GET as getSettings, POST as postSettings } from "../../src/app/api/admin/settings/route";
 import { GET as statusRoute } from "../../src/app/api/admin/status/route";
 import { POST as basketRoute } from "../../src/app/api/admin/basket/route";
+import { GET as walletsRoute } from "../../src/app/api/admin/wallets/route";
+import { parsePlatformAddresses } from "../../src/domain/platform-wallets";
 import { loadLatestSettings } from "../../src/domain/settings";
 import { beginStep, failStep } from "../../src/ledger/ledger";
 import { decodeCodeHash, generateCode, hashCode, CODE_ALPHABET } from "../../src/admin-code";
@@ -213,4 +215,31 @@ test("basket override is refused once any farm or swap exists", async () => {
   const r = await basketRoute(withCookie(cookie, { method: "POST", body: JSON.stringify({ mint: "M3", basket: [{ mint: "Zec1111111111111111111111111111111111111111", weightBps: 10000 }] }) }));
   expect(r.status).toBe(400);
   expect((await r.json()).error.message).toBe("Farms already exist for this launch");
+});
+
+test("platform wallets list each role with its path, address and balance, and flag a low keeper", async () => {
+  const keeper = "Keeper1111111111111111111111111111111111111";
+  const treasury = "Treasury11111111111111111111111111111111111";
+  await makeWebContext({
+    platformAddresses: { keeper, treasury },
+    conn: { getBalance: async (k: any) => (k.toBase58() === keeper ? 5_000_000 : 2_000_000_000) } as any,
+  });
+  const cookie = await signIn();
+  const r = await walletsRoute(withCookie(cookie));
+  expect(r.status).toBe(200);
+  const { wallets } = await r.json();
+  expect(wallets.map((w: any) => w.role)).toEqual(["keeper", "spill", "treasury", "admin", "platform-token"]);
+  expect(wallets[0]).toMatchObject({ index: 0, path: "m/44'/501'/0'/0'", address: keeper, lamports: "5000000", low: true });
+  expect(wallets[0].solscan).toBe(`https://solscan.io/account/${keeper}`);
+  expect(wallets[1]).toMatchObject({ address: null, lamports: null, low: false });
+  expect(wallets[2]).toMatchObject({ path: "m/44'/501'/2'/0'", lamports: "2000000000", low: false });
+  expect((await walletsRoute(new Request(ORIGIN))).status).toBe(401);
+});
+
+test("PLATFORM_ADDRESSES refuses unknown roles and bad addresses", () => {
+  expect(parsePlatformAddresses(undefined)).toEqual({});
+  expect(parsePlatformAddresses('{"keeper":"Keeper1111111111111111111111111111111111111"}').keeper).toBe("Keeper1111111111111111111111111111111111111");
+  expect(() => parsePlatformAddresses('{"boss":"Keeper1111111111111111111111111111111111111"}')).toThrow(/boss/);
+  expect(() => parsePlatformAddresses('{"keeper":"0OIl"}')).toThrow(/keeper/);
+  expect(() => parsePlatformAddresses("not json")).toThrow(/JSON/);
 });

@@ -2,6 +2,7 @@
 //   bun scripts/hd-wallet.ts create   writes a new seed phrase (refuses to overwrite)
 //   bun scripts/hd-wallet.ts show     prints the role addresses
 //   bun scripts/hd-wallet.ts export <role> <out.json>   writes that role's keypair file (mode 600)
+//   bun scripts/hd-wallet.ts env      prints the PLATFORM_ADDRESSES line for the env file (addresses only)
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
@@ -10,9 +11,9 @@ import { wordlist } from "@scure/bip39/wordlists/english.js";
 import { hmac } from "@noble/hashes/hmac.js";
 import { sha512 } from "@noble/hashes/sha2.js";
 import { Keypair } from "@solana/web3.js";
+import { ROLES, rolePath, type Role } from "../src/domain/platform-wallets";
 
-export const ROLES = ["keeper", "spill", "treasury", "admin", "platform-token"] as const;
-type Role = (typeof ROLES)[number];
+export { ROLES };
 
 const DIR = join(homedir(), ".config", "quants", "mainnet");
 const SEED_FILE = join(DIR, "seed-phrase.txt");
@@ -52,12 +53,15 @@ if (import.meta.main) {
   }
   if (cmd === "create" || cmd === "show") {
     const m = readMnemonic();
-    for (const r of ROLES) console.log(`${String(ROLES.indexOf(r)).padStart(2)}  ${r.padEnd(15)} ${roleKeypair(m, r).publicKey.toBase58()}  m/44'/501'/${ROLES.indexOf(r)}'/0'`);
+    for (const r of ROLES) console.log(`${String(ROLES.indexOf(r)).padStart(2)}  ${r.padEnd(15)} ${roleKeypair(m, r).publicKey.toBase58()}  ${rolePath(r)}`);
+  } else if (cmd === "env") {
+    const m = readMnemonic();
+    console.log(`PLATFORM_ADDRESSES='${JSON.stringify(Object.fromEntries(ROLES.map((r) => [r, roleKeypair(m, r).publicKey.toBase58()])))}'`);
   } else if (cmd === "export") {
     if (!ROLES.includes(role as Role) || !out) throw new Error(`usage: export <${ROLES.join("|")}> <out.json>`);
     writeFileSync(out, JSON.stringify(Array.from(roleKeypair(readMnemonic(), role as Role).secretKey)), { mode: 0o600, flag: "wx" });
     console.log(`wrote ${role} keypair to ${out}`);
   } else if (cmd !== "create") {
-    console.log("usage: bun scripts/hd-wallet.ts create | show | export <role> <out.json>");
+    console.log("usage: bun scripts/hd-wallet.ts create | show | env | export <role> <out.json>");
   }
 }

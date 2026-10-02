@@ -18,8 +18,12 @@ bun -e '
     const pub = Keypair.fromSecretKey(Uint8Array.from(await Bun.file(`secrets/${file}.json`).json())).publicKey.toBase58();
     if (pub !== env[name]) { console.error(`secrets/${file}.json is ${pub} but ${name} is ${env[name] || "unset"}`); process.exit(1); }
   }
-  for (const k of ["SITE_HOST", "SITE_URL", "POSTGRES_PASSWORD", "ADMIN_SESSION_SECRET", "ADMIN_CODE_HASH", "CONFIG_KEYS", "OURTOKEN_MINT", "NEXT_PUBLIC_RPC_URL", "NEXT_PUBLIC_OURTOKEN_MINT", "OURTOKEN_GRADUATION", "NEXT_PUBLIC_OURTOKEN_GRADUATION"]) {
+  for (const k of ["SITE_HOST", "SITE_URL", "POSTGRES_PASSWORD", "ADMIN_SESSION_SECRET", "ADMIN_CODE_HASH", "PLATFORM_ADDRESSES", "CONFIG_KEYS", "OURTOKEN_MINT", "NEXT_PUBLIC_RPC_URL", "NEXT_PUBLIC_OURTOKEN_MINT", "OURTOKEN_GRADUATION", "NEXT_PUBLIC_OURTOKEN_GRADUATION"]) {
     if (!env[k]) { console.error(`${k} is empty in .env.production`); process.exit(1); }
+  }
+  const roles = JSON.parse(env.PLATFORM_ADDRESSES);
+  for (const [role, name] of [["keeper", "KEEPER_ADDRESS"], ["spill", "SPILL_ADDRESS"], ["treasury", "TREASURY_ADDRESS"]]) {
+    if (roles[role] !== env[name]) { console.error(`PLATFORM_ADDRESSES ${role} is ${roles[role] || "unset"} but ${name} is ${env[name] || "unset"}`); process.exit(1); }
   }
 '
 

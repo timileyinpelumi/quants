@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { z } from "zod";
 import { applyClusterDefaults } from "./cluster";
 import { decodeCodeHash } from "./admin-code";
+import { parsePlatformAddresses } from "./domain/platform-wallets";
 
 const Env = z.object({
   DATABASE_URL: z.string().url(),
@@ -61,5 +62,6 @@ export function checkWebEnv(env: RawEnv) {
   if (!decodeCodeHash(env.ADMIN_CODE_HASH)) {
     throw new Error("Refusing to start: ADMIN_CODE_HASH is missing or not an argon2id hash. Generate one with: bun scripts/admin-code.ts");
   }
+  parsePlatformAddresses(env.PLATFORM_ADDRESSES);
   assertNoDevSwitches(env);
 }

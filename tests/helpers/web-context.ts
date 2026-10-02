@@ -58,6 +58,7 @@ export async function makeWebContext(over: Partial<WebContext> = {}) {
     spillWallet: Keypair.generate().publicKey,
     ourtokenMint: OURS,
     adminCodeHash: ADMIN_HASH,
+    platformAddresses: {},
     sessionSecret: crypto.getRandomValues(new Uint8Array(32)),
     tokenProgramOf: async () => CLASSIC,
     stocks: { list: async () => [], icons: async () => ({}) },
