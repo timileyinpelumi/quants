@@ -69,7 +69,7 @@ export function StakeForm({ mint, symbol, tiers, maxPenaltyBps, ready, earns, op
           ))}
         </div>
       )}
-      <Link href={`/t/${mint}/stake`} className="text-center text-sm text-stake-light min-h-9 flex items-center justify-center">{active.length ? "Claim rewards or manage stakes" : "See all lock tiers"}</Link>
+      <Link href={`/t/${mint}/stake`} className="text-center text-sm text-stake-light min-h-11 md:min-h-9 flex items-center justify-center">{active.length ? "Claim rewards or manage stakes" : "See all lock tiers"}</Link>
     </div>
   );
 }

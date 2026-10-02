@@ -121,7 +121,7 @@ export function TokenInsights({ mint, symbol, quoteSymbol }: { mint: string; sym
       </div>
 
       {tab === "Trades" && (
-        <div className="flex flex-col max-h-[520px] overflow-y-auto overscroll-contain pr-1">
+        <div className="flex flex-col md:max-h-[520px] md:overflow-y-auto md:overscroll-contain md:pr-1">
           <div className={`grid ${TRADE_COLS} sticky top-0 z-10 bg-ground/95 backdrop-blur gap-3 md:gap-5 py-2 text-[12px] text-faint`}>
             <span>Time</span><span>Type</span><span className="text-right">USD</span><span className="text-right truncate">{symbol}</span>
             <span className="hidden md:block text-right truncate">{quoteSymbol}</span><span className="hidden md:block text-right">Price</span><span className="hidden md:block text-right">Maker</span>
@@ -129,8 +129,8 @@ export function TokenInsights({ mint, symbol, quoteSymbol }: { mint: string; sym
           {!live || trades.length === 0 ? <p className="m-0 py-6 border-t line text-muted text-sm">No trades yet.</p> : trades.map((t) => {
             const price = t.amount > 0 ? (t.valueUsd ?? t.quoteValue) / t.amount : null;
             return (
-              <div key={`${t.signature}:${t.eventIndex}`} className={`grid ${TRADE_COLS} gap-3 md:gap-5 items-center py-2 border-t line text-[13px] font-mono tabular-nums ${t.side === "buy" ? "text-up" : "text-down"} ${t.quoteValue >= big && live.trades.length > 5 ? "font-semibold" : ""}`}>
-                <a href={solscan(`tx/${t.signature}`)} target="_blank" rel="noreferrer" className="text-faint hover:text-ink">{ago(t.at)}</a>
+              <div key={`${t.signature}:${t.eventIndex}`} className={`grid ${TRADE_COLS} gap-3 md:gap-5 items-center py-0.5 md:py-2 border-t line text-[13px] font-mono tabular-nums ${t.side === "buy" ? "text-up" : "text-down"} ${t.quoteValue >= big && live.trades.length > 5 ? "font-semibold" : ""}`}>
+                <a href={solscan(`tx/${t.signature}`)} target="_blank" rel="noreferrer" className="text-faint hover:text-ink max-md:min-h-10 max-md:flex max-md:items-center">{ago(t.at)}</a>
                 <span className="font-sans font-semibold">{t.side === "buy" ? "Buy" : "Sell"}</span>
                 <span className="text-right truncate">{t.valueUsd === null ? `${fmtPrice(t.quoteValue)} ${quoteSymbol}` : `$${fmtPrice(t.valueUsd)}`}</span>
                 <span className="text-right truncate">{fmtCompact(t.amount)}</span>

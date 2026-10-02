@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { WalletButton } from "@/web/wallet/WalletButton";
+import { PhoneNav } from "./PhoneNav";
 
 const links = [
   { href: "/", label: "Home", key: "home" },
@@ -28,24 +29,24 @@ export function Header({ active }: { active: HeaderKey }) {
   const cls = (k: string) => (active === k ? "text-ink" : "text-muted hover:text-ink");
   return (
     <header className="border-b line">
-      <div className="wrap flex items-center gap-4 md:gap-8 py-4 md:py-5">
-        <Link href="/" className="flex items-center gap-2.5 shrink-0" aria-label="quants home">
+      <div className="wrap flex items-center gap-3 md:gap-8 py-3 md:py-5">
+        <Link href="/" className="flex items-center gap-2.5 shrink-0 min-h-11" aria-label="quants home">
           <img src="/brand/quants-mark.svg" alt="" width={32} height={32} className="w-8 h-8" />
-          <span className="font-display font-black text-xl md:text-2xl tracking-tight">quants</span>
+          <span className="font-display font-black text-xl md:text-2xl tracking-tight max-[359px]:hidden">quants</span>
         </Link>
         <nav aria-label="Main" className="hidden lg:flex gap-7 text-[15px] font-medium shrink-0">
           {links.map((l) => <Link key={l.href} href={l.href} className={cls(l.key)}>{l.label}</Link>)}
         </nav>
         <Search className="hidden md:block flex-1 min-w-44 max-w-md" />
-        <div className="ml-auto flex items-center gap-2.5 shrink-0">
-          <Link href="/launch" className={`hidden sm:flex items-center gap-1.5 font-display font-bold rounded-full px-5 min-h-11 ${active === "launch" ? "bg-raised-2 border border-white/10" : "text-ground bg-accent"}`}>
+        <div className="ml-auto flex items-center gap-2 md:gap-2.5 shrink-0">
+          <PhoneNav links={links} active={active} />
+          <Link href="/launch" className={`hidden md:flex items-center gap-1.5 font-display font-bold rounded-full px-5 min-h-11 ${active === "launch" ? "bg-raised-2 border border-white/10" : "text-ground bg-accent"}`}>
             <span aria-hidden className="text-lg leading-none">+</span> Launch
           </Link>
           <WalletButton />
         </div>
       </div>
-      <div className="lg:hidden wrap flex flex-col gap-3 pb-3">
-        <Search className="md:hidden" />
+      <div className="hidden md:flex lg:hidden wrap flex-col gap-3 pb-3">
         <nav aria-label="Main" className="flex gap-6 text-sm font-medium overflow-x-auto">
           {links.map((l) => <Link key={l.href} href={l.href} className={`${cls(l.key)} min-h-9 flex items-center shrink-0`}>{l.label}</Link>)}
         </nav>

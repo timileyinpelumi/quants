@@ -5,6 +5,7 @@ import { PaymentsList, StakerTokensList } from "@/web/rewards/RewardsLists";
 import { getContext } from "@/web/server/context";
 import { rewardsOverview } from "@/web/server/rewards";
 import { usdPrices } from "@/web/server/prices";
+import { MobileTabs, TabPanel, TabRow } from "@/web/ui/MobileTabs";
 
 export const metadata: Metadata = { title: "Rewards", description: "What every token has set aside for its stakers, and each reward payment on chain." };
 export const dynamic = "force-dynamic";
@@ -38,17 +39,24 @@ export default async function RewardsPage() {
           ))}
         </section>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-12 gap-y-12">
+        <MobileTabs ids={["tokens", "payments"]}>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-12 gap-y-12 max-md:gap-y-5">
+          <TabRow label="Reward lists" tabs={[["tokens", "Top tokens"], ["payments", "Latest payments"]]} />
+          <TabPanel show="tokens">
           <section className="flex flex-col">
             <h2 className="m-0 pb-3 font-display font-bold text-xl">Top tokens for stakers</h2>
             <StakerTokensList initial={r.top} nextOffset={r.topNext} />
           </section>
+          </TabPanel>
 
+          <TabPanel show="payments">
           <section className="flex flex-col">
             <h2 className="m-0 pb-3 font-display font-bold text-xl">Latest reward payments</h2>
             <PaymentsList initial={r.recent.map((p) => ({ ...p, priceUsd: px[p.rewardMint] ?? null }))} next={r.recentNext} />
           </section>
+          </TabPanel>
         </div>
+        </MobileTabs>
       </main>
     </div>
   );

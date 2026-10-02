@@ -7,6 +7,8 @@ const trade = (mint: string, rounds: number) =>
   execSync(`bun --env-file=.env.local scripts/trade-curve.ts ${mint} ${rounds} 5`, { stdio: "pipe", timeout: 180_000 }).toString();
 const symbol = `E${Math.random().toString(36).slice(2, 8).toUpperCase().replace(/[^A-Z0-9]/g, "X")}`;
 
+const isPhone = (page: Page) => (page.viewportSize()?.width ?? 1280) < 768;
+
 async function connect(page: Page) {
   const btn = page.getByRole("button", { name: "Connect wallet" }).first();
   if (await btn.isVisible()) {
@@ -35,6 +37,7 @@ test("launch, trade until staking opens, stake, exit early and see the burn", as
   await page.getByRole("button", { name: `Launch ${symbol}` }).click();
   await page.waitForURL(/\/t\/[1-9A-HJ-NP-Za-km-z]{32,44}$/, { timeout: 120_000 });
   const mint = page.url().split("/t/")[1]!;
+  if (isPhone(page)) await page.getByRole("tab", { name: "Rewards" }).click();
 
   await expect(page.getByRole("heading", { name: symbol, level: 1 })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Rewards and staking" })).toBeVisible();
@@ -67,7 +70,7 @@ test("launch, trade until staking opens, stake, exit early and see the burn", as
   await expect(page.getByText(/No stakes yet/)).toBeVisible();
 
   keeperPass();
-  await page.goto(`/t/${mint}`);
+  await page.goto(`/t/${mint}${isPhone(page) ? "#rewards" : ""}`);
   await expect(page.getByText(new RegExp(`^[1-9][\\d,]* ${symbol} burned`))).toBeVisible();
 });
 

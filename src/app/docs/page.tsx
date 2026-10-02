@@ -63,7 +63,7 @@ export default async function DocsPage() {
         <aside className="lg:sticky lg:top-8 self-start">
           <nav aria-label="On this page" className="flex lg:flex-col gap-x-5 gap-y-1 overflow-x-auto lg:overflow-visible text-sm">
             {sections.filter(([id]) => id !== "stocks" || stockPairsEnabled()).map(([id, label]) => (
-              <a key={id} href={`#${id}`} className="text-muted hover:text-ink min-h-9 flex items-center shrink-0">{label}</a>
+              <a key={id} href={`#${id}`} className="text-muted hover:text-ink min-h-10 md:min-h-9 flex items-center shrink-0">{label}</a>
             ))}
           </nav>
         </aside>

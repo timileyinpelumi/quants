@@ -51,11 +51,12 @@ export default async function ExplorePage({ searchParams }: { searchParams: Prom
           </form>
         </div>
 
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-          <nav aria-label="Sort" className="flex gap-1 overflow-x-auto">
+        <div className="flex md:items-center justify-between gap-3 max-md:gap-1 max-md:overflow-x-auto max-md:-mx-4 max-md:px-4 no-scrollbar">
+          <nav aria-label="Sort" className="flex gap-1 shrink-0 md:shrink md:overflow-x-auto">
             {SORTS.map(([k, l]) => <Link key={k} href={href({ sort: k })} aria-current={sort === k ? "page" : undefined} className={pill(sort === k)}>{l}</Link>)}
           </nav>
-          <nav aria-label="Filter" className="flex gap-1 overflow-x-auto">
+          <span aria-hidden className="md:hidden w-px my-2.5 bg-white/10 shrink-0" />
+          <nav aria-label="Filter" className="flex gap-1 shrink-0 md:shrink md:overflow-x-auto">
             {FILTERS.map(([k, l]) => <Link key={k} href={href({ filter: k })} aria-current={filter === k ? "page" : undefined} className={pill(filter === k)}>{l}</Link>)}
           </nav>
         </div>
