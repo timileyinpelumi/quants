@@ -76,6 +76,7 @@ export default async function TokenPage({ params }: { params: Promise<{ mint: st
                 initial={{ reserve: d.curve.quoteReserve, threshold: d.curve.threshold, progress, migrated: d.curve.migrated }} />
             </div>
           </div>
+          <a href="#insights" className="self-start -mt-3 text-sm text-muted hover:text-ink">Trades, activity and holders ↓</a>
         </section>
 
         <section className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_400px] gap-8">

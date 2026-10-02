@@ -34,10 +34,12 @@ export function Chart({ mint, quoteSymbol }: { mint: string; quoteSymbol: string
       grid: { vertLines: { visible: false }, horzLines: { color: "rgba(255,255,255,0.05)" } },
       rightPriceScale: { borderVisible: false },
       timeScale: { borderVisible: false, timeVisible: tf !== "1D" },
-      crosshair: { vertLine: { color: "rgba(76,157,255,0.35)" }, horzLine: { color: "rgba(76,157,255,0.35)" } },
+      crosshair: { vertLine: { color: "rgba(255,255,255,0.25)" }, horzLine: { color: "rgba(255,255,255,0.25)" } },
     });
+    // compare the first and last points drawn, so the colour matches the line
+    const [r, g, b] = candles.at(-1)!.close >= candles[0]!.close ? [46, 189, 133] : [246, 70, 93];
     const s = chart.addSeries(AreaSeries, {
-      lineColor: "#4C9DFF", lineWidth: 3, topColor: "rgba(76,157,255,0.28)", bottomColor: "rgba(76,157,255,0)",
+      lineColor: `rgb(${r},${g},${b})`, lineWidth: 2, topColor: `rgba(${r},${g},${b},0.24)`, bottomColor: `rgba(${r},${g},${b},0)`,
       priceFormat: { type: "custom", minMove: 1e-12, formatter: (p: number) => (unit === "usd" ? `$${fmtPrice(p, 5)}` : fmtPrice(p, 5)) },
     });
     s.setData(candles.map((c) => ({ time: c.time as UTCTimestamp, value: c.close })));

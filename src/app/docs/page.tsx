@@ -4,7 +4,7 @@ import { Header } from "@/web/ui/Header";
 import { getContext } from "@/web/server/context";
 import { loadLatestSettings } from "@/domain/settings";
 import { fmtAmount, lockLabel, lockShort } from "@/web/ui/format";
-import { quoteCoins } from "@/domain/quotes";
+import { quoteCoins, stockPairsEnabled } from "@/domain/quotes";
 import { launchableQuotes } from "@/web/server/quotes";
 import { launchCost } from "@/domain/launch-cost";
 import { usdPrices } from "@/web/server/prices";
@@ -62,7 +62,7 @@ export default async function DocsPage() {
       <div className="grid grid-cols-1 lg:grid-cols-[240px_minmax(0,1fr)] gap-10 lg:gap-16 wrap pt-10 md:pt-14 pb-20">
         <aside className="lg:sticky lg:top-8 self-start">
           <nav aria-label="On this page" className="flex lg:flex-col gap-x-5 gap-y-1 overflow-x-auto lg:overflow-visible text-sm">
-            {sections.map(([id, label]) => (
+            {sections.filter(([id]) => id !== "stocks" || stockPairsEnabled()).map(([id, label]) => (
               <a key={id} href={`#${id}`} className="text-muted hover:text-ink min-h-9 flex items-center shrink-0">{label}</a>
             ))}
           </nav>
@@ -141,12 +141,14 @@ export default async function DocsPage() {
           <P>New tokens trade on a bonding curve. When the curve has raised the amount below in its pair token, the token graduates to a Meteora DAMM v2 pool with permanently locked liquidity. Trading, fees, rewards and staking continue as before.</P>
           <Table head={["Paired with", "Graduates at"]} rows={quoteCoins().filter((c) => c.graduation > 0).map((c) => [c.name === "quants" ? `${c.symbol} (platform token)` : `${c.symbol} (${c.name})`, `${c.graduation.toLocaleString("en-US")} ${c.symbol}`])} />
 
-          <H2 id="stocks">Stock pairs</H2>
-          <P>A token can also be paired with a tokenized stock from xStocks or Backpack{stocks.length ? `: ${stocks.map((c) => c.symbol).join(", ")}` : ""}. These launches are trading only. They have no reward basket and no staking, because Kamino farms cannot hold stock tokens. The share of fees that would buy rewards goes to the creator and the platform instead, so the creator gets {pct(creatorOnly)} and the platform {pct(10_000 - creatorOnly)} of what is left after Meteora&apos;s 20%.</P>
-          <P>The company behind a stock token can pause it, for example around a corporate action. While it is paused nobody can buy or sell tokens paired with it, and quants waits to collect fees, pay creators and graduate those tokens until it is resumed. Nothing is lost while it waits.</P>
-          <P>Meteora accepts a stock as a pair only once it has a token badge for that stock, and quants offers only stocks that have one and that pass its checks: no transfer fee and no transfer hook.</P>
-          <P>Some stock tokens scale the amount a wallet shows, to account for dividends and splits. quants shows balances and trade amounts the way your wallet does. Transactions, charts and graduation progress use the amounts recorded on chain.</P>
-          {stocks.some((c) => c.graduation > 0) && <Table head={["Paired with", "Graduates at"]} rows={stocks.filter((c) => c.graduation > 0).map((c) => [`${c.symbol} (${c.name})`, `${c.graduation.toLocaleString("en-US")} ${c.symbol}`])} />}
+          {stockPairsEnabled() && <>
+            <H2 id="stocks">Stock pairs</H2>
+            <P>A token can also be paired with a tokenized stock from xStocks or Backpack{stocks.length ? `: ${stocks.map((c) => c.symbol).join(", ")}` : ""}. These launches are trading only. They have no reward basket and no staking, because Kamino farms cannot hold stock tokens. The share of fees that would buy rewards goes to the creator and the platform instead, so the creator gets {pct(creatorOnly)} and the platform {pct(10_000 - creatorOnly)} of what is left after Meteora&apos;s 20%.</P>
+            <P>The company behind a stock token can pause it, for example around a corporate action. While it is paused nobody can buy or sell tokens paired with it, and quants waits to collect fees, pay creators and graduate those tokens until it is resumed. Nothing is lost while it waits.</P>
+            <P>Meteora accepts a stock as a pair only once it has a token badge for that stock, and quants offers only stocks that have one and that pass its checks: no transfer fee and no transfer hook.</P>
+            <P>Some stock tokens scale the amount a wallet shows, to account for dividends and splits. quants shows balances and trade amounts the way your wallet does. Transactions, charts and graduation progress use the amounts recorded on chain.</P>
+            {stocks.some((c) => c.graduation > 0) && <Table head={["Paired with", "Graduates at"]} rows={stocks.filter((c) => c.graduation > 0).map((c) => [`${c.symbol} (${c.name})`, `${c.graduation.toLocaleString("en-US")} ${c.symbol}`])} />}
+          </>}
 
           <H2 id="risks">Risks</H2>
           <P>Launched tokens are volatile and most lose value. Reward tokens can lose value too. Smart contracts can have bugs. Only use money you can afford to lose. Read the <Link href="/terms" className="text-accent">terms and risks</Link>.</P>

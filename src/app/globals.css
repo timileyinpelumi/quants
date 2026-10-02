@@ -14,7 +14,9 @@
   --color-stake: #5BB4CC;
   --color-stake-light: #8CCFDF;
   --color-burn: #FF9B7A;
-  --font-display: var(--font-unbounded), sans-serif;
+  --color-up: #2EBD85;
+  --color-down: #F6465D;
+  --font-display: var(--font-bricolage), sans-serif;
   --font-sans: var(--font-geist), system-ui, sans-serif;
   --font-mono: var(--font-geist-mono), monospace;
 }
@@ -37,7 +39,7 @@ input::placeholder, textarea::placeholder { color: var(--color-faint); }
 .wallet-adapter-button { font-family: var(--font-geist-mono) !important; font-weight: 500 !important; border-radius: 999px !important; background: #1B1A24 !important; border: 1px solid rgba(255,255,255,0.10) !important; height: 44px !important; font-size: 14px !important; padding: 0 20px !important; }
 .wallet-adapter-button:not([disabled]):hover { background: #232230 !important; }
 .wallet-adapter-modal-wrapper { background: #111018 !important; border-radius: 32px !important; border: 1px solid rgba(255,255,255,0.08); }
-.wallet-adapter-modal-title { font-family: var(--font-unbounded) !important; font-weight: 900 !important; }
+.wallet-adapter-modal-title { font-family: var(--font-display) !important; font-weight: 700 !important; }
 .wallet-adapter-dropdown-list { background: #16151E !important; border-radius: 20px !important; }
 
 @utility wrap {

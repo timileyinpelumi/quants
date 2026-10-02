@@ -38,7 +38,7 @@ const localQuotes: Record<string, PublicKey> = {
   JUP: await createMint(conn, keeper, keeper.publicKey, null, 6),
 };
 const quoteEnv = {
-  OURTOKEN_MINT: ours.toBase58(), OURTOKEN_SYMBOL: "QNT", OURTOKEN_DECIMALS: "6", OURTOKEN_GRADUATION: "100000",
+  OURTOKEN_MINT: ours.toBase58(), OURTOKEN_SYMBOL: "QUANTS", OURTOKEN_DECIMALS: "6", OURTOKEN_GRADUATION: "100000",
   QUOTE_MINTS: JSON.stringify(Object.fromEntries(Object.entries(localQuotes).map(([k, v]) => [k, v.toBase58()]))),
 };
 // Token-2022 stand-ins for stock pairs; the web app lists them through LOCAL_STOCKS instead of the issuers' lists.
@@ -154,7 +154,7 @@ const env = {
   LOCAL_TOKEN_LIST: JSON.stringify(Object.entries(rewards).map(([symbol, m]) => ({ mint: m.toBase58(), symbol, name: symbol, icon: null, decimals: symbol === "ZEC" ? 8 : 6, tokenProgram: "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA" }))),
   NEXT_PUBLIC_RPC_URL: RPC,
   NEXT_PUBLIC_OURTOKEN_MINT: ours.toBase58(),
-  NEXT_PUBLIC_OURTOKEN_SYMBOL: "QNT",
+  NEXT_PUBLIC_OURTOKEN_SYMBOL: "QUANTS",
   NEXT_PUBLIC_SOL_GRADUATION: "85",
   NEXT_PUBLIC_OURTOKEN_GRADUATION: "100000",
   NEXT_PUBLIC_TEST_WALLET_SECRET: JSON.stringify(Array.from(tester.secretKey)),

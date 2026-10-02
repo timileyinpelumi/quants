@@ -125,7 +125,7 @@ export function TradePanel({ mint, symbol, quoteMint, quoteSymbol, quoteDecimals
             type="button"
             aria-pressed={tab === s}
             onClick={() => { setTab(s); setAmount(""); setMsg(null); }}
-            className={`font-display font-bold text-[15px] py-3 min-h-11 rounded-full cursor-pointer capitalize ${tab === s ? (s === "buy" ? "bg-accent text-ground" : s === "sell" ? "bg-burn text-ground" : "bg-stake-light text-ground") : "text-muted hover:text-ink"}`}
+            className={`font-display font-bold text-[15px] py-3 min-h-11 rounded-full cursor-pointer capitalize ${tab === s ? (s === "buy" ? "bg-up text-ground" : s === "sell" ? "bg-down text-ground" : "bg-stake-light text-ground") : "text-muted hover:text-ink"}`}
           >
             {s}
           </button>
@@ -168,7 +168,7 @@ export function TradePanel({ mint, symbol, quoteMint, quoteSymbol, quoteDecimals
       {quoteError && <p className="m-0 text-sm text-burn">{quoteError}</p>}
       {msg && <p role="status" className={`m-0 text-sm ${msg.ok ? "text-accent" : "text-burn"}`}>{msg.text}</p>}
 
-      <Button size="lg" variant={side === "buy" ? "accent" : "burn"} disabled={busy || (!!owner && (!quote || tooMuch))} onClick={trade}>
+      <Button size="lg" variant={side === "buy" ? "up" : "down"} disabled={busy || (!!owner && (!quote || tooMuch))} onClick={trade}>
         {busy ? "Approve in your wallet" : !owner ? "Connect wallet" : `${side === "buy" ? "Buy" : "Sell"} ${symbol}`}
       </Button>
       <p className="m-0 text-[12px] text-faint text-center">{quote?.venue === "damm" ? "Trades on the graduated Meteora pool" : "Trades on the bonding curve"}</p>

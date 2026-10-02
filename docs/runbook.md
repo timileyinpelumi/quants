@@ -18,6 +18,7 @@ Copy `.env.example` to `.env` and fill in:
 | `JUPITER_API_KEY` | Free key from the Jupiter portal; without it requests are limited to 30 a minute |
 | `ALERT_WEBHOOK_URL` | Optional. Incoming webhook the keeper and indexer post alerts to (see Alerts) |
 | `QUOTE_GRADUATIONS` | Optional. JSON of graduation targets by pair symbol, for example `{"SOL":100,"USDC":15000}` (see Graduation targets) |
+| `STOCK_PAIRS` | Optional. `1` lets new launches pair with stocks (see Stock pairs). Off by default |
 
 ## Wallets
 
@@ -44,7 +45,7 @@ Keep `config-keys.json` next to `.env` on the server (it is gitignored because t
 
 ### Stock pairs
 
-Tokenized stocks (xStocks from Backed, and Backpack stocks such as `SPCX.US`) can be pair tokens. They are Token-2022 mints, so:
+Tokenized stocks (xStocks from Backed, and Backpack stocks such as `SPCX.US`) can be pair tokens. New stock launches are off by default because these launches have no staking: the launch form shows crypto pairs only, the docs page leaves out the stock section, and `/api/launch/prepare` refuses a stock pair. Set `STOCK_PAIRS=1` on the web app to turn them on. Stock launches that already exist keep trading either way, the registry keeps refreshing, and `e2e/stocks.spec.ts` runs only when `STOCK_PAIRS=1` is set for both the web app and the Playwright run. They are Token-2022 mints, so:
 
 - **Trading only.** Kamino farms reject these mints, so a launch against a stock has no reward basket, no stake pool and no farms. The keeper splits its fees between the treasury and the creator in proportion to `platformBps` and `creatorBps` (the basket share is shared out the same way) and never runs the rent, swap or fund steps for it. The launch form hides the basket and staking for these pairs, and the token page, explore and home show a Trading only tag instead of staking.
 - **Token badge.** DBC rejects Token-2022 quote mints with extensions unless the config and every pool pass the mint's DBC token badge (`deriveTokenBadgeAddress(mint)`). Meteora creates badges, and the xStocks and Backpack stocks checked so far have one on mainnet. `create-configs.ts` refuses a stock with extensions and no badge, and `MeteoraLive.buildLaunchTx` passes the badge whenever the quote mint is Token-2022 and the badge account exists.
@@ -137,7 +138,7 @@ On top of the keeper variables above, the web app needs:
 | `ADMIN_SESSION_SECRET` | At least 32 random bytes, hex |
 | `CONFIG_KEYS_PATH` | Path to `config-keys.json` |
 | `NEXT_PUBLIC_RPC_URL` | RPC the browser uses |
-| `NEXT_PUBLIC_OURTOKEN_MINT`, `NEXT_PUBLIC_OURTOKEN_SYMBOL` | The platform token |
+| `NEXT_PUBLIC_OURTOKEN_MINT`, `NEXT_PUBLIC_OURTOKEN_SYMBOL` | The platform token. Its ticker is `QUANTS`, the default when the symbol is unset |
 | `NEXT_PUBLIC_SOL_GRADUATION`, `NEXT_PUBLIC_OURTOKEN_GRADUATION` | Shown on the launch form; must match what the config keys were created with |
 | `SITE_URL` | Public origin, e.g. `https://quants.example`; the admin sign in message names its domain |
 | `TRUST_PROXY` | `1` behind Caddy or on Vercel so rate limits key on `x-forwarded-for`; leave unset when the app is reachable directly |

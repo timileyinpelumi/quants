@@ -19,6 +19,8 @@ export type TokenRow = {
   /** Percent of the way to opening staking; null once open. */
   stakingPct: number | null;
   tradingOnly: boolean;
+  /** Last 24h of prices in the pair token, oldest first; set only where a sparkline is drawn. */
+  spark?: number[];
 };
 export type TradeRow = {
   signature: string; eventIndex: number; mint: string; symbol: string; side: "buy" | "sell"; valueUsd: number | null; quoteValue: number; quoteMint: string;
@@ -160,6 +162,43 @@ export async function recentBuys(sql: SQL, limit: number): Promise<BuyRow[]> {
   return rows.map((r: any) => ({
     id: `${r.signature}:${r.event_index}`, mint: r.mint, symbol: r.symbol, trader: r.trader, amount: r.base * BASE_UNIT, at: new Date(r.block_time).toISOString(),
   }));
+}
+
+/**
+ * One query for every listed token: the price before the window, then the closing price of each of `points` buckets
+ * over the last 24h, with empty buckets carrying the last price forward. A token with no trades gets [].
+ */
+export async function sparklines(sql: SQL, mints: string[], now = Date.now(), points = 24): Promise<Record<string, number[]>> {
+  if (!mints.length) return {};
+  const since = new Date(now - DAY);
+  const step = DAY / points;
+  const rows = await sql`
+    with l as (select id, mint from launches where mint in ${sql(mints)}),
+    b as (
+      select t.launch_id, least(${points - 1}, floor(extract(epoch from (t.block_time - ${since}::timestamptz)) * 1000 / ${step}))::int as i,
+        (array_agg(t.price order by t.slot, t.seq))[1] as open, (array_agg(t.price order by t.slot desc, t.seq desc))[1] as close
+      from trades t where t.launch_id in (select id from l) and t.block_time > ${since}
+      group by 1, 2
+    )
+    select l.mint, ref.price as ref,
+      coalesce((select json_agg(json_build_array(b.i, b.open, b.close) order by b.i) from b where b.launch_id = l.id), '[]') as pts
+    from l left join lateral (select price from trades where launch_id = l.id and block_time <= ${since} order by slot desc, seq desc limit 1) ref on true`;
+  const out: Record<string, number[]> = {};
+  for (const r of rows as any[]) {
+    const pts = (typeof r.pts === "string" ? JSON.parse(r.pts) : r.pts) as [number, number, number][];
+    let last: number | null = r.ref ?? pts[0]?.[1] ?? null;
+    if (last === null) { out[r.mint] = []; continue; }
+    const close = new Map(pts.map(([i, , c]) => [i, c]));
+    const line = [last];
+    for (let i = 0; i < points; i++) { last = close.get(i) ?? last; line.push(last); }
+    out[r.mint] = line;
+  }
+  return out;
+}
+
+export async function withSparks(sql: SQL, rows: TokenRow[], now = Date.now()): Promise<TokenRow[]> {
+  const s = await sparklines(sql, rows.map((r) => r.mint), now);
+  return rows.map((r) => ({ ...r, spark: s[r.mint] ?? [] }));
 }
 
 export async function exploreTokens(sql: SQL, o: TokenQuery, now = Date.now(), icons?: Icons): Promise<TokenRow[]> {

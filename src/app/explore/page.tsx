@@ -3,7 +3,7 @@ import { Header } from "@/web/ui/Header";
 import { getContext } from "@/web/server/context";
 import { allQuotes, quoteIcons } from "@/web/server/quotes";
 import { ExploreList } from "@/web/explore/ExploreList";
-import { exploreTokens, type ExploreFilter, type ExploreSort } from "@/web/server/landing";
+import { exploreTokens, withSparks, type ExploreFilter, type ExploreSort } from "@/web/server/landing";
 
 export const dynamic = "force-dynamic";
 
@@ -19,8 +19,9 @@ export default async function ExplorePage({ searchParams }: { searchParams: Prom
   const ctx = getContext();
   const quotes = await allQuotes(ctx);
   const pair = quotes.find((c) => c.mint === p.quote);
-  const rows = await exploreTokens(ctx.sql, { sort, filter, q, quote: pair?.mint, limit: PAGE + 1 }, Date.now(), (m) => quoteIcons(ctx, m, quotes));
-  const tokens = rows.slice(0, PAGE);
+  const now = Date.now();
+  const rows = await exploreTokens(ctx.sql, { sort, filter, q, quote: pair?.mint, limit: PAGE + 1 }, now, (m) => quoteIcons(ctx, m, quotes));
+  const tokens = await withSparks(ctx.sql, rows.slice(0, PAGE), now);
   const nextOffset = rows.length > PAGE ? PAGE : null;
   const href = (o: { sort?: string; filter?: string }) => {
     const sp = new URLSearchParams();

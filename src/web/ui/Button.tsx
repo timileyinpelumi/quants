@@ -4,6 +4,8 @@ const variants = {
   accent: "bg-accent text-ground glow-accent",
   stake: "bg-stake-light text-ground glow-stake",
   burn: "bg-burn text-ground puff",
+  up: "bg-up text-ground",
+  down: "bg-down text-ground",
   ghost: "bg-raised-2 text-ink border border-white/10",
   outline: "bg-transparent text-ink border border-white/15",
   danger: "bg-transparent text-burn border border-burn/45",

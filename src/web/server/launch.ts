@@ -3,7 +3,7 @@ import type { WebContext } from "./context";
 import { prepareLaunch, LaunchError } from "@/launch/prepare";
 import { loadLatestSettings } from "@/domain/settings";
 import { NATIVE_MINT } from "@/domain/types";
-import { allQuotes } from "./quotes";
+import { allQuotes, launchableQuotes } from "./quotes";
 
 const Body = z.object({
   devBuySol: z.string().regex(/^\d+$/, "First buy must be a whole number of lamports").default("0"),
@@ -33,9 +33,10 @@ export async function prepareWithSwap(ctx: WebContext, raw: unknown) {
     transactions.push({ base64: (await ctx.jupiter.buildUnsignedSwap(q, rest.creator)).base64, versioned: true });
   }
   const quotes = await allQuotes(ctx);
+  const launchable = await launchableQuotes(ctx, quotes);
   const p = await prepareLaunch(
     {
-      sql: ctx.sql, meteora: ctx.meteora, configKeys: ctx.configKeys, quoteMints: quotes.map((c) => c.mint),
+      sql: ctx.sql, meteora: ctx.meteora, configKeys: ctx.configKeys, quoteMints: launchable.map((c) => c.mint),
       tradingOnlyMints: quotes.filter((c) => c.tradingOnly).map((c) => c.mint),
       isVerified: (m) => ctx.jupiter.isVerified(m), tokenProgramOf: ctx.tokenProgramOf,
     },

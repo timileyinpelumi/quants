@@ -11,7 +11,7 @@ const TABS: { id: "all" | PairKind; label: string }[] = [
 ];
 
 export function pairTabs(quotes: PairOption[]) {
-  return TABS.map((t) => ({ ...t, count: t.id === "all" ? quotes.length : quotes.filter((q) => q.kind === t.id).length }));
+  return TABS.map((t) => ({ ...t, count: t.id === "all" ? quotes.length : quotes.filter((q) => q.kind === t.id).length })).filter((t) => t.id === "all" || t.count > 0);
 }
 
 export function filterPairs(quotes: PairOption[], tab: "all" | PairKind, q: string) {
@@ -26,7 +26,7 @@ export function PairPicker({ quotes, value, onChange }: { quotes: PairOption[]; 
   const shown = useMemo(() => filterPairs(quotes, tab, q), [quotes, tab, q]);
   const picked = quotes.find((c) => c.mint === value);
   const label = picked?.symbol ?? "SOL";
-  const grouped = tabs.filter((t) => t.id !== "all" && t.count > 0).length > 1;
+  const grouped = tabs.length > 2;
 
   return (
     <div className="flex flex-col gap-3">
