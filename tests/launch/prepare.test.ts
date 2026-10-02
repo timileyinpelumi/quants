@@ -1,8 +1,9 @@
 import { test, expect } from "bun:test";
+import { Transaction } from "@solana/web3.js";
 import { freshDb } from "../helpers/db";
 import { FakeChain } from "../helpers/fake-chain";
 import { FakeMeteora } from "../helpers/fake-meteora";
-import { prepareLaunch, LaunchError } from "../../src/launch/prepare";
+import { prepareLaunch, launchOnly, LaunchError } from "../../src/launch/prepare";
 import { defaultSettings, saveSettings } from "../../src/domain/settings";
 import { NATIVE_MINT } from "../../src/domain/types";
 import { staticConfigs } from "../../src/launch/config-keys";
@@ -24,7 +25,7 @@ async function setup(verified = true, tokenProgram = "TokenkegQfeZyiNwAJbNbGKPFX
 
 test("prepares a transaction against the right config key with no launch fee", async () => {
   const { deps, meteora } = await setup();
-  const r = await prepareLaunch(deps, valid);
+  const r = launchOnly(await prepareLaunch(deps, valid));
   expect(r.pool).toStartWith("pool-");
   expect(typeof r.transaction).toBe("string");
   expect(meteora.launches[0]!.configKey).toBe("CfgSol200");
@@ -65,7 +66,7 @@ test("rejects bad input", async () => {
 
 test("the pair token can be the whole reward basket without a verified listing", async () => {
   const { deps, sql } = await setup(false);
-  const r = await prepareLaunch(deps, { ...valid, basket: [{ mint: NATIVE_MINT, weightBps: 10_000 }] });
+  const r = launchOnly(await prepareLaunch(deps, { ...valid, basket: [{ mint: NATIVE_MINT, weightBps: 10_000 }] }));
   const [row] = await sql`select basket from prepared_launches where mint = ${r.mint}`;
   expect((typeof row.basket === "string" ? JSON.parse(row.basket) : row.basket).map((b: any) => b.mint)).toEqual([NATIVE_MINT]);
   await expect(prepareLaunch(deps, { ...valid, basket: [{ mint: valid.basket[0]!.mint, weightBps: 10_000 }] })).rejects.toMatchObject({ code: "basket_not_verified" });
@@ -88,7 +89,7 @@ test("the first buy cap is checked against the curve quote, not the client's min
   meteora.firstBuyOut = async (_cfg, amount) => amount * 1_000n;
   await expect(prepareLaunch(deps, { ...valid, devBuyQuoteAmount: (cap / 1_000n + 1n).toString(), devBuyMinOut: "0" }))
     .rejects.toMatchObject({ code: "dev_buy_too_large" });
-  const ok = await prepareLaunch(deps, { ...valid, devBuyQuoteAmount: (cap / 1_000n).toString(), devBuyMinOut: "0" });
+  const ok = launchOnly(await prepareLaunch(deps, { ...valid, devBuyQuoteAmount: (cap / 1_000n).toString(), devBuyMinOut: "0" }));
   expect(ok.mint).toBeDefined();
   expect(meteora.firstBuyQuotes.at(-1)).toEqual({ configKey: "CfgSol200", amount: cap / 1_000n });
 });
@@ -98,12 +99,12 @@ test("a stock pair is trading only: no basket, and a basket is refused", async (
   const STOCK = "Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh";
   const deps = { sql, meteora, configFor: staticConfigs({ ...configKeys, [`${STOCK}:200`]: "CfgStock200" }), quoteMints: [NATIVE_MINT, STOCK], tradingOnlyMints: [STOCK],
     isVerified: async () => { throw new Error("no basket check for a trading only pair"); }, tokenProgramOf: async () => "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb" };
-  const r = await prepareLaunch(deps, { ...valid, quoteMint: STOCK, basket: [] });
+  const r = launchOnly(await prepareLaunch(deps, { ...valid, quoteMint: STOCK, basket: [] }));
   expect(meteora.launches.at(-1)!.configKey).toBe("CfgStock200");
   const [row] = await sql`select trading_only, basket from prepared_launches where mint = ${r.mint}`;
   expect(row.trading_only).toBe(true);
   expect(row.basket).toEqual([]);
-  const noBasket = await prepareLaunch(deps, { ...valid, quoteMint: STOCK, basket: undefined });
+  const noBasket = launchOnly(await prepareLaunch(deps, { ...valid, quoteMint: STOCK, basket: undefined }));
   expect(noBasket.mint).toBeDefined();
   await expect(prepareLaunch(deps, { ...valid, quoteMint: STOCK })).rejects.toMatchObject({ code: "invalid_input", message: expect.stringContaining("no reward basket") });
 });
@@ -111,4 +112,21 @@ test("a stock pair is trading only: no basket, and a basket is refused", async (
 test("rejects basket tokens that are not classic SPL tokens", async () => {
   const { deps } = await setup(true, "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb");
   await expect(prepareLaunch(deps, valid)).rejects.toMatchObject({ code: "basket_unsupported" });
+});
+
+test("stopping before the launch validates everything but builds and records nothing", async () => {
+  const { deps, meteora, sql } = await setup();
+  expect(await prepareLaunch(deps, valid, { stopBeforeLaunch: true })).toEqual({ step: "ready", configKey: "CfgSol200" });
+  expect(meteora.launches).toEqual([]);
+  expect((await sql`select mint from prepared_launches`).length).toBe(0);
+  await expect(prepareLaunch(deps, { ...valid, symbol: "TOO LONG" }, { stopBeforeLaunch: true })).rejects.toBeInstanceOf(LaunchError);
+});
+
+test("the launch step is partially signed by the mint it records, and nothing else", async () => {
+  const { deps, sql } = await setup();
+  const r = launchOnly(await prepareLaunch(deps, valid));
+  const tx = Transaction.from(Buffer.from(r.transaction, "base64"));
+  expect(tx.signatures.filter((s) => s.signature).map((s) => s.publicKey.toBase58())).toEqual([r.mint]);
+  expect(tx.feePayer!.toBase58()).toBe(valid.creator);
+  expect((await sql`select mint from prepared_launches`).map((x: any) => x.mint)).toEqual([r.mint]);
 });

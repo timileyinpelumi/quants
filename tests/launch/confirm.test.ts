@@ -4,7 +4,7 @@ import { getAssociatedTokenAddressSync } from "@solana/spl-token";
 import { freshDb } from "../helpers/db";
 import { FakeChain } from "../helpers/fake-chain";
 import { FakeMeteora } from "../helpers/fake-meteora";
-import { prepareLaunch } from "../../src/launch/prepare";
+import { prepareLaunch, launchOnly } from "../../src/launch/prepare";
 import { confirmLaunch } from "../../src/launch/confirm";
 import { NATIVE_MINT } from "../../src/domain/types";
 import { defaultSettings, saveSettings } from "../../src/domain/settings";
@@ -23,11 +23,11 @@ async function prepared(opts: { onChainCreator?: string; onChainConfig?: string 
   await saveSettings(sql, defaultSettings(OURS), "t");
   const meteora = new FakeMeteora(new FakeChain());
   const configKeys = { [`${NATIVE_MINT}:200`]: "CfgSol200" };
-  const p = await prepareLaunch(
+  const p = launchOnly(await prepareLaunch(
     { sql, meteora, configFor: staticConfigs(configKeys), quoteMints: [NATIVE_MINT, OURS], isVerified: async () => true, tokenProgramOf: async () => "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA" },
     { name: "Cat", symbol: "CAT", uri: "https://x.test/cat.json", creator: CREATOR, quoteMint: NATIVE_MINT, feeTierBps: 200,
       basket: [{ mint: "Zec1111111111111111111111111111111111111111", weightBps: 10_000 }] },
-  );
+  ));
   meteora.pools.set(p.pool, { baseMint: p.mint, config: opts.onChainConfig ?? "CfgSol200", creator: opts.onChainCreator ?? CREATOR });
   return { sql, meteora, p };
 }
@@ -52,10 +52,10 @@ test("a trading only launch is recorded without a basket or stake pool", async (
   await saveSettings(sql, defaultSettings(OURS), "t");
   const meteora = new FakeMeteora(new FakeChain());
   const STOCK = "Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh";
-  const p = await prepareLaunch(
+  const p = launchOnly(await prepareLaunch(
     { sql, meteora, configFor: staticConfigs({ [`${STOCK}:200`]: "CfgStock200" }), quoteMints: [STOCK], tradingOnlyMints: [STOCK], isVerified: async () => true, tokenProgramOf: async () => "" },
     { name: "Cat", symbol: "CAT", uri: "https://x.test/cat.json", creator: CREATOR, quoteMint: STOCK, feeTierBps: 200, basket: [] },
-  );
+  ));
   meteora.pools.set(p.pool, { baseMint: p.mint, config: "CfgStock200", creator: CREATOR });
   const id = await confirmLaunch({ sql, conn: conn(true), meteora, spillWallet: SPILL }, { signature: "sig", mint: p.mint });
   const [l] = await sql`select trading_only, quote_mint from launches where id = ${id}`;

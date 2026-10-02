@@ -15,7 +15,6 @@ export interface NewConfig { config: Keypair; feeBps: number; quote: QuoteSpec; 
 export interface LaunchTxInput {
   name: string; symbol: string; uri: string; creator: string; configKey: string; quoteMint: string;
   devBuyQuoteAmount: bigint; devBuyMinOut: bigint;
-  createConfig?: NewConfig;
   /** Lamports the launcher sends the keeper in the launch transaction, when the keeper is below its floor. */
   keeperTopUp?: { to: string; lamports: bigint };
 }
@@ -28,8 +27,10 @@ export interface MeteoraPort {
   curveProgress(pool: string): Promise<{ quoteReserve: bigint; threshold: bigint; migrated: boolean }>;
   buildMigrate(pool: string): Promise<SignedTx>;
   findGraduatedPosition(configKey: string, baseMint: string, quoteMint: string): Promise<GraduatedPosition | null>;
-  /** `setupTx` creates the config key when `input.createConfig` is set; it must land before `tx`. */
-  buildLaunchTx(input: LaunchTxInput): Promise<{ tx: Transaction; setupTx?: Transaction; baseMint: Keypair; pool: string }>;
+  /** Pool creation, first buy and keeper top up against a config key that exists on chain, partially signed by the new mint. */
+  buildLaunchTx(input: LaunchTxInput): Promise<{ tx: Transaction; baseMint: Keypair; pool: string }>;
+  /** Creates a config key paid by `creator`, partially signed by the config keypair. It must confirm before the launch is built. */
+  buildConfigTx(input: { creator: string; quoteMint: string; create: NewConfig }): Promise<Transaction>;
   /** Base units a first buy of `quoteAmount` takes from a fresh curve, before fees (an upper bound on what it receives). */
   firstBuyMaxOut(config: string | { feeBps: number; quote: QuoteSpec }, quoteAmount: bigint): Promise<bigint>;
   /** The parts of an on-chain config key quants checks before trusting it, or null when it does not exist. */
@@ -154,38 +155,34 @@ export class MeteoraLive implements MeteoraPort {
     const firstBuyParam = input.devBuyQuoteAmount > 0n
       ? { buyer: creator, buyAmount: new BN(input.devBuyQuoteAmount.toString()), minimumAmountOut: new BN(input.devBuyMinOut.toString()), referralTokenAccount: null }
       : undefined;
-    let setupTx: Transaction | undefined;
-    const tx = new Transaction();
-    if (input.createConfig) {
-      const c = input.createConfig;
-      const keeper = pk(c.keeper);
-      const built = await this.dbc.partner.createConfigAndPoolWithFirstBuy({
-        config: c.config.publicKey, feeClaimer: keeper, leftoverReceiver: keeper, quoteMint: pk(input.quoteMint), payer: creator, tokenBadge,
-        preCreatePoolParam: { name: input.name, symbol: input.symbol, uri: input.uri, poolCreator: creator, baseMint: baseMint.publicKey },
-        firstBuyParam,
-        ...buildQuantsConfig(c.feeBps, c.quote),
-      });
-      setupTx = new Transaction().add(...built.createConfigTx.instructions);
-      tx.add(...built.createPoolWithFirstBuyTx.instructions);
-    } else {
-      const create = await this.dbc.creator.createPoolWithFirstBuy({
-        createPoolParam: { name: input.name, symbol: input.symbol, uri: input.uri, payer: creator, poolCreator: creator, config: pk(input.configKey), baseMint: baseMint.publicKey, tokenBadge },
-        firstBuyParam,
-      });
-      tx.add(...create.instructions);
-    }
+    const tx = await this.dbc.creator.createPoolWithFirstBuy({
+      createPoolParam: { name: input.name, symbol: input.symbol, uri: input.uri, payer: creator, poolCreator: creator, config: pk(input.configKey), baseMint: baseMint.publicKey, tokenBadge },
+      firstBuyParam,
+    });
     if (input.keeperTopUp && input.keeperTopUp.lamports > 0n) {
       tx.add(SystemProgram.transfer({ fromPubkey: creator, toPubkey: pk(input.keeperTopUp.to), lamports: input.keeperTopUp.lamports }));
     }
-    const { blockhash } = await this.chain.conn.getLatestBlockhash("confirmed");
-    for (const t of setupTx ? [setupTx, tx] : [tx]) {
-      t.recentBlockhash = blockhash;
-      t.feePayer = creator;
-    }
-    if (setupTx) setupTx.partialSign(input.createConfig!.config);
+    tx.recentBlockhash = (await this.chain.conn.getLatestBlockhash("confirmed")).blockhash;
+    tx.feePayer = creator;
     tx.partialSign(baseMint);
     const pool = deriveDbcPoolAddress(pk(input.quoteMint), baseMint.publicKey, pk(input.configKey)).toBase58();
-    return { tx, setupTx, baseMint, pool };
+    return { tx, baseMint, pool };
+  }
+
+  async buildConfigTx(input: { creator: string; quoteMint: string; create: NewConfig }) {
+    const c = input.create;
+    const keeper = pk(c.keeper);
+    const creator = pk(input.creator);
+    const quoteMint = pk(input.quoteMint);
+    const tx = await this.dbc.partner.createConfig({
+      config: c.config.publicKey, feeClaimer: keeper, leftoverReceiver: keeper, quoteMint, payer: creator,
+      tokenBadge: await quoteTokenBadge(this.chain.conn, quoteMint),
+      ...buildQuantsConfig(c.feeBps, c.quote),
+    });
+    tx.recentBlockhash = (await this.chain.conn.getLatestBlockhash("confirmed")).blockhash;
+    tx.feePayer = creator;
+    tx.partialSign(c.config);
+    return tx;
   }
 
 }

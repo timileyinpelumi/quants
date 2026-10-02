@@ -4,6 +4,7 @@ import { LaunchError } from "@/launch/prepare";
 import { quoteCoin } from "@/domain/quotes";
 import { allQuotes } from "./quotes";
 import type { Side, TradeTarget } from "@/meteora/trade";
+import { checkTx, type WalletTx } from "./tx-check";
 
 const addr = z.string().regex(/^[1-9A-HJ-NP-Za-km-z]{32,44}$/, "Wallet address is not valid");
 const amount = z.string().regex(/^\d+$/, "Amount must be a whole number of base units").refine((v) => BigInt(v) > 0n, "Enter an amount");
@@ -31,8 +32,10 @@ function readable(e: unknown): never {
   throw e;
 }
 
-export async function buildTrade(ctx: WebContext, raw: unknown) {
+export async function buildTrade(ctx: WebContext, raw: unknown): Promise<WalletTx> {
   const b = z.object({ mint: z.string().min(1), side, amount, minOut: z.string().regex(/^\d+$/), owner: addr }).parse(raw);
   const t = await target(ctx, b.mint);
-  return ctx.trade.buildSwapTx(t, b.side as Side, BigInt(b.amount), BigInt(b.minOut), b.owner).catch(readable);
+  const transaction = { base64: await ctx.trade.buildSwapTx(t, b.side as Side, BigInt(b.amount), BigInt(b.minOut), b.owner).catch(readable), versioned: false };
+  await checkTx(ctx.conn, transaction);
+  return transaction;
 }

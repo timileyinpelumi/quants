@@ -7,8 +7,7 @@ export const dynamic = "force-dynamic";
 export async function POST(req: Request, { params }: { params: Promise<{ action: string }> }) {
   try {
     rateLimit(req, "stake", 30);
-    const base64 = await buildStakeAction(getContext(), (await params).action, await readJson(req));
-    return json({ transaction: { base64, versioned: false } });
+    return json({ transaction: await buildStakeAction(getContext(), (await params).action, await readJson(req)) });
   } catch (e) {
     return jsonError(e);
   }

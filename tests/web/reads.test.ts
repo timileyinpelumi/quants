@@ -1,6 +1,6 @@
 import { test, expect } from "bun:test";
 import { OURS, makeWebContext } from "../helpers/web-context";
-import { prepareLaunch } from "../../src/launch/prepare";
+import { prepareLaunch, launchOnly } from "../../src/launch/prepare";
 import { confirmLaunch } from "../../src/launch/confirm";
 import { listLaunches, launchDetail, feeSummary } from "../../src/web/server/reads";
 import { beginStep, confirmStep } from "../../src/ledger/ledger";
@@ -12,11 +12,11 @@ const ZEC = "Zec1111111111111111111111111111111111111111";
 const CREATOR = "Creator111111111111111111111111111111111111";
 
 async function launch(c: Awaited<ReturnType<typeof makeWebContext>>, symbol: string) {
-  const p = await prepareLaunch(
+  const p = launchOnly(await prepareLaunch(
     { sql: c.sql, meteora: c.meteora, configFor: staticConfigs(c.configKeys), quoteMints: [NATIVE_MINT, OURS], isVerified: async () => true, tokenProgramOf: c.tokenProgramOf },
     { name: `${symbol} Coin`, symbol, uri: "https://ipfs.io/ipfs/m", image: "https://ipfs.io/ipfs/i", creator: CREATOR, quoteMint: NATIVE_MINT, feeTierBps: 200,
       basket: [{ mint: ZEC, weightBps: 10_000, symbol: "ZEC", decimals: 8 }] },
-  );
+  ));
   (c.meteora as any).pools.set(p.pool, { baseMint: p.mint, config: "CfgSol200", creator: CREATOR });
   const id = await confirmLaunch({ sql: c.sql, conn: { getSignatureStatuses: async () => ({ value: [{ err: null }] }) } as any, meteora: c.meteora, spillWallet: c.spillWallet }, { signature: "s", mint: p.mint });
   return { ...p, id };

@@ -4,6 +4,7 @@ import { LaunchError } from "@/launch/prepare";
 import { earlyExitPenalty } from "@/domain/penalty";
 import { BPS } from "@/domain/types";
 import { ttlCache } from "@/domain/lru";
+import { checkTx, type WalletTx } from "./tx-check";
 
 const addr = z.string().regex(/^[1-9A-HJ-NP-Za-km-z]{32,44}$/, "Wallet address is not valid");
 
@@ -60,7 +61,13 @@ export async function positions(ctx: WebContext, mint: string, ownerRaw: string)
 const Body = z.object({ mint: z.string().min(1), tierId: z.string().min(1), owner: addr, amount: z.string().regex(/^\d+$/, "Amount must be a whole number").optional() });
 const Action = z.enum(["stake", "claim", "exit", "withdraw"], { message: "Unknown action" });
 
-export async function buildStakeAction(ctx: WebContext, actionRaw: string, raw: unknown): Promise<string> {
+export async function buildStakeAction(ctx: WebContext, actionRaw: string, raw: unknown): Promise<WalletTx> {
+  const transaction = { base64: await stakeActionTx(ctx, actionRaw, raw), versioned: false };
+  await checkTx(ctx.conn, transaction);
+  return transaction;
+}
+
+async function stakeActionTx(ctx: WebContext, actionRaw: string, raw: unknown): Promise<string> {
   const action = Action.parse(actionRaw);
   const b = Body.parse(raw);
   const { launch, tiers } = await launchStake(ctx, b.mint);

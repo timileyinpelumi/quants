@@ -1,5 +1,5 @@
-import { Keypair, SystemProgram, Transaction } from "@solana/web3.js";
-import type { MeteoraPort, GraduatedPosition, LaunchTxInput } from "../../src/meteora/port";
+import { Keypair, PublicKey, SystemProgram, Transaction } from "@solana/web3.js";
+import type { MeteoraPort, GraduatedPosition, LaunchTxInput, NewConfig } from "../../src/meteora/port";
 import type { FakeChain } from "./fake-chain";
 
 export class FakeMeteora implements MeteoraPort {
@@ -7,6 +7,7 @@ export class FakeMeteora implements MeteoraPort {
   curve = new Map<string, { migrated: boolean; complete: boolean }>();
   graduated = new Map<string, GraduatedPosition>();
   launches: LaunchTxInput[] = [];
+  configTxs: { creator: string; quoteMint: string; create: NewConfig }[] = [];
   pools = new Map<string, { baseMint: string; config: string; creator: string }>();
   progress = new Map<string, { quoteReserve: bigint; threshold: bigint; migrated: boolean }>();
   firstBuyQuotes: { configKey: string; amount: bigint }[] = [];
@@ -32,15 +33,23 @@ export class FakeMeteora implements MeteoraPort {
   async poolInfo(pool: string) { return this.pools.get(pool) ?? null; }
   async buildMigrate(pool: string) { return this.chain.tx(`migrate-${pool}`); }
   async findGraduatedPosition(_c: string, baseMint: string) { return this.graduated.get(baseMint) ?? null; }
+  // Shaped like the live ones: the creator pays, and the new account (mint or config) has signed already.
   async buildLaunchTx(input: LaunchTxInput) {
     this.launches.push(input);
     const baseMint = Keypair.generate();
-    const tx = new Transaction({ feePayer: baseMint.publicKey, recentBlockhash: "11111111111111111111111111111111" })
-      .add(SystemProgram.transfer({ fromPubkey: baseMint.publicKey, toPubkey: baseMint.publicKey, lamports: 1 }));
-    const setupTx = input.createConfig
-      ? new Transaction({ feePayer: baseMint.publicKey, recentBlockhash: "11111111111111111111111111111111" })
-        .add(SystemProgram.transfer({ fromPubkey: baseMint.publicKey, toPubkey: input.createConfig.config.publicKey, lamports: 1 }))
-      : undefined;
-    return { tx, setupTx, baseMint, pool: `pool-${baseMint.publicKey.toBase58()}` };
+    const creator = new PublicKey(input.creator);
+    const tx = new Transaction({ feePayer: creator, recentBlockhash: "11111111111111111111111111111111" })
+      .add(SystemProgram.createAccount({ fromPubkey: creator, newAccountPubkey: baseMint.publicKey, lamports: 1, space: 82, programId: SystemProgram.programId }));
+    if (input.keeperTopUp) tx.add(SystemProgram.transfer({ fromPubkey: creator, toPubkey: new PublicKey(input.keeperTopUp.to), lamports: input.keeperTopUp.lamports }));
+    tx.partialSign(baseMint);
+    return { tx, baseMint, pool: `pool-${baseMint.publicKey.toBase58()}` };
+  }
+  async buildConfigTx(input: { creator: string; quoteMint: string; create: NewConfig }) {
+    this.configTxs.push(input);
+    const creator = new PublicKey(input.creator);
+    const tx = new Transaction({ feePayer: creator, recentBlockhash: "11111111111111111111111111111111" })
+      .add(SystemProgram.createAccount({ fromPubkey: creator, newAccountPubkey: input.create.config.publicKey, lamports: 1, space: 1000, programId: SystemProgram.programId }));
+    tx.partialSign(input.create.config);
+    return tx;
   }
 }

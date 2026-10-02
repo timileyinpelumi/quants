@@ -13,7 +13,7 @@ import { configKeyName, FEE_TIERS_BPS } from "../src/meteora/config";
 import { createConfigTx } from "../src/meteora/create-config";
 import { migrate } from "../src/db/migrate";
 import { defaultSettings, saveSettings } from "../src/domain/settings";
-import { prepareLaunch } from "../src/launch/prepare";
+import { prepareLaunch, launchOnly } from "../src/launch/prepare";
 import { confirmLaunch } from "../src/launch/confirm";
 import { NATIVE_MINT } from "../src/domain/types";
 import { quoteCoins } from "../src/domain/quotes";
@@ -88,10 +88,10 @@ const deps = { sql, meteora, configFor: staticConfigs(configKeys), quoteMints: [
   tokenProgramOf: async (m: string) => (await conn.getAccountInfo(new PublicKey(m)))!.owner.toBase58() };
 
 async function launch(name: string, symbol: string, basket: { mint: PublicKey; symbol: string; decimals: number; weightBps: number }[], quoteMint = NATIVE_MINT) {
-  const p = await prepareLaunch(deps, {
+  const p = launchOnly(await prepareLaunch(deps, {
     name, symbol, uri: `https://example.com/${symbol}.json`, creator: creator.publicKey.toBase58(), quoteMint, feeTierBps: 200,
     basket: basket.map((b) => ({ ...b, mint: b.mint.toBase58() })), devBuyQuoteAmount: quoteMint === NATIVE_MINT ? "500000000" : "0",
-  });
+  }));
   const tx = Transaction.from(Buffer.from(p.transaction, "base64"));
   tx.partialSign(creator);
   const sig = await conn.sendRawTransaction(tx.serialize());

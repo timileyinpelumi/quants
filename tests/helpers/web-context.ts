@@ -1,9 +1,10 @@
-import { Keypair } from "@solana/web3.js";
+import { Keypair, type VersionedTransaction } from "@solana/web3.js";
 import { freshDb } from "./db";
 import { FakeChain } from "./fake-chain";
 import { FakeMeteora } from "./fake-meteora";
 import { FakeStaking } from "./fake-staking";
 import { FakeJupiter } from "./fake-jupiter";
+import { fakeTx } from "./fake-tx";
 import { setContextForTests, type WebContext } from "../../src/web/server/context";
 import { TokenIcons } from "../../src/web/server/icons";
 import { JupiterPrices } from "../../src/indexer/prices";
@@ -38,7 +39,7 @@ export class FakeTrade {
     if (this.fail) throw new Error(this.fail);
     return { amountIn, filledIn: amountIn, amountOut: 1000n, minOut: 990n, fee: 20n, venue: target.dammPool ? "damm" as const : "curve" as const };
   }
-  async buildSwapTx(target: any, side: any, amountIn: bigint, minOut: bigint, owner: string) { if (this.fail) throw new Error(this.fail); this.built.push({ target, side, amountIn, minOut, owner }); return "c3dhcA=="; }
+  async buildSwapTx(target: any, side: any, amountIn: bigint, minOut: bigint, owner: string) { if (this.fail) throw new Error(this.fail); this.built.push({ target, side, amountIn, minOut, owner }); return fakeTx(owner); }
 }
 
 export async function makeWebContext(over: Partial<WebContext> = {}) {
@@ -51,9 +52,13 @@ export async function makeWebContext(over: Partial<WebContext> = {}) {
   meteora.thresholds.set("CfgOurs200", 100_000n * 10n ** 6n);
   resetConfigSeed();
   resetKeeperBalanceCache();
+  // Every transaction handed to a wallet is simulated first; tests replace simulateTransaction to make it fail.
+  const simulated: VersionedTransaction[] = [];
+  const conn = Object.assign({
+    simulateTransaction: async (tx: VersionedTransaction) => { simulated.push(tx); return { context: { slot: 1 }, value: { err: null, logs: [] } }; },
+  }, over.conn ?? {}) as any;
   const ctx: WebContext = {
     sql,
-    conn: {} as any,
     meteora,
     staking: new FakeStaking(chain),
     jupiter: new FakeJupiter(chain),
@@ -71,9 +76,10 @@ export async function makeWebContext(over: Partial<WebContext> = {}) {
     tokenProgramOf: async () => CLASSIC,
     stocks: { list: async () => [], icons: async () => ({}) },
     ...over,
+    conn,
   };
   setContextForTests(ctx);
   resetRateLimits();
   resetStakeCache();
-  return Object.assign(ctx, { fakeChain: chain });
+  return Object.assign(ctx, { fakeChain: chain, simulated });
 }

@@ -17,6 +17,11 @@ import { useUsd, usdText } from "@/web/ui/usd";
 const SOL = "So11111111111111111111111111111111111111112";
 export type QuoteOption = PairOption;
 
+type LaunchStep =
+  | { step: "config"; transaction: UnsignedTx }
+  | { step: "swap"; transaction: UnsignedTx; quoteBought: string }
+  | { step: "launch"; transaction: UnsignedTx; mint: string };
+
 type Tier = { id: string; lockSeconds: number; multiplierBps: number };
 type Status = "idle" | "uploading" | "preparing" | "signing" | "confirming";
 const LABELS: Record<Status, string> = {
@@ -144,7 +149,8 @@ export function LaunchForm({ split, tiers, maxPenaltyBps, quotes, initialPair, f
     if (!wallet.publicKey) { modal.setVisible(true); return; }
     if (problems.length) { setError(problems[0]!); return; }
     setError(null);
-    let prepared: { mint: string; transactions: UnsignedTx[] } | null = null;
+    const steps: LaunchStep["step"][] = [];
+    const got: { mint?: string } = {};
     try {
       setStatus("uploading");
       const form = new FormData();
@@ -156,25 +162,33 @@ export function LaunchForm({ split, tiers, maxPenaltyBps, quotes, initialPair, f
       const meta = await metaRes.json();
       if (!metaRes.ok) throw new Error(meta.error?.message ?? "Image upload failed. Try again.");
 
-      setStatus("preparing");
-      prepared = await postJson<{ mint: string; transactions: UnsignedTx[] }>("/api/launch/prepare", {
+      const request: Record<string, unknown> = {
         name: name.trim(), symbol, uri: meta.uri, image: meta.image, creator: wallet.publicKey.toBase58(),
         quoteMint: pair, feeTierBps: fee, devBuySol: (devBuyLamports ?? 0n).toString(),
         basket: tradingOnly ? [] : basket.map((b) => ({ mint: b.mint, weightBps: b.weight * 100, symbol: b.symbol, decimals: b.decimals })),
+      };
+      // Each step is fetched only after the one before confirmed, so the wallet can check it against current state.
+      const sigs = await sendSequence(wallet, connection, async () => {
+        if (got.mint) return null;
+        setStatus("preparing");
+        const s = await postJson<LaunchStep>("/api/launch/prepare", request);
+        if (steps.filter((k) => k === s.step).length >= (s.step === "config" ? 2 : 1)) throw new Error("This launch could not be set up right now. Try again in a moment.");
+        steps.push(s.step);
+        if (s.step === "swap") request.quoteBought = s.quoteBought;
+        if (s.step === "launch") got.mint = s.mint;
+        setStatus("signing");
+        return s.transaction;
       });
 
-      setStatus("signing");
-      const txs = prepared.transactions;
-      const sigs = await sendSequence(wallet, connection, async (done) => txs[done.length] ?? null);
-
-      await settle({ mint: prepared.mint, sig: sigs[sigs.length - 1]! });
+      await settle({ mint: got.mint!, sig: sigs[sigs.length - 1]! });
     } catch (e) {
-      const count = prepared?.transactions.length ?? 0;
-      if (e instanceof SendError && prepared && e.unconfirmed && e.confirmed.length === count - 1) {
-        await settle({ mint: prepared.mint, sig: e.unconfirmed });
+      const launchAt = steps.indexOf("launch");
+      const swapAt = steps.indexOf("swap");
+      if (e instanceof SendError && got.mint && e.unconfirmed && e.confirmed.length === launchAt) {
+        await settle({ mint: got.mint, sig: e.unconfirmed });
         return;
       }
-      if (e instanceof SendError && count === 2 && e.confirmed.length === 1) {
+      if (e instanceof SendError && swapAt >= 0 && e.confirmed.length > swapAt) {
         setError(`The swap to ${pairLabel} went through but the launch did not. The ${pairLabel} is in your wallet. Try again with a smaller first buy, or none.`);
       } else {
         setError(e instanceof Error ? e.message : "Something went wrong. Try again.");
@@ -274,7 +288,7 @@ export function LaunchForm({ split, tiers, maxPenaltyBps, quotes, initialPair, f
               </Field>
               <p className="m-0 text-sm text-muted md:pb-[18px]">
                 {devBuyLamports && devBuyLamports > 0n && usdOf(devBuyLamports) ? `About ${usdOf(devBuyLamports)}. ` : ""}
-                {pair === SOL ? "Bought on the curve in the same approval as the launch." : `Swapped to ${pairLabel}, then bought on the curve, in one approval.`}
+                {pair === SOL ? "Bought on the curve in the same approval as the launch." : `Swapped to ${pairLabel} first, then bought on the curve with the launch. Your wallet asks twice.`}
               </p>
             </div>
           </div>

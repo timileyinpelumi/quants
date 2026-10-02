@@ -41,7 +41,8 @@ test("stake validates amount and tier, and returns an unsigned transaction", asy
   const bad = await post("stake", { mint: "CATmint", tierId: "999d", owner: OWNER, amount: "10" });
   expect(bad.status).toBe(400);
   const ok = await (await post("stake", { mint: "CATmint", tierId: "7d", owner: OWNER, amount: "10" })).json();
-  expect(ok.transaction).toEqual({ base64: "dHg=", versioned: false });
+  expect(ok.transaction).toMatchObject({ versioned: false });
+  expect(c.simulated.length).toBe(1);
   expect((c.staking as any).built.at(-1)).toMatchObject({ action: "stake", farm: "farm7", amount: 10n });
 });
 
