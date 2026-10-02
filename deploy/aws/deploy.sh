@@ -32,13 +32,10 @@ tag="$(git rev-parse --short HEAD 2>/dev/null || date -u +%Y%m%d%H%M%S)"
 h="$(host)"
 echo "deploying $tag to $h"
 
-rsync -az --delete --timeout=120 -e "ssh ${ssh_opts[*]}" \
-  --include=/.env.production --include=/secrets/ --include=/secrets/keeper.json --include=/secrets/spill.json \
-  --exclude='/secrets/*' --exclude='.env*' --exclude=/.git --exclude=/.claude --exclude=/.beads --exclude=/.planning \
-  --exclude=node_modules --exclude=/.next --exclude=/.dev-uploads --exclude=/backups --exclude=/test-results \
-  --exclude=/playwright-report --exclude=/test-ledger --exclude='/config-keys*.json' --exclude='/devnet*' \
-  --exclude='*.tsbuildinfo' --exclude=/o.txt --exclude=/scratch --exclude=/.vercel --exclude=/deploy/aws/.host \
-  ./ "$SSH_USER@$h:$REMOTE_DIR/"
+# Only files tracked in git, plus the env file and keypairs; local tool folders never leave this machine.
+list="$(mktemp)"; trap 'rm -f "$list"' EXIT
+{ git ls-files; printf '%s\n' .env.production secrets/keeper.json secrets/spill.json; } > "$list"
+rsync -az --timeout=120 --files-from="$list" -e "ssh ${ssh_opts[*]}" ./ "$SSH_USER@$h:$REMOTE_DIR/"
 
 remote bash -s -- "$tag" "$REMOTE_DIR" <<'REMOTE'
 set -euo pipefail
