@@ -22,3 +22,5 @@ config-keys.devnet.json
 secrets/
 backups/
 deploy/aws/.host
+brand-src/.fit/
+brand-src/__pycache__/

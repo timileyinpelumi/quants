@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Header } from "@/web/ui/Header";
 import { Avatar } from "@/web/ui/Avatar";
@@ -19,8 +20,24 @@ import { allQuotes, quoteIcons } from "@/web/server/quotes";
 import { fetchMint, uiMultiplier } from "@/chain/mints";
 import { TradingOnly } from "@/web/ui/StakingAt";
 import { usdPrices } from "@/web/server/prices";
+import { ShareMenu, VoteButtons } from "@/web/token/TokenActions";
+import { shareDescription, tokenShare } from "@/web/server/token-share";
 
 export const dynamic = "force-dynamic";
+
+export async function generateMetadata({ params }: { params: Promise<{ mint: string }> }): Promise<Metadata> {
+  const { mint } = await params;
+  const t = await tokenShare(getContext().sql, mint).catch(() => null);
+  if (!t) return { title: "Token not found" };
+  const title = t.name ? `${t.symbol} ${t.name}` : t.symbol;
+  const description = shareDescription(t);
+  return {
+    title,
+    description,
+    openGraph: { title: `${title} on quants`, description, url: `/t/${mint}`, type: "website", siteName: "quants" },
+    twitter: { card: "summary_large_image", title: `${title} on quants`, description },
+  };
+}
 
 export default async function TokenPage({ params }: { params: Promise<{ mint: string }> }) {
   const { mint } = await params;
@@ -69,6 +86,8 @@ export default async function TokenPage({ params }: { params: Promise<{ mint: st
             </div>
             <div className="col-span-2 md:col-span-1 md:col-start-2 md:self-start flex gap-2.5 text-[13px] md:flex-wrap no-scrollbar max-md:overflow-x-auto max-md:-mx-4 max-md:px-4 [&>*]:shrink-0 max-md:[&>*]:min-h-10">
               <span className={`${pill} gap-1.5 pl-1.5 pr-3 py-1`}><Avatar seed={launch.quoteMint} label={pairSymbol} image={icons[launch.quoteMint]} size={20} />{symbol} / {pairSymbol}</span>
+              <ShareMenu mint={mint} symbol={symbol} stakes={!tradingOnly} />
+              <VoteButtons mint={mint} symbol={symbol} />
               <span className={`${pill} px-3 py-1.5`}>{launch.feeTierBps / 100}% trading fee</span>
               {tradingOnly && <span className="flex items-center"><TradingOnly /></span>}
               <CopyButton value={mint} label={shortAddr(mint)} />

@@ -139,7 +139,8 @@ On top of the keeper variables above, the web app needs:
 | `NEXT_PUBLIC_RPC_URL` | RPC the browser uses |
 | `NEXT_PUBLIC_OURTOKEN_MINT`, `NEXT_PUBLIC_OURTOKEN_SYMBOL` | The platform token. Its ticker is `QUANTS`, the default when the symbol is unset |
 | `NEXT_PUBLIC_SOL_GRADUATION`, `NEXT_PUBLIC_OURTOKEN_GRADUATION` | Shown on the launch form; must match what the config keys were created with |
-| `SITE_URL` | Public origin, e.g. `https://quants.example`; the admin sign in message names its domain |
+| `SITE_URL` | Public origin, e.g. `https://quants.example`; the admin sign in message names its domain, and shared token links preview with images from it |
+| `NEXT_PUBLIC_X_URL` | The quants X profile, e.g. `https://x.com/quants`; shown in the header, menu and footer. Unset hides it |
 | `TRUST_PROXY` | `1` behind Caddy or on Vercel so rate limits key on `x-forwarded-for`; leave unset when the app is reachable directly |
 
 Uploads are signed server side: images go to Cloudinary as image uploads and metadata JSON as raw uploads under the `quants` folder, named by a hash of their content, and the token URI and image are the returned `https://res.cloudinary.com/...` links. The API secret never reaches the browser. Without Cloudinary set, `/api/metadata` refuses uploads, except in local development where `DEV_UPLOADS_BASE` keeps files in `.dev-uploads` and serves them from `/api/dev-uploads`. Launches made before the switch keep their IPFS links.

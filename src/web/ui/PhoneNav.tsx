@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { XIcon } from "./XIcon";
 
 type NavLink = { href: string; label: string; key: string };
 
@@ -18,7 +19,7 @@ function useSheet(open: boolean, close: () => void) {
   }, [open, close]);
 }
 
-export function PhoneNav({ links, active }: { links: readonly NavLink[]; active: string }) {
+export function PhoneNav({ links, active, xUrl }: { links: readonly NavLink[]; active: string; xUrl?: string | null }) {
   const [open, setOpen] = useState<"menu" | "search" | null>(null);
   const close = useRef(() => setOpen(null)).current;
   const input = useRef<HTMLInputElement>(null);
@@ -67,6 +68,13 @@ export function PhoneNav({ links, active }: { links: readonly NavLink[]; active:
                 {active === l.key && <span aria-hidden className="w-2 h-2 rounded-full bg-accent" />}
               </Link>
             ))}
+            {xUrl && (
+              <a href={xUrl} target="_blank" rel="noreferrer" onClick={close}
+                className="flex items-center justify-between min-h-14 font-display font-bold text-xl text-muted">
+                X
+                <XIcon size={20} />
+              </a>
+            )}
           </nav>
         </div>
       )}
