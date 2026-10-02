@@ -10,6 +10,9 @@ export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 export const dynamic = "force-dynamic";
 
+const display = readFile(join(process.cwd(), "assets/fonts/Bricolage-ExtraBold.ttf"));
+const D = { fontFamily: "Bricolage", fontWeight: 800 } as const;
+
 const INK = "#F4F2EE", MUTED = "#9A97A8", BLUE = "#1896FD", UP = "#2EBD85", DOWN = "#F6465D";
 
 export default async function Image({ params }: { params: Promise<{ mint: string }> }) {
@@ -34,25 +37,25 @@ export default async function Image({ params }: { params: Promise<{ mint: string
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
             <img src={markSrc} width={84} height={84} style={{ borderRadius: 20 }} />
-            <span style={{ fontSize: 44, fontWeight: 700, letterSpacing: -1 }}>quants</span>
+            <span style={{ ...D, fontSize: 48, letterSpacing: -1 }}>quants</span>
           </div>
           {t && !t.tradingOnly && <span style={{ fontSize: 26, color: MUTED }}>Trading fees pay its stakers</span>}
         </div>
         <div style={{ display: "flex", flexDirection: "column", marginTop: 72 }}>
-          <span style={{ fontSize: 132, fontWeight: 700, letterSpacing: -4, lineHeight: 1 }}>{symbol.slice(0, 12)}</span>
+          <span style={{ ...D, fontSize: 140, letterSpacing: -4, lineHeight: 1 }}>{symbol.slice(0, 12)}</span>
           {t?.name && <span style={{ fontSize: 40, color: MUTED, marginTop: 14 }}>{t.name.slice(0, 40)}</span>}
         </div>
         <div style={{ display: "flex", gap: 80, marginTop: "auto", borderTop: "2px solid rgba(255,255,255,0.1)", paddingTop: 36 }}>
           {stats.map(([label, value, color]) => (
             <div key={label} style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               <span style={{ fontSize: 26, color: MUTED }}>{label}</span>
-              <span style={{ fontSize: 54, fontWeight: 700, color }}>{value}</span>
+              <span style={{ ...D, fontSize: 56, color }}>{value}</span>
             </div>
           ))}
         </div>
         <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: 14, background: BLUE, display: "flex" }} />
       </div>
     ),
-    size,
+    { ...size, fonts: [{ name: "Bricolage", data: await display, weight: 800, style: "normal" }] },
   );
 }

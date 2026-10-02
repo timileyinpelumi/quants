@@ -36,7 +36,7 @@ export function Header({ active }: { active: HeaderKey }) {
           <img src="/brand/quants-icon.svg" alt="" width={32} height={32} className="w-8 h-8 rounded-lg" />
           <span className="font-display font-black text-xl md:text-2xl tracking-tight max-[359px]:hidden">quants</span>
         </Link>
-        <nav aria-label="Main" className="hidden lg:flex gap-7 text-[15px] font-medium shrink-0">
+        <nav aria-label="Main" className="hidden xl:flex gap-7 text-[15px] font-medium shrink-0">
           {links.map((l) => <Link key={l.href} href={l.href} className={cls(l.key)}>{l.label}</Link>)}
         </nav>
         <Search className="hidden md:block flex-1 min-w-44 max-w-md" />
@@ -54,7 +54,7 @@ export function Header({ active }: { active: HeaderKey }) {
           <WalletButton />
         </div>
       </div>
-      <div className="hidden md:flex lg:hidden wrap flex-col gap-3 pb-3">
+      <div className="hidden md:flex xl:hidden wrap flex-col gap-3 pb-3">
         <nav aria-label="Main" className="flex gap-6 text-sm font-medium overflow-x-auto">
           {links.map((l) => <Link key={l.href} href={l.href} className={`${cls(l.key)} min-h-9 flex items-center shrink-0`}>{l.label}</Link>)}
         </nav>

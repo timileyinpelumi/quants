@@ -70,7 +70,7 @@ export function PhoneNav({ links, active, xUrl }: { links: readonly NavLink[]; a
             ))}
             {xUrl && (
               <a href={xUrl} target="_blank" rel="noreferrer" onClick={close}
-                className="flex items-center justify-between min-h-14 border-t line font-display font-bold text-xl text-muted">
+                className="flex items-center justify-between min-h-14 font-display font-bold text-xl text-muted">
                 X
                 <XIcon size={20} />
               </a>
