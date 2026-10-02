@@ -9,18 +9,19 @@ import { Field, Suffixed, TextArea, TextInput, inputClass } from "@/web/ui/Field
 import { Segmented } from "@/web/ui/Segmented";
 import { fmtAmount, lockLabel, lockShort } from "@/web/ui/format";
 import { sendSequence, SendError, type UnsignedTx } from "@/web/wallet/send";
+import { reportSendFailure } from "@/web/wallet/report";
 import { BasketPicker, basketTotal, type BasketItem } from "./BasketPicker";
 import { PairPicker, type PairOption } from "./PairPicker";
-import { launchCost } from "@/domain/launch-cost";
+import { launchCost, needSolMessage, SHORT_OF_SOL } from "@/domain/launch-cost";
 import { useUsd, usdText } from "@/web/ui/usd";
 
 const SOL = "So11111111111111111111111111111111111111112";
 export type QuoteOption = PairOption;
 
-type LaunchStep =
+type LaunchStep = { needLamports?: string } & (
   | { step: "config"; transaction: UnsignedTx }
   | { step: "swap"; transaction: UnsignedTx; quoteBought: string }
-  | { step: "launch"; transaction: UnsignedTx; mint: string };
+  | { step: "launch"; transaction: UnsignedTx; mint: string });
 
 type Tier = { id: string; lockSeconds: number; multiplierBps: number };
 type Status = "idle" | "uploading" | "preparing" | "signing" | "confirming";
@@ -150,7 +151,7 @@ export function LaunchForm({ split, tiers, maxPenaltyBps, quotes, initialPair, f
     if (problems.length) { setError(problems[0]!); return; }
     setError(null);
     const steps: LaunchStep["step"][] = [];
-    const got: { mint?: string } = {};
+    const got: { mint?: string; need?: bigint } = {};
     try {
       setStatus("uploading");
       const form = new FormData();
@@ -168,12 +169,23 @@ export function LaunchForm({ split, tiers, maxPenaltyBps, quotes, initialPair, f
         basket: tradingOnly ? [] : basket.map((b) => ({ mint: b.mint, weightBps: b.weight * 100, symbol: b.symbol, decimals: b.decimals })),
       };
       // Each step is fetched only after the one before confirmed, so the wallet can check it against current state.
-      const sigs = await sendSequence(wallet, connection, async () => {
-        if (got.mint) return null;
+      const sigs = await sendSequence(wallet, connection, async (done) => {
+        const confirmed = steps.slice(0, done.length);
+        if (confirmed.includes("launch")) return null;
         setStatus("preparing");
-        const s = await postJson<LaunchStep>("/api/launch/prepare", request);
-        if (steps.filter((k) => k === s.step).length >= (s.step === "config" ? 2 : 1)) throw new Error("This launch could not be set up right now. Try again in a moment.");
-        steps.push(s.step);
+        let s = await postJson<LaunchStep>("/api/launch/prepare", request);
+        // The setup transaction confirmed, but the server's RPC can be a few seconds behind before it sees the config key.
+        for (let i = 0; s.step === "config" && confirmed.includes("config") && i < 3; i++) {
+          await new Promise((r) => setTimeout(r, 2000));
+          s = await postJson<LaunchStep>("/api/launch/prepare", request);
+        }
+        if (confirmed.includes(s.step)) {
+          throw new Error(s.step === "config"
+            ? "The setup transaction confirmed but the network has not caught up yet. Wait a minute and launch again."
+            : "This launch step came back twice. Wait a minute and launch again.");
+        }
+        steps[done.length] = s.step;
+        if (s.needLamports) got.need = BigInt(s.needLamports);
         if (s.step === "swap") request.quoteBought = s.quoteBought;
         if (s.step === "launch") got.mint = s.mint;
         setStatus("signing");
@@ -182,6 +194,7 @@ export function LaunchForm({ split, tiers, maxPenaltyBps, quotes, initialPair, f
 
       await settle({ mint: got.mint!, sig: sigs[sigs.length - 1]! });
     } catch (e) {
+      reportSendFailure(`launch:${(e instanceof SendError ? steps[e.confirmed.length] : steps.at(-1)) ?? "prepare"}`, e, wallet.wallet?.adapter.name);
       const launchAt = steps.indexOf("launch");
       const swapAt = steps.indexOf("swap");
       if (e instanceof SendError && got.mint && e.unconfirmed && e.confirmed.length === launchAt) {
@@ -190,6 +203,8 @@ export function LaunchForm({ split, tiers, maxPenaltyBps, quotes, initialPair, f
       }
       if (e instanceof SendError && swapAt >= 0 && e.confirmed.length > swapAt) {
         setError(`The swap to ${pairLabel} went through but the launch did not. The ${pairLabel} is in your wallet. Try again with a smaller first buy, or none.`);
+      } else if (e instanceof Error && got.need !== undefined && SHORT_OF_SOL.test(e.message)) {
+        setError(needSolMessage(got.need));
       } else {
         setError(e instanceof Error ? e.message : "Something went wrong. Try again.");
       }

@@ -28,3 +28,13 @@ test("opensAt is the stakers' share as a percent of the rent, floored and capped
   expect(opensAt({ valueLamports: 400n, rentLamports: 400n })).toBe(100);
   expect(opensAt({ valueLamports: 10_000n, rentLamports: 400n })).toBe(100);
 });
+
+test("what a launcher's wallet needs: config rent only when the pair has no key, then launch rent, first buy, fees and top up", async () => {
+  const { walletNeed, needSolMessage, CONFIG_RENT, LAUNCH_RENT, LAUNCH_FEES, SHORT_OF_SOL } = await import("../../src/domain/launch-cost");
+  expect(walletNeed({ config: false, firstBuy: 0n })).toBe(LAUNCH_RENT + LAUNCH_FEES);
+  expect(walletNeed({ config: true, firstBuy: 1_000_000_000n, keeperTopUp: 6_000_000n })).toBe(CONFIG_RENT + LAUNCH_RENT + LAUNCH_FEES + 1_006_000_000n);
+  expect(needSolMessage(21_000_000n)).toBe("Your wallet needs about 0.03 SOL for this launch. Add SOL and try again.");
+  expect(needSolMessage(50_000_000n)).toBe("Your wallet needs about 0.05 SOL for this launch. Add SOL and try again.");
+  expect(needSolMessage(1_021_000_000n)).toBe("Your wallet needs about 1.03 SOL for this launch. Add SOL and try again.");
+  for (const m of ["Transfer: insufficient lamports 4900000, need 8000000", "InsufficientFundsForRent", "Attempt to debit an account but found no record of a prior credit."]) expect(SHORT_OF_SOL.test(m)).toBe(true);
+});

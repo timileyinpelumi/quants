@@ -36,12 +36,13 @@ export async function seedConfigKeys(sql: SQL, meteora: Pick<MeteoraPort, "confi
 }
 
 const select = (sql: SQL, mint: string, fee: number, threshold: bigint) =>
-  sql`select address, secret, status from config_keys where quote_mint = ${mint} and fee_bps = ${fee} and threshold = ${threshold.toString()}::numeric`;
+  sql`select address, secret, status, issued_at < now() - interval '2 minutes' as stale from config_keys where quote_mint = ${mint} and fee_bps = ${fee} and threshold = ${threshold.toString()}::numeric`;
 
 /**
  * The config key a launch on (pair, fee) uses at the current graduation target. When none exists yet, the first
  * caller claims a row with a fresh keypair and every caller until it lands gets the same address, so two first
- * launches on a pair race to create one account instead of two.
+ * launches on a pair race to create one account instead of two. A pending row not handed out for 2 minutes and still
+ * not on chain is dropped for a fresh keypair, so a setup transaction that failed or expired never blocks the pair.
  */
 export async function resolveConfig(deps: { sql: SQL; meteora: Pick<MeteoraPort, "configState">; keeper: string }, coin: ConfigCoin, feeBps: number): Promise<ResolvedConfig | null> {
   const { sql } = deps;
@@ -64,6 +65,9 @@ export async function resolveConfig(deps: { sql: SQL; meteora: Pick<MeteoraPort,
       console.error(JSON.stringify({ at: new Date().toISOString(), configMismatch: row.address }));
       await sql`delete from config_keys where address = ${row.address} and status = 'pending'`;
       row = undefined;
+    } else if (row.stale) {
+      await sql`delete from config_keys where address = ${row.address} and status = 'pending' and issued_at < now() - interval '2 minutes'`;
+      row = undefined;
     }
   }
   if (!row) {
@@ -74,6 +78,7 @@ export async function resolveConfig(deps: { sql: SQL; meteora: Pick<MeteoraPort,
     [row] = await select(sql, coin.mint, feeBps, threshold);
     if (row.status === "live") return { configKey: row.address };
   }
+  await sql`update config_keys set issued_at = now() where address = ${row.address} and status = 'pending'`;
   const secret = typeof row.secret === "string" ? JSON.parse(row.secret) : row.secret;
   return {
     configKey: row.address,

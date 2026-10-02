@@ -19,31 +19,26 @@ const sim = (value: object = ok.value) => {
   return { calls, conn: { simulateTransaction: async (tx: VersionedTransaction, config: any) => { calls.push({ tx, config }); return { context: { slot: 1 }, value }; } } as any };
 };
 
-test("server signatures move out of the transaction so the wallet signs first", () => {
+test("server signatures are dropped so the wallet signs first; the server signs later through cosign", () => {
   const t = presigned();
-  const w = walletTx(t.serialize({ requireAllSignatures: false }).toString("base64"), { optional: true });
-  expect(w.optional).toBe(true);
+  const w = walletTx(t.serialize({ requireAllSignatures: false }).toString("base64"));
   expect(w.versioned).toBe(false);
-  expect(w.signatures).toEqual([{ publicKey: extra.publicKey.toBase58(), signature: Buffer.from(t.signatures[1]!.signature!).toString("base64") }]);
   const back = Transaction.from(Buffer.from(w.base64, "base64"));
   expect(back.signatures.every((s) => s.signature === null)).toBe(true);
   expect(back.serializeMessage().equals(t.serializeMessage())).toBe(true);
-  back.partialSign(payer);
-  back.addSignature(extra.publicKey, Buffer.from(w.signatures![0]!.signature, "base64"));
-  expect(back.verifySignatures()).toBe(true);
 });
 
-test("a wallet only transaction carries no signatures field", () => {
+test("a wallet only transaction is passed through as is", () => {
   const t = new Transaction({ feePayer: payer.publicKey, recentBlockhash: BLOCKHASH }).add(SystemProgram.transfer({ fromPubkey: payer.publicKey, toPubkey: payer.publicKey, lamports: 1 }));
   expect(walletTx(t.serialize({ requireAllSignatures: false }).toString("base64"))).toEqual({ base64: t.serialize({ requireAllSignatures: false }).toString("base64"), versioned: false });
 });
 
-test("simulation runs on the transaction as is, without signature checks and without a new blockhash", async () => {
+test("simulation runs without signature checks and with the RPC's own blockhash", async () => {
   const { calls, conn } = sim();
   const w = walletTx(presigned().serialize({ requireAllSignatures: false }).toString("base64"));
   await checkTx(conn, w);
   expect(calls.length).toBe(1);
-  expect(calls[0]!.config).toEqual({ sigVerify: false, replaceRecentBlockhash: false, commitment: "confirmed" });
+  expect(calls[0]!.config).toEqual({ sigVerify: false, replaceRecentBlockhash: true, commitment: "confirmed" });
   expect(Buffer.from(calls[0]!.tx.serialize()).toString("base64")).toBe(w.base64);
 });
 
@@ -62,6 +57,21 @@ test("a failed simulation is a readable error", async () => {
     expect(err.code).toBe("simulation_failed");
     expect(err.message).toBe(message);
   }
+});
+
+test("during a launch, any shortage of SOL says how much the launch needs", async () => {
+  const cases: object[] = [
+    { err: "AccountNotFound", logs: [] },
+    { err: "InsufficientFundsForFee", logs: [] },
+    { err: { InsufficientFundsForRent: { account_index: 0 } }, logs: [] },
+    { err: { InstructionError: [0, { Custom: 1 }] }, logs: ["Transfer: insufficient lamports 4900000, need 8000000"] },
+  ];
+  for (const value of cases) {
+    const err = await checkTx(sim(value).conn, walletTx(presigned().serialize({ requireAllSignatures: false }).toString("base64")), 41_000_000n).catch((e) => e);
+    expect(err.message).toBe("Your wallet needs about 0.05 SOL for this launch. Add SOL and try again.");
+  }
+  const other = await checkTx(sim({ err: { InstructionError: [1, { Custom: 42 }] }, logs: [] }).conn, walletTx(presigned().serialize({ requireAllSignatures: false }).toString("base64")), 41_000_000n).catch((e) => e);
+  expect(other.message).toContain("would fail on chain");
 });
 
 test("an RPC that cannot simulate is a readable error, not a transaction sent blind", async () => {

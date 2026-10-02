@@ -47,7 +47,13 @@ What stays in the env and why: database, RPC and Jupiter URLs and keys, Cloudina
 
 - **Keeper.** Fee claimer on every DBC config, owner of every graduated LP position, admin of every Kamino farm. Holds claimed fees between keeper runs and pays rent for farms. That rent comes out of each launch's stakers' share (see Staking opens), so the ledger moves it out of the basket before the keeper spends it. Keep at least 1 SOL above what the ledger says it owes for transaction fees and retries.
 - **Spill.** Only receives early-exit penalties from farms. The keeper burns from it. It should never hold anything else.
-- **Treasury.** Receives the platform share. Receive only. It must already exist on-chain (hold at least the rent-exempt minimum of SOL), or small SOL payouts to it fail.
+- **Treasury.** Receives the platform share of bonding curve fees and all LP fees of graduated pools. Receive only.
+
+Public pages never show these addresses. The admin Wallets tab does.
+
+### Graduated pool LP fees
+
+After graduation, pool LP fees go to the platform. The keeper claims the fees of each graduated launch's locked DAMM v2 position (step `claim:<id>:damm`) into the `lp` bucket in `escrow`, separate from `unsplit`, which holds the bonding curve's partner fees. The split step moves the whole `lp` balance to `treasury` in its own `split` row with `detail.lp = true`; only `unsplit` is split between basket, creator and treasury. Payout then sends `treasury` as usual. Both buckets are keeper balances, so reconcile counts them like any other. The token page's fee summary counts LP fees in Platform and reports them as `lp`. It must already exist on-chain (hold at least the rent-exempt minimum of SOL), or small SOL payouts to it fail.
 
 ## One-time setup
 
@@ -62,7 +68,7 @@ Nothing else is needed on chain before the first launch (see Starting with no SO
 
 Each pair graduates once a set amount of the pair token has been raised on the curve: 85 SOL, 12,000 USDC, 12,000 USDT and 30,000 JUP by default, and the platform token's own target. Change them on the admin page under Pairs and Platform token.
 
-The target is fixed into the DBC config key a pool is created from, and every pool keeps the target it started with. Config keys live in the `config_keys` table by pair, fee tier and threshold. When a launch needs a key for the current target that does not exist yet, prepare returns a setup step first that creates it, paid by that launcher (about 0.008 SOL of rent), and records the key. The launcher approves it on its own, and the launch transaction is built only after it confirmed. So a new target applies to the next launch on that pair, and old pools keep theirs. The first prepare claims the row, so two first launches on the same pair get the same address; one setup transaction lands, the other fails harmlessly (it is optional) and both launches go through. A pending key is trusted only once it is on chain with the keeper as fee claimer, the right mint and the right threshold.
+The target is fixed into the DBC config key a pool is created from, and every pool keeps the target it started with. Config keys live in the `config_keys` table by pair, fee tier and threshold. When a launch needs a key for the current target that does not exist yet, prepare returns a setup step first that creates it, paid by that launcher (about 0.008 SOL of rent), and records the key. The launcher approves it on its own, and the launch transaction is built only after it confirmed. So a new target applies to the next launch on that pair, and old pools keep theirs. The first prepare claims the row, so two first launches on the same pair get the same address. If a setup transaction fails, the launch form shows its error and stops; launching again gets the setup step again, or the launch when the key landed meanwhile. A pending row not handed out for 2 minutes (`issued_at`) and not on chain is dropped and the next launch gets a fresh keypair, so a failed or expired setup never blocks the pair. A pending key is trusted only once it is on chain with the keeper as fee claimer, the right mint and the right threshold.
 
 `CONFIG_KEYS` (or `config-keys.json` at `CONFIG_KEYS_PATH`) is an optional seed: keys made by `scripts/create-configs.ts` are recorded on the first prepare with the threshold read from chain and reused when it matches. Stock pairs still need keys made by the script, since their graduation is set per stock.
 

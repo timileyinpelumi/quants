@@ -1,4 +1,5 @@
 import type { SQL } from "bun";
+import type { Keypair } from "@solana/web3.js";
 import { z } from "zod";
 import type { MeteoraPort } from "../meteora/port";
 import type { ConfigFor } from "./config-keys";
@@ -6,7 +7,7 @@ import { loadLatestSettings } from "../domain/settings";
 import { NATIVE_MINT } from "../domain/types";
 
 export class LaunchError extends Error {
-  constructor(public code: "invalid_input" | "launches_paused" | "basket_not_verified" | "basket_unsupported" | "dev_buy_too_large" | "not_found_on_chain" | "pool_mismatch" | "simulation_failed" | "tx_too_large", message: string) { super(message); }
+  constructor(public code: "invalid_input" | "launches_paused" | "basket_not_verified" | "basket_unsupported" | "dev_buy_too_large" | "not_found_on_chain" | "pool_mismatch" | "simulation_failed" | "tx_too_large" | "cosign_refused" | "blockhash_expired", message: string) { super(message); }
 }
 
 // ALLOW_LOCAL_URIS is set only by scripts/dev-seed.ts so local uploads served over http work.
@@ -49,9 +50,9 @@ const SUPPLY_BASE_UNITS = 1_000_000_000n * 1_000_000n;
  * `ready` is returned instead of `launch` when the caller asked to stop before it (a swap to the pair token comes first).
  */
 export type PreparedStep =
-  | { step: "config"; transaction: string; configKey: string }
+  | { step: "config"; transaction: string; configKey: string; signers: Keypair[] }
   | { step: "ready"; configKey: string }
-  | { step: "launch"; transaction: string; mint: string; pool: string; settingsVersion: number };
+  | { step: "launch"; transaction: string; mint: string; pool: string; settingsVersion: number; signers: Keypair[] };
 
 export function launchOnly(p: PreparedStep) {
   if (p.step !== "launch") throw new Error(`expected the launch step, got ${p.step}`);
@@ -95,7 +96,7 @@ export async function prepareLaunch(
   }
   if (create) {
     const tx = await deps.meteora.buildConfigTx({ creator: input.creator, quoteMint: input.quoteMint, create });
-    return { step: "config", transaction: tx.serialize({ requireAllSignatures: false }).toString("base64"), configKey };
+    return { step: "config", transaction: tx.serialize({ requireAllSignatures: false }).toString("base64"), configKey, signers: [create.config] };
   }
   if (opts.stopBeforeLaunch) return { step: "ready", configKey };
   const keeperTopUp = (await deps.keeperTopUp?.()) ?? undefined;
@@ -107,5 +108,5 @@ export async function prepareLaunch(
   await deps.sql`insert into prepared_launches (mint, pool, quote_mint, fee_tier_bps, config_key, creator, basket, settings_version, name, symbol, uri, image, trading_only)
     values (${mint}, ${pool}, ${input.quoteMint}, ${input.feeTierBps}, ${configKey}, ${input.creator},
             ${JSON.stringify(input.basket)}::text::jsonb, ${settings.version}, ${input.name}, ${input.symbol}, ${input.uri}, ${input.image ?? null}, ${tradingOnly})`;
-  return { step: "launch", transaction: tx.serialize({ requireAllSignatures: false }).toString("base64"), mint, pool, settingsVersion: settings.version };
+  return { step: "launch", transaction: tx.serialize({ requireAllSignatures: false }).toString("base64"), mint, pool, settingsVersion: settings.version, signers: [baseMint] };
 }

@@ -4,6 +4,7 @@ import { PublicKey } from "@solana/web3.js";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 import { sendOne } from "@/web/wallet/send";
+import { reportSendFailure } from "@/web/wallet/report";
 import { tokenBalance } from "@/web/wallet/balance";
 
 export type Tier = { id: string; lockSeconds: number; multiplierBps: number };
@@ -58,6 +59,7 @@ export function useStake(mint: string) {
       await refresh();
       return true;
     } catch (e) {
+      reportSendFailure(`stake:${action}`, e, wallet.wallet?.adapter.name);
       setError(e instanceof Error ? e.message : "Something went wrong. Try again.");
       return false;
     } finally {

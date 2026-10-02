@@ -3,10 +3,12 @@ import type { WebContext } from "./context";
 import { prepareLaunch, LaunchError } from "@/launch/prepare";
 import { loadLatestSettings } from "@/domain/settings";
 import { NATIVE_MINT } from "@/domain/types";
+import { walletNeed } from "@/domain/launch-cost";
 import { allQuotes, launchableQuotes } from "./quotes";
 import { resolveConfig, seedConfigKeys } from "@/launch/config-keys";
 import { keeperTopUp } from "./keeper-topup";
 import { checkTx, walletTx, type WalletTx } from "./tx-check";
+import { issueCosign } from "./cosign";
 
 const g = globalThis as { __quantsConfigSeed?: Promise<number> };
 
@@ -32,9 +34,9 @@ const Body = z.object({
 }).passthrough();
 
 export type LaunchStep =
-  | { step: "config"; transaction: WalletTx }
-  | { step: "swap"; transaction: WalletTx; quoteBought: string }
-  | { step: "launch"; transaction: WalletTx; mint: string; pool: string; settingsVersion: number };
+  | { step: "config"; transaction: WalletTx; needLamports: string }
+  | { step: "swap"; transaction: WalletTx; quoteBought: string; needLamports: string }
+  | { step: "launch"; transaction: WalletTx; mint: string; pool: string; settingsVersion: number; needLamports: string };
 
 /**
  * One wallet prompt per call, in order: create the config key when the pair and fee have none yet, swap SOL to the
@@ -82,19 +84,20 @@ export async function prepareWithSwap(ctx: WebContext, raw: unknown): Promise<La
     { ...rest, devBuyQuoteAmount: devBuyQuoteAmount.toString(), devBuyMinOut: "0" },
     { stopBeforeLaunch: swap !== undefined },
   );
+  const need = walletNeed({ config: p.step === "config", firstBuy: sol, keeperTopUp: (await keeperTopUp(ctx))?.lamports });
+  const needLamports = need.toString();
   if (p.step === "config") {
-    // Optional: when another launch created the same config key first, this one fails and the launch goes on.
-    const transaction = walletTx(p.transaction, { optional: true });
-    await checkTx(ctx.conn, transaction);
-    return { step: "config", transaction };
+    const transaction = walletTx(p.transaction);
+    await checkTx(ctx.conn, transaction, need);
+    return { step: "config", transaction: await issueCosign(ctx.sql, transaction, p.signers, need), needLamports };
   }
   if (p.step === "ready") {
     if (!swap) throw new Error("ready without a swap");
     const transaction: WalletTx = { base64: (await ctx.jupiter.buildUnsignedSwap(swap, rest.creator)).base64, versioned: true };
-    await checkTx(ctx.conn, transaction);
-    return { step: "swap", transaction, quoteBought: devBuyQuoteAmount.toString() };
+    await checkTx(ctx.conn, transaction, need);
+    return { step: "swap", transaction, quoteBought: devBuyQuoteAmount.toString(), needLamports };
   }
   const transaction = walletTx(p.transaction);
-  await checkTx(ctx.conn, transaction);
-  return { step: "launch", transaction, mint: p.mint, pool: p.pool, settingsVersion: p.settingsVersion };
+  await checkTx(ctx.conn, transaction, need);
+  return { step: "launch", transaction: await issueCosign(ctx.sql, transaction, p.signers, need), mint: p.mint, pool: p.pool, settingsVersion: p.settingsVersion, needLamports };
 }

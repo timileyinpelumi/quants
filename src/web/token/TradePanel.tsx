@@ -6,6 +6,7 @@ import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 import { Button } from "@/web/ui/Button";
 import { fmtAmount } from "@/web/ui/format";
 import { sendOne } from "@/web/wallet/send";
+import { reportSendFailure } from "@/web/wallet/report";
 import { tokenBalance } from "@/web/wallet/balance";
 import { rawToUi, uiToRaw } from "@/web/ui/scaled";
 import { StakeForm } from "@/web/stake/StakeForm";
@@ -121,6 +122,7 @@ export function TradePanel({ mint, symbol, quoteMint, quoteSymbol, quoteDecimals
       setAmount("");
       await loadBalances();
     } catch (e) {
+      reportSendFailure(`trade:${side}`, e, wallet.wallet?.adapter.name);
       setMsg({ ok: false, text: e instanceof Error ? e.message : "Something went wrong. Try again." });
     } finally {
       setBusy(false);

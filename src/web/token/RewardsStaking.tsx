@@ -113,6 +113,7 @@ export function RewardsStaking({ mint, symbol, d, fees, icons, px, quote, tokenU
             </div>
             <span className="text-[13px] text-muted leading-normal">
               All time, after Meteora&apos;s 20% of each trading fee{BigInt(fees.meteora) > 0n ? `, about ${q(fees.meteora)}` : ""}. Fees not yet split are counted in fees earned only.
+              {BigInt(fees.lp) > 0n ? ` After graduation, pool LP fees go to the platform: ${q(fees.lp)} so far, included in Platform.` : ""}
             </span>
           </TabPanel>
 
