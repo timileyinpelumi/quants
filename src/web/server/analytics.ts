@@ -290,12 +290,61 @@ export async function health(d: AnalyticsDeps, w: Window): Promise<Health> {
   };
 }
 
-export type Report = { range: Range; from: string; to: string; unit: Unit; overview: Overview; series: Point[]; tokens: TopToken[]; fees: FeeFlow; health: Health };
+export type Traffic = {
+  views: Stat;
+  /** Unique visitors summed by day: the salt changes daily, so one person on two days counts twice. */
+  visitors: Stat;
+  days: { t: string; views: number; visitors: number }[];
+  pages: { path: string; views: number; visitors: number }[];
+  referrers: { host: string; views: number }[];
+};
+
+const trafficTotals = async (sql: SQL, from: Date, to: Date) => {
+  const [r] = await sql`
+    select coalesce(sum(n), 0)::int as views, coalesce(sum(v), 0)::int as visitors from (
+      select count(*) as n, count(distinct visitor) as v from page_views where at >= ${from} and at < ${to} group by date_trunc('day', at, 'UTC')
+    ) x`;
+  return { views: r.views as number, visitors: r.visitors as number };
+};
+
+export async function traffic(sql: SQL, w: Window): Promise<Traffic> {
+  const [cur, prev, days, pages, refs, [first]] = await Promise.all([
+    trafficTotals(sql, w.from, w.to),
+    w.prevFrom ? trafficTotals(sql, w.prevFrom, w.from) : null,
+    sql`select date_trunc(${w.unit}, at, 'UTC') as b, count(*)::int as n, count(distinct visitor)::int as v
+        from page_views where at >= ${w.from} and at < ${w.to} group by 1`,
+    sql`select path, count(*)::int as n, count(distinct (date_trunc('day', at, 'UTC'), visitor))::int as v
+        from page_views where at >= ${w.from} and at < ${w.to} group by 1 order by 2 desc, 1 limit 10`,
+    sql`select referrer, count(*)::int as n from page_views where at >= ${w.from} and at < ${w.to} and referrer is not null
+        group by 1 order by 2 desc, 1 limit 10`,
+    w.range === "all" ? sql`select min(at) as at from page_views` : Promise.resolve([{ at: w.from }]),
+  ]);
+  const step = w.unit === "hour" ? HOUR : DAY;
+  const end = truncate(w.to.getTime(), w.unit);
+  const start = first?.at ? Math.max(truncate(new Date(first.at).getTime(), w.unit), end - (MAX_POINTS - 1) * step) : end;
+  const byT = new Map<number, any>(days.map((r: any) => [new Date(r.b).getTime(), r]));
+  const out: Traffic["days"] = [];
+  for (let t = start; t <= end; t += step) out.push({ t: new Date(t).toISOString(), views: byT.get(t)?.n ?? 0, visitors: byT.get(t)?.v ?? 0 });
+  return {
+    views: { value: cur.views, prev: prev?.views ?? null },
+    visitors: { value: cur.visitors, prev: prev?.visitors ?? null },
+    days: out,
+    pages: pages.map((r: any) => ({ path: r.path, views: r.n, visitors: r.v })),
+    referrers: refs.map((r: any) => ({ host: r.referrer, views: r.n })),
+  };
+}
+
+export type Report = {
+  range: Range; from: string; to: string; unit: Unit;
+  overview: Overview; series: Point[]; tokens: TopToken[]; fees: FeeFlow; health: Health; traffic: Traffic;
+};
 
 export async function report(d: AnalyticsDeps, range: Range, now = Date.now()): Promise<Report> {
   const w = windowOf(range, now);
-  const [ov, pts, tokens, fees, h] = await Promise.all([overview(d, w), series(d.sql, w), topTokens(d.sql, w), feeFlow(d, w), health(d, w)]);
-  return { range, from: w.from.toISOString(), to: w.to.toISOString(), unit: w.unit, overview: ov, series: pts, tokens, fees, health: h };
+  const [ov, pts, tokens, fees, h, tr] = await Promise.all([
+    overview(d, w), series(d.sql, w), topTokens(d.sql, w), feeFlow(d, w), health(d, w), traffic(d.sql, w),
+  ]);
+  return { range, from: w.from.toISOString(), to: w.to.toISOString(), unit: w.unit, overview: ov, series: pts, tokens, fees, health: h, traffic: tr };
 }
 
 export function contextDeps(ctx: WebContext): AnalyticsDeps {

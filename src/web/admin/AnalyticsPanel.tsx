@@ -1,6 +1,6 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
-import type { FeeFlow, Health, Overview, Range, Report, Stat, TopToken } from "@/web/server/analytics";
+import type { FeeFlow, Health, Overview, Range, Report, Stat, TopToken, Traffic } from "@/web/server/analytics";
 import { Segmented } from "@/web/ui/Segmented";
 import { Button } from "@/web/ui/Button";
 import { fmtChange, fmtCompact, shortAddr } from "@/web/ui/format";
@@ -252,6 +252,49 @@ function HealthView({ h }: { h: Health }) {
   );
 }
 
+function Ranked({ title, rows, empty }: { title: string; rows: { key: string; label: string; views: number; visitors?: number }[]; empty: string }) {
+  return (
+    <div className="flex flex-col text-sm min-w-0">
+      <div className="grid grid-cols-[minmax(0,1fr)_72px_72px] gap-3 pb-2 text-[13px] text-muted">
+        <span>{title}</span><span className="text-right">Views</span><span className="text-right">{rows.some((r) => r.visitors !== undefined) ? "Visitors" : ""}</span>
+      </div>
+      {rows.length === 0 ? <p className="m-0 py-3 border-t line text-muted">{empty}</p> : rows.map((r) => (
+        <div key={r.key} className="grid grid-cols-[minmax(0,1fr)_72px_72px] gap-3 py-2.5 border-t line">
+          <span className="font-mono truncate">{r.label}</span>
+          <span className="font-mono text-right">{fmtCount(r.views)}</span>
+          <span className="font-mono text-right text-muted">{r.visitors === undefined ? "" : fmtCount(r.visitors)}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function TrafficView({ t, unit, range }: { t: Traffic; unit: Report["unit"]; range: Range }) {
+  const labels = t.days.map((d) => when(d.t, unit));
+  const per = unit === "hour" ? "hour" : "day";
+  return (
+    <div className="flex flex-col gap-8">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-5">
+        {([["Page views", t.views], ["Daily visitors, summed", t.visitors]] as const).map(([label, s]) => (
+          <div key={label} className="flex flex-col gap-1 border-t line pt-3 min-w-0">
+            <span className="text-[13px] text-muted truncate">{label}</span>
+            <span className="font-mono text-xl">{fmtCount(s.value ?? 0)}</span>
+            {range === "all" ? <span className="text-[12px] text-faint">All time</span> : <Change s={s} />}
+          </div>
+        ))}
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-6">
+        <Bars title={`Views per ${per}`} values={t.days.map((d) => d.views)} labels={labels} fmt={fmtCount} />
+        <Bars title={`Unique visitors per ${per}`} values={t.days.map((d) => d.visitors)} labels={labels} fmt={fmtCount} sum={false} />
+      </div>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-10 gap-y-8">
+        <Ranked title="Top pages" empty="No views in this range." rows={t.pages.map((p) => ({ key: p.path, label: p.path, views: p.views, visitors: p.visitors }))} />
+        <Ranked title="Top referrers" empty="No referred visits in this range." rows={t.referrers.map((r) => ({ key: r.host, label: r.host, views: r.views }))} />
+      </div>
+    </div>
+  );
+}
+
 export function Section({ title, note, children }: { title: string; note?: string; children: React.ReactNode }) {
   return (
     <section className="flex flex-col gap-4">
@@ -307,6 +350,9 @@ export function AnalyticsPanel() {
           </Section>
           <Section title="Keeper and indexer" note="Errors and failed steps count this range. Balances and lag are live.">
             <HealthView h={shown.health} />
+          </Section>
+          <Section title="Traffic" note="Counted on the server with no cookies. A visitor is a daily hash of address and browser, so the same person on two days counts twice. Bots, prefetches, admin and API calls are left out.">
+            <TrafficView t={shown.traffic} unit={shown.unit} range={range} />
           </Section>
         </>
       )}
