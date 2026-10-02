@@ -12,11 +12,19 @@ const DAY = 86_400_000;
 
 export type DexStats = { priceUsd: number | null; change24h: number | null; volume24hUsd: number | null; mcapUsd: number | null };
 export type PairStats = { pairs: number; volume24hUsd: number; volumeAllUsd: number; stakersUsd: number };
+export type RecentPair = { mint: string; symbol: string | null; image: string | null; createdAt: string };
 export type PlatformCard = {
   mint: string; symbol: string; name: string;
   priceUsd: number | null; mcapUsd: number | null; change24h: number | null; volume24hUsd: number | null;
   pairs: PairStats;
+  recent: RecentPair[];
 };
+
+/** The newest launches paired with the platform token. */
+export async function recentPairs(sql: SQL, mint: string, limit = 3): Promise<RecentPair[]> {
+  const rows = await sql`select mint, symbol, image, created_at from launches where quote_mint = ${mint} order by created_at desc, id desc limit ${limit}`;
+  return rows.map((r: any) => ({ mint: r.mint, symbol: r.symbol, image: r.image, createdAt: new Date(r.created_at).toISOString() }));
+}
 
 const num = (v: unknown): number | null => {
   const n = typeof v === "string" ? Number(v) : v;
@@ -85,9 +93,9 @@ export async function platformCard(d: PlatformDeps): Promise<PlatformCard | null
   const coin = (d.coins ?? quoteCoins()).find((c) => c.platform);
   if (!coin) return null;
   const now = d.now ?? Date.now();
-  const [price, supply, dex, pairs, own] = await Promise.all([
+  const [price, supply, dex, pairs, own, recent] = await Promise.all([
     safe(() => d.price(coin.mint)), safe(() => d.supply(coin.mint)), safe(() => d.dex(coin.mint)),
-    pairStats(d.sql, coin.mint, now), featured(d.sql, now, undefined, [coin]),
+    pairStats(d.sql, coin.mint, now), featured(d.sql, now, undefined, [coin]), recentPairs(d.sql, coin.mint),
   ]);
   const row = own?.token ?? null;
   const priceUsd = price ?? dex?.priceUsd ?? row?.priceUsd ?? null;
@@ -96,7 +104,7 @@ export async function platformCard(d: PlatformDeps): Promise<PlatformCard | null
     mint: coin.mint, symbol: coin.symbol, name: coin.name, priceUsd, mcapUsd,
     change24h: dex?.change24h ?? (row && row.price !== null ? row.change24h : null),
     volume24hUsd: dex?.volume24hUsd ?? row?.volume24hUsd ?? null,
-    pairs,
+    pairs, recent,
   };
 }
 
