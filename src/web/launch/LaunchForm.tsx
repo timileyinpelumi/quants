@@ -9,6 +9,7 @@ import { Field, Suffixed, TextArea, TextInput, inputClass } from "@/web/ui/Field
 import { Segmented } from "@/web/ui/Segmented";
 import { fmtAmount, lockLabel, lockShort } from "@/web/ui/format";
 import { sendSequence, SendError, type UnsignedTx } from "@/web/wallet/send";
+import { reportSendFailure } from "@/web/wallet/report";
 import { BasketPicker, basketTotal, type BasketItem } from "./BasketPicker";
 import { PairPicker, type PairOption } from "./PairPicker";
 import { launchCost, needSolMessage, SHORT_OF_SOL } from "@/domain/launch-cost";
@@ -193,6 +194,7 @@ export function LaunchForm({ split, tiers, maxPenaltyBps, quotes, initialPair, f
 
       await settle({ mint: got.mint!, sig: sigs[sigs.length - 1]! });
     } catch (e) {
+      reportSendFailure(`launch:${(e instanceof SendError ? steps[e.confirmed.length] : steps.at(-1)) ?? "prepare"}`, e, wallet.wallet?.adapter.name);
       const launchAt = steps.indexOf("launch");
       const swapAt = steps.indexOf("swap");
       if (e instanceof SendError && got.mint && e.unconfirmed && e.confirmed.length === launchAt) {
