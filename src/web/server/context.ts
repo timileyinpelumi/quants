@@ -1,5 +1,5 @@
 import type { SQL } from "bun";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { Connection, Keypair, PublicKey } from "@solana/web3.js";
 import { sharedDb } from "@/db/client";
 import { SolanaChain } from "@/chain/solana";
@@ -8,12 +8,14 @@ import { KaminoBackend } from "@/staking/kamino";
 import type { StakingAdapter } from "@/staking/adapter";
 import { TradeLive, type TradePort } from "@/meteora/trade";
 import type { JupiterPort } from "@/jupiter/port";
-import { uploadsFrom, type UploadPort } from "./uploads";
+import { uploadPrefix, uploadsFrom, type UploadPort } from "./uploads";
 import { TokenIcons } from "./icons";
 import { JupiterPrices, type PricePort } from "@/indexer/prices";
 import { applyClusterDefaults, configKeysPath } from "@/cluster";
 import { pricesFor, swapPortFor } from "@/jupiter/select";
 import { checkWebEnv } from "@/env";
+import { decodeCodeHash } from "@/admin-code";
+import { parsePlatformAddresses, type Role } from "@/domain/platform-wallets";
 import { StockRegistry } from "@/stocks/registry";
 import type { StockListing } from "@/stocks/sources";
 
@@ -24,14 +26,18 @@ export interface WebContext {
   staking: StakingAdapter;
   jupiter: JupiterPort;
   uploads: UploadPort;
+  /** Launch metadata and images must start with this (our upload store), so launches made here only show content uploaded here. */
+  uploadPrefix: string | null;
   trade: TradePort;
   icons: TokenIcons;
   prices: PricePort;
   configKeys: Record<string, string>;
   keeperAddress: string;
   spillWallet: PublicKey;
-  ourtokenMint: string;
-  adminWallets: Set<string>;
+  /** argon2id PHC string of the admin access code. */
+  adminCodeHash: string;
+  /** Public addresses of the platform HD wallet roles, from PLATFORM_ADDRESSES. Never the seed. */
+  platformAddresses: Partial<Record<Role, string>>;
   sessionSecret: Uint8Array;
   tokenProgramOf(mint: string): Promise<string>;
   stocks: Pick<StockRegistry, "list" | "icons">;
@@ -61,23 +67,25 @@ export function getContext(): WebContext {
   const chain = new SolanaChain(conn, Keypair.generate(), Keypair.generate());
   const sql = sharedDb();
   const meteora = new MeteoraLive(chain, e.DAMM_V2_MIGRATION_CONFIG!);
-  // hosted deploys pass the keys as JSON since config-keys.json is not committed
-  const configKeys: Record<string, string> = JSON.parse(e.CONFIG_KEYS ?? readFileSync(configKeysPath(e), "utf8"));
+  // Optional seed: config keys made by scripts/create-configs.ts (stocks need them); crypto pairs get theirs on demand.
+  const keysFile = configKeysPath(e);
+  const configKeys: Record<string, string> = e.CONFIG_KEYS ? JSON.parse(e.CONFIG_KEYS) : existsSync(keysFile) ? JSON.parse(readFileSync(keysFile, "utf8")) : {};
   const ctx: WebContext = {
     sql,
     conn,
     meteora,
-    staking: new KaminoBackend(chain, e.RPC_URL!, e.KAMINO_GLOBAL_CONFIG!),
+    staking: new KaminoBackend(chain, e.RPC_URL!, e.KAMINO_GLOBAL_CONFIG ?? ""),
     jupiter: withLocalTokens(swapPortFor(e, chain), e.LOCAL_TOKEN_LIST),
     uploads: uploadsFrom(e),
+    uploadPrefix: uploadPrefix(e),
     trade: new TradeLive(conn),
     prices: pricesFor(e, conn, new JupiterPrices(e.JUPITER_API_KEY ? "https://api.jup.ag/price/v3" : "https://lite-api.jup.ag/price/v3", e.JUPITER_API_KEY)),
     icons: new TokenIcons(e.JUPITER_API_KEY ? "https://api.jup.ag/tokens/v2" : "https://lite-api.jup.ag/tokens/v2", e.JUPITER_API_KEY),
     configKeys,
     keeperAddress: e.KEEPER_ADDRESS!,
     spillWallet: new PublicKey(e.SPILL_ADDRESS!),
-    ourtokenMint: e.OURTOKEN_MINT!,
-    adminWallets: new Set((e.ADMIN_WALLETS ?? "").split(",").map((s) => s.trim()).filter(Boolean)),
+    adminCodeHash: decodeCodeHash(e.ADMIN_CODE_HASH),
+    platformAddresses: parsePlatformAddresses(e.PLATFORM_ADDRESSES),
     sessionSecret: new TextEncoder().encode(e.ADMIN_SESSION_SECRET!),
     tokenProgramOf: async (mint) => (await conn.getAccountInfo(new PublicKey(mint)))?.owner.toBase58() ?? "",
     // LOCAL_STOCKS (local validator only) lists stand-in stock mints in place of the xStocks and Backpack lists.

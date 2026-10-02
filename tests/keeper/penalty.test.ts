@@ -25,7 +25,7 @@ test("collects slashed amounts from every farm and burns all of it", async () =>
     if (label === "collect") f.chain.receipts.set(t.signature, collected.shift()!);
     return t;
   };
-  const [launch] = await loadLaunches(f.sql, deps.ourtokenMint);
+  const [launch] = await loadLaunches(f.sql);
   await penaltyStep(deps, launch!, f.settings, "r1");
   expect(f.chain.sent.filter((s) => s.startsWith("collect")).length).toBe(2);
   expect(f.chain.sent.filter((s) => s.startsWith("burn")).length).toBe(1);
@@ -40,7 +40,7 @@ test("no transactions when nothing was slashed", async () => {
   const deps = { ...f.deps, staking };
   const id = await insertLaunch(f.sql, { mint: "CAT" });
   await readyPool(f.sql, id);
-  const [launch] = await loadLaunches(f.sql, deps.ourtokenMint);
+  const [launch] = await loadLaunches(f.sql);
   await penaltyStep(deps, launch!, f.settings, "r1");
   expect(f.chain.sent.length).toBe(0);
 });

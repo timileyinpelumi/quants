@@ -10,7 +10,14 @@ import type { ChainPort, SignedTx, SigState } from "./port";
 import { NATIVE_MINT } from "../domain/types";
 import { mintPaused, readMint, TOKEN_2022_PROGRAM } from "./mints";
 
-export const loadKeypair = (json: string) => Keypair.fromSecretKey(Uint8Array.from(JSON.parse(json)));
+// Parse errors would quote the text they failed on, which is the secret key, so they are replaced with a fixed message.
+export function loadKeypair(json: string): Keypair {
+  try {
+    return Keypair.fromSecretKey(Uint8Array.from(JSON.parse(json)));
+  } catch {
+    throw new Error("keypair is not a JSON array of 64 secret key bytes");
+  }
+}
 export const kitSigner = (kp: Keypair): TransactionSigner => createNoopSigner(address(kp.publicKey.toBase58()));
 
 export function fromKitInstruction(ix: Instruction): TransactionInstruction {

@@ -13,6 +13,16 @@ test("sets frame, sniffing and referrer headers", () => {
   expect(directive(csp(h), "frame-ancestors")).toBe("frame-ancestors 'none'");
 });
 
+test("production adds HSTS and upgrades insecure requests; dev does not", () => {
+  const prod = securityHeaders("https://rpc.example.com", false);
+  expect(prod).toContainEqual({ key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains" });
+  expect(csp(prod)).toContain("upgrade-insecure-requests");
+  expect(prod.find((h) => h.key === "Permissions-Policy")!.value).toContain("camera=()");
+  const dev = securityHeaders("http://127.0.0.1:8899", true);
+  expect(dev.some((h) => h.key === "Strict-Transport-Security")).toBe(false);
+  expect(csp(dev)).not.toContain("upgrade-insecure-requests");
+});
+
 test("the CSP lets the browser reach the RPC over https and its websocket", () => {
   const p = csp(securityHeaders("https://rpc.example.com/?api-key=k", false));
   const connect = directive(p, "connect-src");

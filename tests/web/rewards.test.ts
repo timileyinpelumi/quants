@@ -6,7 +6,7 @@ import { defaultSettings, saveSettings } from "../../src/domain/settings";
 
 test("totals, ranks tokens by what they set aside for stakers, and lists recent reward payments", async () => {
   const sql = await freshDb();
-  const v = await saveSettings(sql, defaultSettings("OURS"), "t");
+  const v = await saveSettings(sql, defaultSettings("OURS1111111111111111111111111111111111111111"), "t");
   const a = await insertLaunch(sql, { mint: "AAA" });
   const b = await insertLaunch(sql, { mint: "BBB" });
   await sql`update launches set symbol = case mint when 'AAA' then 'AAA' else 'BBB' end`;

@@ -20,7 +20,7 @@ test("creates and configures one farm per tier, then marks the pool ready", asyn
   const deps = { ...f.deps, staking };
   const id = await insertLaunch(f.sql);
   await pendingPool(f.sql, id);
-  const [launch] = await loadLaunches(f.sql, deps.ourtokenMint);
+  const [launch] = await loadLaunches(f.sql);
   expect(await createFarmsStep(deps, launch!, f.settings, "r1")).toBe("ready");
   const tiers = await f.sql`select farm from stake_tiers where launch_id = ${id}`;
   expect(tiers.every((t: any) => t.farm)).toBe(true);
@@ -36,7 +36,7 @@ test("a retried farm creation reuses the stored farm keypair", async () => {
   const deps = { ...f.deps, staking };
   const id = await insertLaunch(f.sql);
   await pendingPool(f.sql, id);
-  const [launch] = await loadLaunches(f.sql, deps.ourtokenMint);
+  const [launch] = await loadLaunches(f.sql);
   f.chain.nextOutcome = "unknown";
   await createFarmsStep(deps, launch!, f.settings, "r1");
   const [a] = await f.sql`select detail->>'farm' as farm from distributions where kind = 'create_farm' order by id limit 1`;
@@ -55,7 +55,7 @@ test("adds rewards in batches sized for one transaction and skips rewards alread
   await pendingPool(f.sql, id);
   const mints = Array.from({ length: 9 }, (_, i) => `R${i}`);
   for (const m of mints) await f.sql`insert into baskets values (${id}, ${m}, 1000)`;
-  const [launch] = await loadLaunches(f.sql, deps.ourtokenMint);
+  const [launch] = await loadLaunches(f.sql);
   f.chain.nextOutcome = "unknown";
   await createFarmsStep(deps, launch!, f.settings, "r1");
   const [first] = await f.sql`select detail->>'farm' as farm from distributions where kind = 'create_farm' order by id limit 1`;
@@ -77,7 +77,7 @@ test("fund allocates by stake times multiplier and sets rate over the period", a
   const deps = { ...f.deps, staking };
   const id = await insertLaunch(f.sql);
   await pendingPool(f.sql, id);
-  const [launch] = await loadLaunches(f.sql, deps.ourtokenMint);
+  const [launch] = await loadLaunches(f.sql);
   await createFarmsStep(deps, launch!, f.settings, "r1");
   const farms = await f.sql`select tier_id, farm from stake_tiers where launch_id = ${id} order by lock_seconds`;
   staking.staked.set(farms[0].farm, 100n).set(farms[1].farm, 100n);
@@ -98,7 +98,7 @@ test("fund holds rewards in escrow when nobody has staked", async () => {
   const deps = { ...f.deps, staking };
   const id = await insertLaunch(f.sql);
   await pendingPool(f.sql, id);
-  const [launch] = await loadLaunches(f.sql, deps.ourtokenMint);
+  const [launch] = await loadLaunches(f.sql);
   await createFarmsStep(deps, launch!, f.settings, "r1");
   const r = await beginStep(f.sql, { launchId: id, idemKey: "seed", kind: "swap", settingsVersion: 1, detail: {} });
   await confirmStep(f.sql, r, [{ bucket: "reward", mint: "ZEC", amount: 1_000n }]);
@@ -113,7 +113,7 @@ test("fund does nothing while the stake pool is pending", async () => {
   const deps = { ...f.deps, staking };
   const id = await insertLaunch(f.sql);
   await pendingPool(f.sql, id);
-  const [launch] = await loadLaunches(f.sql, deps.ourtokenMint);
+  const [launch] = await loadLaunches(f.sql);
   const r = await beginStep(f.sql, { launchId: id, idemKey: "seed", kind: "swap", settingsVersion: 1, detail: {} });
   await confirmStep(f.sql, r, [{ bucket: "reward", mint: "ZEC", amount: 1_000n }]);
   await fundStep(deps, launch!, f.settings, "r1");

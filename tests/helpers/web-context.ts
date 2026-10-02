@@ -9,12 +9,16 @@ import { TokenIcons } from "../../src/web/server/icons";
 import { JupiterPrices } from "../../src/indexer/prices";
 import { resetRateLimits } from "../../src/web/server/http";
 import { resetStakeCache } from "../../src/web/server/stake";
+import { resetConfigSeed } from "../../src/web/server/launch";
+import { resetKeeperBalanceCache } from "../../src/web/server/keeper-topup";
 import type { UploadPort } from "../../src/web/server/uploads";
 import { defaultSettings, saveSettings } from "../../src/domain/settings";
 import { NATIVE_MINT } from "../../src/domain/types";
+import { decodeCodeHash, hashCode } from "../../src/admin-code";
 
 export const OURS = "OURS1111111111111111111111111111111111111111";
-export const ADMIN = Keypair.generate();
+export const ADMIN_CODE = "X7232DDUWJDB369DGWUDHKMN";
+const ADMIN_HASH = decodeCodeHash(await hashCode(ADMIN_CODE));
 export const CLASSIC = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
 
 export class FakeUploads implements UploadPort {
@@ -41,21 +45,28 @@ export async function makeWebContext(over: Partial<WebContext> = {}) {
   const sql = await freshDb();
   await saveSettings(sql, defaultSettings(OURS), "t");
   const chain = new FakeChain();
+  const meteora = new FakeMeteora(chain);
+  // the seeded config keys carry the default graduation targets, so launches reuse them
+  meteora.thresholds.set("CfgSol200", 85n * 10n ** 9n);
+  meteora.thresholds.set("CfgOurs200", 100_000n * 10n ** 6n);
+  resetConfigSeed();
+  resetKeeperBalanceCache();
   const ctx: WebContext = {
     sql,
     conn: {} as any,
-    meteora: new FakeMeteora(chain),
+    meteora,
     staking: new FakeStaking(chain),
     jupiter: new FakeJupiter(chain),
     uploads: new FakeUploads(),
+    uploadPrefix: null,
     trade: new FakeTrade(),
     prices: new JupiterPrices("https://prices.test", undefined, async () => Response.json({})),
     icons: new TokenIcons("https://jup.test/tokens/v2", undefined, async () => Response.json([])),
     configKeys: { [`${NATIVE_MINT}:200`]: "CfgSol200", [`${OURS}:200`]: "CfgOurs200" },
     keeperAddress: "Keeper1111111111111111111111111111111111111",
     spillWallet: Keypair.generate().publicKey,
-    ourtokenMint: OURS,
-    adminWallets: new Set([ADMIN.publicKey.toBase58()]),
+    adminCodeHash: ADMIN_HASH,
+    platformAddresses: {},
     sessionSecret: crypto.getRandomValues(new Uint8Array(32)),
     tokenProgramOf: async () => CLASSIC,
     stocks: { list: async () => [], icons: async () => ({}) },

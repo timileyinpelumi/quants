@@ -74,11 +74,11 @@ def glyph(uid, c=BLUE, gap=1.0):
   </g>'''
 
 
-def mark_svg(uid="qm", gap=1.0, crop=0):
+def mark_svg(uid="qm", gap=1.0, crop=0, tile=False):
     v = f"{crop} {crop} {1080 - 2 * crop} {1080 - 2 * crop}"
+    bg = f'<rect x="{crop}" y="{crop}" width="{1080 - 2 * crop}" height="{1080 - 2 * crop}" fill="{TILE}"/>\n  ' if tile else ""
     return f'''<svg xmlns="http://www.w3.org/2000/svg" viewBox="{v}" role="img" aria-label="quants">
-  <rect x="{crop}" y="{crop}" width="{1080 - 2 * crop}" height="{1080 - 2 * crop}" fill="{TILE}"/>
-  {glyph(uid, gap=gap)}
+  {bg}{glyph(uid, gap=gap)}
 </svg>
 '''
 
@@ -108,9 +108,12 @@ out = sys.argv[1] if len(sys.argv) > 1 else None
 brand = out or os.path.join(here, "..", "public", "brand")
 app = out or os.path.join(here, "..", "src", "app")
 open(os.path.join(brand, "quants-mark.svg"), "w").write(mark_svg())
+open(os.path.join(brand, "quants-mark-tile.svg"), "w").write(mark_svg("qt", tile=True))
 # Small uses (tab icon, header, footer) are drawn at 16 to 64px: a tighter crop and wider gaps keep the rings apart.
 icon = mark_svg("qi", gap=1.6, crop=150)
 open(os.path.join(app, "icon.svg"), "w").write(icon)
 open(os.path.join(brand, "quants-icon.svg"), "w").write(icon)
+# The black tile: the featured card avatar, the apple touch icon and share images, where a background is expected.
+open(os.path.join(brand, "quants-icon-tile.svg"), "w").write(mark_svg("qit", gap=1.6, crop=150, tile=True))
 open(os.path.join(brand, "quants-logo.svg"), "w").write(logo_svg(INK_LIGHT, "ql"))
 open(os.path.join(brand, "quants-logo-dark.svg"), "w").write(logo_svg(INK_DARK, "qd"))

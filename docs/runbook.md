@@ -1,5 +1,7 @@
 # Runbook
 
+Security review and accepted risks: `docs/security.md`.
+
 ## Environment
 
 Copy `.env.example` to `.env` and fill in:
@@ -11,14 +13,35 @@ Copy `.env.example` to `.env` and fill in:
 | `KEEPER_KEYPAIR` | JSON secret key array of the keeper wallet. Or `KEEPER_KEYPAIR_PATH`, a file holding it (not both) |
 | `SPILL_KEYPAIR` | JSON secret key array of the spill wallet. Or `SPILL_KEYPAIR_PATH` |
 | `TREASURY_ADDRESS` | Platform treasury (receive only) |
-| `OURTOKEN_MINT` | The platform token, classic SPL |
-| `KAMINO_GLOBAL_CONFIG` | Output of `scripts/create-kamino-global-config.ts` |
+| `KAMINO_GLOBAL_CONFIG` | Optional. Without it the keeper creates one on the first staking open (see Starting with no SOL) |
 | `DAMM_V2_MIGRATION_CONFIG` | `A8gMrEPJkacWkcb3DGwtJwTe16HktSEfvwtuDh2MCtck` (DAMM v2 Customizable) |
 | `JUPITER_BASE_URL` | `https://api.jup.ag/swap/v1` |
 | `JUPITER_API_KEY` | Free key from the Jupiter portal; without it requests are limited to 30 a minute |
-| `ALERT_WEBHOOK_URL` | Optional. Incoming webhook the keeper and indexer post alerts to (see Alerts) |
-| `QUOTE_GRADUATIONS` | Optional. JSON of graduation targets by pair symbol, for example `{"SOL":100,"USDC":15000}` (see Graduation targets) |
-| `STOCK_PAIRS` | Optional. `1` lets new launches pair with stocks (see Stock pairs). Off by default |
+
+Seed values, read once when a fresh database gets its first settings version (see Settings). After that the admin page owns them and these do nothing:
+
+| Variable | Seeds |
+|---|---|
+| `OURTOKEN_MINT`, `OURTOKEN_SYMBOL`, `OURTOKEN_DECIMALS`, `OURTOKEN_GRADUATION` | The platform token. Leave the mint empty until the token exists |
+| `QUOTE_GRADUATIONS` | Graduation targets by pair symbol, for example `{"SOL":100,"USDC":15000}` |
+| `STOCK_PAIRS` | `1` turns stock pairs on |
+| `ALERT_WEBHOOK_URL` | The alert webhook |
+
+## Settings
+
+Business values live in the versioned `settings` table and are edited on the admin page (Settings tab). Saving shows the changed sections and asks to confirm, then writes a new version. Pages read settings through a 5 second cache and the keeper and indexer read them every pass, so a change applies without a rebuild or restart.
+
+| Section | What |
+|---|---|
+| Launches | Pause new launches (prepare refuses and the launch page says so; trading, staking and the keeper carry on), site banner shown on every page |
+| Pairs | Which pair tokens new launches can use, the graduation target of each, the creator payout minimum per pair, stock pairs on or off |
+| Platform token | Mint (empty means not launched: the home page shows the prelaunch card), symbol, decimals, graduation target, offered as a pair |
+| Fees | Fee tiers offered (0.25% to 10%, up to four), fee split, swap slippage cap, first buy cap |
+| Staking | Lock tiers, max early exit penalty, reward stream period |
+| Keeper | Run interval, alert webhook |
+| Home page | Featured headline and text, prelaunch message (`{symbol}` becomes the platform symbol), X link (empty falls back to `NEXT_PUBLIC_X_URL`) |
+
+What stays in the env and why: database, RPC and Jupiter URLs and keys, Cloudinary, keypairs, wallet addresses (`TREASURY_ADDRESS`, `KEEPER_ADDRESS`, `SPILL_ADDRESS`, `PLATFORM_ADDRESSES`), `DAMM_V2_MIGRATION_CONFIG`, `QUOTE_MINTS`, `KAMINO_GLOBAL_CONFIG` and `CONFIG_KEYS`: secrets, infrastructure addresses or chain data that must match the network. `NEXT_PUBLIC_RPC_URL` is built into the browser bundle. `INDEXER_INTERVAL_SECONDS` and the backup settings are operations, not product.
 
 ## Wallets
 
@@ -31,21 +54,21 @@ Copy `.env.example` to `.env` and fill in:
 ```bash
 docker compose up -d
 bun run migrate
-bun scripts/create-kamino-global-config.ts         # prints KAMINO_GLOBAL_CONFIG
-OURTOKEN_GRADUATION=<amount> bun scripts/create-configs.ts > config-keys.json
 ```
+
+Nothing else is needed on chain before the first launch (see Starting with no SOL). The first settings version is written from the env seed the first time anything reads settings.
 
 ### Graduation targets
 
-Each pair graduates once a set amount of the pair token has been raised on the curve: 85 SOL, 12,000 USDC, 12,000 USDT, 30,000 JUP, and `OURTOKEN_GRADUATION` for the platform token. To change any of them, set `QUOTE_GRADUATIONS` to JSON keyed by symbol, for example `QUOTE_GRADUATIONS='{"SOL":100,"JUP":40000}'`. Pairs you leave out keep their default. An unknown symbol or a target that is not a positive number is an error naming the pair, in the script and in the web app.
+Each pair graduates once a set amount of the pair token has been raised on the curve: 85 SOL, 12,000 USDC, 12,000 USDT and 30,000 JUP by default, and the platform token's own target. Change them on the admin page under Pairs and Platform token.
 
-The target is written into each config key when `scripts/create-configs.ts` runs, and every pool keeps the target of the config key it was launched from. Set `QUOTE_GRADUATIONS` before creating config keys. Changing it afterwards does nothing for existing keys or pools; create a new set of config keys for a new target to apply. The admin page lists the targets the server is set to under Pairs, and `NEXT_PUBLIC_SOL_GRADUATION` and `NEXT_PUBLIC_OURTOKEN_GRADUATION` must match what the keys were created with.
+The target is fixed into the DBC config key a pool is created from, and every pool keeps the target it started with. Config keys live in the `config_keys` table by pair, fee tier and threshold. When a launch needs a key for the current target that does not exist yet, prepare adds an optional setup transaction that creates it, paid by that launcher (about 0.008 SOL of rent), and records the key. So a new target applies to the next launch on that pair, and old pools keep theirs. The first prepare claims the row, so two first launches on the same pair get the same address; one setup transaction lands, the other fails harmlessly and both launches go through. A pending key is trusted only once it is on chain with the keeper as fee claimer, the right mint and the right threshold.
 
-Keep `config-keys.json` next to `.env` on the server (it is gitignored because the dev seed regenerates it); the web app reads it from `CONFIG_KEYS_PATH`. Save the initial settings from a script or the admin page (plan 2) with `saveSettings(sql, defaultSettings(OURTOKEN_MINT), "<admin>")`.
+`CONFIG_KEYS` (or `config-keys.json` at `CONFIG_KEYS_PATH`) is an optional seed: keys made by `scripts/create-configs.ts` are recorded on the first prepare with the threshold read from chain and reused when it matches. Stock pairs still need keys made by the script, since their graduation is set per stock.
 
 ### Stock pairs
 
-Tokenized stocks (xStocks from Backed, and Backpack stocks such as `SPCX.US`) can be pair tokens. New stock launches are off by default because these launches have no staking: the launch form shows crypto pairs only, the docs page leaves out the stock section, and `/api/launch/prepare` refuses a stock pair. Set `STOCK_PAIRS=1` on the web app to turn them on. Stock launches that already exist keep trading either way, the registry keeps refreshing, and `e2e/stocks.spec.ts` runs only when `STOCK_PAIRS=1` is set for both the web app and the Playwright run. They are Token-2022 mints, so:
+Tokenized stocks (xStocks from Backed, and Backpack stocks such as `SPCX.US`) can be pair tokens. New stock launches are off by default because these launches have no staking: the launch form shows crypto pairs only, the docs page leaves out the stock section, and `/api/launch/prepare` refuses a stock pair. Turn on Stock pairs on the admin page (or seed it with `STOCK_PAIRS=1`). Stock launches that already exist keep trading either way, the registry keeps refreshing, and `e2e/stocks.spec.ts` runs only when `STOCK_PAIRS=1` is set for the Playwright run and the setting is on. They are Token-2022 mints, so:
 
 - **Trading only.** Kamino farms reject these mints, so a launch against a stock has no reward basket, no stake pool and no farms. The keeper splits its fees between the treasury and the creator in proportion to `platformBps` and `creatorBps` (the basket share is shared out the same way) and never runs the rent, swap or fund steps for it. The launch form hides the basket and staking for these pairs, and the token page, explore and home show a Trading only tag instead of staking.
 - **Token badge.** DBC rejects Token-2022 quote mints with extensions unless the config and every pool pass the mint's DBC token badge (`deriveTokenBadgeAddress(mint)`). Meteora creates badges, and the xStocks and Backpack stocks checked so far have one on mainnet. `create-configs.ts` refuses a stock with extensions and no badge, and `MeteoraLive.buildLaunchTx` passes the badge whenever the quote mint is Token-2022 and the badge account exists.
@@ -67,7 +90,18 @@ Locally, `scripts/dev-seed.ts` creates two Token-2022 stand-in stocks with no ex
 bun run keeper
 ```
 
-It runs every `keeperIntervalSeconds` (default 600) and logs one JSON line per run with `runId`, `launches` and per-launch `errors`.
+It runs every `keeperIntervalSeconds` (default 600, set on the admin page) and logs one JSON line per run with `runId`, `launches` and per-launch `errors`.
+
+### Starting with no SOL
+
+Nothing has to be paid for up front:
+
+- **Config keys** are created by the first launch that needs one, in that launcher's setup transaction (see Graduation targets).
+- **The Kamino global config.** Without `KAMINO_GLOBAL_CONFIG`, the first launch to open staking covers it: its rent includes the global config (about 0.016 SOL), its `rent` row carries `detail.globalConfig = true`, and the keeper creates the global config (keeper as admin, treasury fee 0) before that launch's farms and records it in `platform_accounts`. Other launches wait for it and pay only their own rent. Set `KAMINO_GLOBAL_CONFIG` to use an existing one instead.
+- **Keeper float.** While the keeper holds under 0.01 SOL, every launch transaction tops it up to 0.01 SOL from the launcher (never more than 0.01 SOL, nothing once it is funded). That covers the keeper's first fee claim.
+- **The platform token** is launched by the operator from their own wallet, like any launch: leave its mint empty until then, then set it on the admin page.
+
+The remaining minimum is about 0.01 SOL in the keeper for its first fee claim, which the first launch provides. After that the keeper pays farm rent from each launch's stakers' share and its fees from claimed fees; keep an eye on the Wallets tab, which turns the keeper red below 0.01 SOL.
 
 ### Staking opens
 
@@ -91,7 +125,7 @@ Each trade stores the quote token's USD price from Jupiter (`JUPITER_API_KEY`) a
 
 ## Alerts
 
-Set `ALERT_WEBHOOK_URL` and the keeper and indexer post `{"text": "..."}` to it. That works as is with Slack incoming webhooks and anything that accepts the same body. For Discord, add `/slack` to the end of the channel's webhook URL. Without the variable nothing is sent.
+Set the alert webhook on the admin page (Keeper section; `ALERT_WEBHOOK_URL` seeds it) and the keeper and indexer post `{"text": "..."}` to it. They pick up a change on their next pass. That works as is with Slack incoming webhooks and anything that accepts the same body. For Discord, add `/slack` to the end of the channel's webhook URL. With no webhook nothing is sent.
 
 They alert when:
 
@@ -133,28 +167,42 @@ On top of the keeper variables above, the web app needs:
 | `KEEPER_ADDRESS` | Keeper public key, listed on the docs page |
 | `SPILL_ADDRESS` | Spill public key; stake pools send penalties to its token accounts |
 | `CLOUDINARY_URL` | `cloudinary://<api key>:<api secret>@<cloud name>` from the Cloudinary console, for launch images and metadata JSON. Or set `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY` and `CLOUDINARY_API_SECRET` |
-| `ADMIN_WALLETS` | Comma separated wallet addresses allowed into `/admin` |
-| `ADMIN_SESSION_SECRET` | At least 32 random bytes, hex |
-| `CONFIG_KEYS_PATH` | Path to `config-keys.json` |
+| `ADMIN_CODE_HASH` | argon2id hash of the admin access code, base64, from `bun scripts/admin-code.ts` (see Admin access) |
+| `ADMIN_SESSION_SECRET` | At least 32 random bytes, hex; signs the admin session cookie |
+| `CONFIG_KEYS_PATH` | Optional path to `config-keys.json` (a seed, see Graduation targets) |
 | `NEXT_PUBLIC_RPC_URL` | RPC the browser uses |
-| `NEXT_PUBLIC_OURTOKEN_MINT`, `NEXT_PUBLIC_OURTOKEN_SYMBOL` | The platform token. Its ticker is `QUANTS`, the default when the symbol is unset |
-| `NEXT_PUBLIC_SOL_GRADUATION`, `NEXT_PUBLIC_OURTOKEN_GRADUATION` | Shown on the launch form; must match what the config keys were created with |
-| `SITE_URL` | Public origin, e.g. `https://quants.example`; the admin sign in message names its domain, and shared token links preview with images from it |
-| `NEXT_PUBLIC_X_URL` | The quants X profile, e.g. `https://x.com/quants`; shown in the header, menu and footer. Unset hides it |
+| `PLATFORM_ADDRESSES` | Public addresses of the platform wallet roles, from `bun scripts/hd-wallet.ts env`; the admin Wallets tab lists them with balances |
+| `SITE_URL` | Public origin, e.g. `https://quants.example`; admin requests must come from it, and shared token links preview with images from it |
+| `NEXT_PUBLIC_X_URL` | Fallback X profile when the admin X link is empty; shown in the header, menu, footer and the prelaunch card. Neither set hides it |
 | `TRUST_PROXY` | `1` behind Caddy or on Vercel so rate limits key on `x-forwarded-for`; leave unset when the app is reachable directly |
 
 Uploads are signed server side: images go to Cloudinary as image uploads and metadata JSON as raw uploads under the `quants` folder, named by a hash of their content, and the token URI and image are the returned `https://res.cloudinary.com/...` links. The API secret never reaches the browser. Without Cloudinary set, `/api/metadata` refuses uploads, except in local development where `DEV_UPLOADS_BASE` keeps files in `.dev-uploads` and serves them from `/api/dev-uploads`. Launches made before the switch keep their IPFS links.
 
 Never set these in production: `NEXT_PUBLIC_TEST_WALLET_SECRET`, `PINATA_JWT=stub`, `DEV_UPLOADS_BASE`, `ALLOW_LOCAL_URIS`, `LOCAL_TOKEN_LIST`, `LOCAL_REWARD_MINTS`. They exist for the local seed and end to end run only. The web app and keeper refuse to start when `PINATA_JWT=stub`, `DEV_UPLOADS_BASE`, `ALLOW_LOCAL_URIS`, `LOCAL_TOKEN_LIST` or `LOCAL_REWARD_MINTS` is set and `RPC_URL` is not localhost or 127.0.0.1. The Vercel preview runs against a tunnelled local validator with `PINATA_JWT=stub` and `LOCAL_TOKEN_LIST`, so it sets `ALLOW_DEV_SWITCHES=1`; nothing else should. (`PINATA_JWT=stub` now only turns on local uploads, like `DEV_UPLOADS_BASE`.)
 
-`ADMIN_SESSION_SECRET` must be at least 64 hex characters (`openssl rand -hex 32`); the web app refuses to start otherwise.
+`ADMIN_SESSION_SECRET` must be at least 64 hex characters (`openssl rand -hex 32`) and `ADMIN_CODE_HASH` must be an argon2id hash; the web app refuses to start otherwise.
+
+### Admin access
+
+`/admin` asks for one access code. Create it once per network:
+
+```bash
+bun scripts/admin-code.ts                       # mainnet; --cluster devnet or localnet for the others
+```
+
+It writes the plain code to `~/.config/quants/<cluster>/admin-code.txt` (mode 600, in a mode 700 folder) and prints the `ADMIN_CODE_HASH=` line for the env file. The server only ever sees the hash. The script refuses to overwrite an existing code file; `--rotate` makes a new code, and deploying its hash ends every admin session at once (sessions are tied to the hash they were made with).
+
+- A session lasts 12 hours. The cookie is httpOnly, SameSite=Strict, Secure in production, and signed with `ADMIN_SESSION_SECRET`; the session itself is a row in `admin_sessions`, so Sign out ends it on the server.
+- Five wrong codes from one address in 15 minutes lock that address for the rest of the window. Fifty wrong codes in an hour from anywhere lock sign in for everyone until the hour passes. Every attempt is a row in `admin_logins` and a log line (`adminLogin`). To unlock early: `delete from admin_logins where not ok`.
+- Admin API requests from another origin are refused (Origin and Sec-Fetch-Site checks).
+- Lost the code: run the script with `--rotate`, put the new hash in the env file and deploy.
 
 ## Deploying to a VPS
 
 1. Install Bun, Node 22 or newer (for the build), Postgres 16 and Caddy. Create a `quants` user. The service files run `/usr/local/bin/bun`, and the Bun installer puts it in your home directory, so copy it there: `sudo install -m 755 ~/.bun/bin/bun /usr/local/bin/bun`. Check the units with `systemd-analyze verify deploy/*.service`.
 2. Clone the repo to `/opt/quants` and put `config-keys.json` in it. Split the variables from `.env.example` into two files, both mode 600 and owned by `quants`:
-   - `/opt/quants/keeper.env` (keeper only): `DATABASE_URL`, `RPC_URL`, `KEEPER_KEYPAIR`, `SPILL_KEYPAIR`, `TREASURY_ADDRESS`, `OURTOKEN_MINT`, `KAMINO_GLOBAL_CONFIG`, `DAMM_V2_MIGRATION_CONFIG`, `JUPITER_BASE_URL`, `JUPITER_API_KEY`.
-   - `/opt/quants/web.env` (web and indexer): everything in the web table below plus `DATABASE_URL`, `RPC_URL`, `OURTOKEN_MINT`, `KAMINO_GLOBAL_CONFIG`, `DAMM_V2_MIGRATION_CONFIG`, `JUPITER_API_KEY`, `SITE_URL=https://<your domain>` and `TRUST_PROXY=1`. No keypairs.
+   - `/opt/quants/keeper.env` (keeper only): `DATABASE_URL`, `RPC_URL`, `KEEPER_KEYPAIR`, `SPILL_KEYPAIR`, `TREASURY_ADDRESS`, `DAMM_V2_MIGRATION_CONFIG`, `JUPITER_BASE_URL`, `JUPITER_API_KEY`, optionally `KAMINO_GLOBAL_CONFIG`.
+   - `/opt/quants/web.env` (web and indexer): everything in the web table below plus `DATABASE_URL`, `RPC_URL`, `DAMM_V2_MIGRATION_CONFIG`, `JUPITER_API_KEY`, `SITE_URL=https://<your domain>` and `TRUST_PROXY=1`. No keypairs.
    - Do not leave a `/opt/quants/.env`: Bun and Next load it into every process started there, which would put the keypairs back into the web server.
 3. `bun install`, `bun --env-file=web.env run migrate`, `bun --env-file=web.env run build`.
 4. Copy `deploy/quants-web.service`, `deploy/quants-keeper.service` and `deploy/quants-indexer.service` to `/etc/systemd/system/`, then `systemctl enable --now quants-web quants-keeper quants-indexer`.
@@ -185,7 +233,7 @@ With `BACKUP_BUCKET=<bucket>` it also gives the instance a role that can write b
 
 Create two A records pointing at the Elastic IP: `quants.wtf` and `www.quants.wtf` (`www` redirects to the bare domain). If the zone is in Route 53, `provision.sh --dns` upserts them. Let's Encrypt only issues a certificate once the A record resolves to the instance, so until DNS has propagated Caddy logs certificate errors and keeps retrying. Check with `dig +short quants.wtf`.
 
-Before DNS is pointed, use sslip.io, which resolves `<ip with dashes>.sslip.io` to that IP: set `SITE_HOST=3-80-12-34.sslip.io` and `SITE_URL=https://3-80-12-34.sslip.io` (the line provision prints). Let's Encrypt issues for it like any other name. Switch both to `quants.wtf` and deploy again once DNS resolves; `SITE_URL` is the domain the admin sign in message names.
+Before DNS is pointed, use sslip.io, which resolves `<ip with dashes>.sslip.io` to that IP: set `SITE_HOST=3-80-12-34.sslip.io` and `SITE_URL=https://3-80-12-34.sslip.io` (the line provision prints). Let's Encrypt issues for it like any other name. Switch both to `quants.wtf` and deploy again once DNS resolves; admin requests are only accepted from `SITE_URL`.
 
 ### Fill .env.production and secrets
 
@@ -197,7 +245,7 @@ bun scripts/hd-wallet.ts export keeper secrets/keeper.json
 bun scripts/hd-wallet.ts export spill secrets/spill.json
 ```
 
-`KEEPER_ADDRESS`, `SPILL_ADDRESS` and `TREASURY_ADDRESS` come from `show`. `CONFIG_KEYS` is the contents of the mainnet `config-keys.json` on one line, in single quotes. `POSTGRES_PASSWORD` must be hex (`openssl rand -hex 24`) because it goes into `DATABASE_URL` as is. The keypairs are mounted read only into the keeper container only (`/run/secrets/keeper` and `/run/secrets/spill`, read through `KEEPER_KEYPAIR_PATH` and `SPILL_KEYPAIR_PATH`); they are never in the image or in `.env.production`. The container user has uid 1000, the same as `ubuntu` on the instance, so the files can stay mode 600.
+`KEEPER_ADDRESS`, `SPILL_ADDRESS` and `TREASURY_ADDRESS` come from `show`. Make the admin code with `bun scripts/admin-code.ts` and paste its `ADMIN_CODE_HASH=` line. `PLATFORM_ADDRESSES` is the line `bun scripts/hd-wallet.ts env` prints: every role's public address, which the admin Wallets tab lists with its derivation path and SOL balance (the keeper row turns red below 0.01 SOL). The seed phrase never goes to the server. `CONFIG_KEYS` is optional: the contents of a `config-keys.json` on one line, in single quotes, when you made keys with the script. `POSTGRES_PASSWORD` must be hex (`openssl rand -hex 24`) because it goes into `DATABASE_URL` as is. The keypairs are mounted read only into the keeper container only (`/run/secrets/keeper` and `/run/secrets/spill`, read through `KEEPER_KEYPAIR_PATH` and `SPILL_KEYPAIR_PATH`); they are never in the image or in `.env.production`. The container user has uid 1000, the same as `ubuntu` on the instance, so the files can stay mode 600.
 
 ### Deploy
 
@@ -205,7 +253,7 @@ bun scripts/hd-wallet.ts export spill secrets/spill.json
 deploy/aws/deploy.sh
 ```
 
-It checks that each keypair file matches its address and that required values are set, rsyncs the repo (without `.git`, `node_modules`, `.next`, local env files and devnet state) plus `.env.production` and `secrets/` to `/opt/quants`, builds the image there tagged with the commit (`quants-app:<sha>`, plus `latest`), runs `docker compose up -d`, waits for web to be healthy and then runs `deploy/aws/smoke.sh` on the instance. The smoke check passes when `migrate` exited 0, web returns 200 on `/` and `/explore` (inside the network and on `https://SITE_HOST/`), the indexer logged its first pass and the keeper logged a run, with no restarts. On a fresh database the keeper reaches the chain and then waits for settings; smoke prints a warning for that. Sign in on `/admin` and save the settings, and the next keeper run (within a minute) goes through. `NEXT_PUBLIC_*` values are built into the bundle, so every deploy rebuilds. A build takes several minutes on a t3.medium.
+It checks that each keypair file matches its address and that required values are set, rsyncs the repo (without `.git`, `node_modules`, `.next`, local env files and devnet state) plus `.env.production` and `secrets/` to `/opt/quants`, builds the image there tagged with the commit (`quants-app:<sha>`, plus `latest`), runs `docker compose up -d`, waits for web to be healthy and then runs `deploy/aws/smoke.sh` on the instance. The smoke check passes when `migrate` exited 0, web returns 200 on `/` and `/explore` (inside the network and on `https://SITE_HOST/`), the indexer logged its first pass and the keeper logged a run, with no restarts. On a fresh database the first settings version comes from the env seed, so the keeper runs straight away. Sign in on `/admin` with the code to check and change the settings. `NEXT_PUBLIC_*` values are built into the bundle, so every deploy rebuilds; settings do not need one. A build takes several minutes on a t3.medium.
 
 ### Logs
 
@@ -300,7 +348,7 @@ It creates the QUANTS mint (6 decimals) and five stand-ins with Metaplex metadat
 It writes three gitignored files:
 
 - `config-keys.devnet.json`
-- `devnet.env`: `CLUSTER=devnet`, the keeper, spill and treasury addresses, `OURTOKEN_*`, `KAMINO_GLOBAL_CONFIG`, `DAMM_V2_MIGRATION_CONFIG`, `QUOTE_MINTS` (devnet USDC), `QUOTE_GRADUATIONS`, `CONFIG_KEYS_PATH` and `CONFIG_KEYS`, `DEVNET_TOKENS` and the `NEXT_PUBLIC_*` values. `NEXT_PUBLIC_RPC_URL` is the public devnet RPC, because the browser sees it; keep a keyed RPC in `DEVNET_RPC_URL`.
+- `devnet.env`: `CLUSTER=devnet`, the keeper, spill and treasury addresses, `OURTOKEN_*`, `KAMINO_GLOBAL_CONFIG`, `DAMM_V2_MIGRATION_CONFIG`, `QUOTE_MINTS` (devnet USDC), `QUOTE_GRADUATIONS`, `CONFIG_KEYS_PATH` and `CONFIG_KEYS`, `DEVNET_TOKENS` and `NEXT_PUBLIC_RPC_URL`. `NEXT_PUBLIC_RPC_URL` is the public devnet RPC, because the browser sees it; keep a keyed RPC in `DEVNET_RPC_URL`.
 - `devnet.secrets.env`: `KEEPER_KEYPAIR` and `SPILL_KEYPAIR`. Keeper only; never give these to the web app.
 
 ### Env merge
@@ -313,7 +361,7 @@ cat devnet.env devnet.secrets.env > .env.devnet
 cat >> .env.devnet <<'ENV'
 DATABASE_URL=postgres://quants:quants@localhost:5434/quants_devnet
 DEVNET_RPC_URL=https://devnet.helius-rpc.com/?api-key=<key>
-ADMIN_WALLETS=<your wallet>
+ADMIN_CODE_HASH=<from bun scripts/admin-code.ts --cluster devnet>
 ADMIN_SESSION_SECRET=<openssl rand -hex 32>
 CLOUDINARY_URL=cloudinary://<key>:<secret>@<cloud>
 SITE_URL=http://localhost:3000
@@ -333,7 +381,7 @@ bun --env-file=.env.devnet run dev                     # web app against devnet,
 
 Next reads `.env.local` on its own and adds every variable from it that is not already set, which brings back the local dev switches and the test wallet. Move it aside while the web app runs on devnet (`mv .env.local .env.local.off`), or run devnet from a separate checkout. Bun with `--env-file` reads only the file given, so the keeper, indexer and scripts are not affected.
 
-All three read `RPC_URL` from `DEVNET_RPC_URL` when `RPC_URL` is unset. The keeper's first run needs settings saved (the run below does it, or the admin page). On devnet raise the slippage cap to 5% (`slippageBps: 500`), since the stand-in pools are small.
+All three read `RPC_URL` from `DEVNET_RPC_URL` when `RPC_URL` is unset. On devnet raise the slippage cap to 5% on the admin page, since the stand-in pools are small.
 
 ### Lifecycle run
 
@@ -350,7 +398,7 @@ Devnet drops transactions, so every step is kept in `devnet-run-state.json` (wal
 Set these on the preview environment (`vercel env add <name> preview`), from `devnet.env`:
 
 - Everything in `devnet.env` (including `CONFIG_KEYS`, since `config-keys.devnet.json` is not committed, and `DEVNET_TOKENS`).
-- `DATABASE_URL` (a Neon database migrated with `bun --env-file=<neon env> run migrate`), `DEVNET_RPC_URL`, `ADMIN_WALLETS`, `ADMIN_SESSION_SECRET`, `CLOUDINARY_URL`, `SITE_URL=https://<preview domain>`, `TRUST_PROXY=1`.
+- `DATABASE_URL` (a Neon database migrated with `bun --env-file=<neon env> run migrate`), `DEVNET_RPC_URL`, `ADMIN_CODE_HASH`, `ADMIN_SESSION_SECRET`, `CLOUDINARY_URL`, `SITE_URL=https://<preview domain>`, `TRUST_PROXY=1`.
 - Remove the tunnel setup: `RPC_URL` and `NEXT_PUBLIC_RPC_URL` pointing at the tunnel, `ALLOW_DEV_SWITCHES`, `PINATA_JWT`, `LOCAL_TOKEN_LIST`, `ALLOW_LOCAL_URIS`, `DEV_UPLOADS_BASE` and `NEXT_PUBLIC_TEST_WALLET_SECRET` (the build refuses the test wallet with a non-local RPC).
 
-Never put `KEEPER_KEYPAIR` or `SPILL_KEYPAIR` on Vercel. Run the keeper and indexer from your machine or the VPS with `.env.devnet`, then redeploy the preview so the `NEXT_PUBLIC_*` values are built in.
+Never put `KEEPER_KEYPAIR` or `SPILL_KEYPAIR` on Vercel. Run the keeper and indexer from your machine or the VPS with `.env.devnet`, then redeploy the preview so `NEXT_PUBLIC_RPC_URL` is built in.

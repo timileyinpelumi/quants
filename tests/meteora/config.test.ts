@@ -22,3 +22,14 @@ test("every tier builds a valid config with the fee we asked for", () => {
     expect(p.creatorPermanentLockedLiquidityPercentage + p.creatorLiquidityPercentage + p.partnerLiquidityPercentage).toBe(0);
   }
 });
+
+test("a first buy on a config that does not exist yet is quoted from its parameters", async () => {
+  const { Connection } = await import("@solana/web3.js");
+  const { MeteoraLive } = await import("../../src/meteora/port");
+  const m = new MeteoraLive({ conn: new Connection("http://127.0.0.1:1") } as any, "A8gMrEPJkacWkcb3DGwtJwTe16HktSEfvwtuDh2MCtck");
+  const small = await m.firstBuyMaxOut({ feeBps: 200, quote: SOL }, 100_000_000n);
+  const big = await m.firstBuyMaxOut({ feeBps: 200, quote: SOL }, 10_000_000_000n);
+  expect(small > 0n).toBe(true);
+  expect(big > small).toBe(true);
+  expect(big < 1_000_000_000n * 1_000_000n).toBe(true);
+});

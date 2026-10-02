@@ -30,7 +30,7 @@ test("OURTOKEN launch with a first buy puts the Jupiter swap first and caps the 
 });
 
 const STOCK = "Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh";
-const stock = { mint: STOCK, symbol: "NVDAx", name: "NVIDIA xStock", decimals: 8, graduation: 50, iconMint: STOCK, platform: false, payoutMin: 0n, kind: "xstocks" as const, tradingOnly: true };
+const stock = { mint: STOCK, symbol: "NVDAx", name: "NVIDIA xStock", decimals: 8, graduation: 50, iconMint: STOCK, platform: false, payoutMin: 0n, kind: "xstocks" as const, tradingOnly: true, enabled: true };
 
 test("with STOCK_PAIRS=1 a stock pair from the registry launches trading only, with no basket", async () => {
   process.env.STOCK_PAIRS = "1";
@@ -130,19 +130,44 @@ test("an empty search returns popular tokens", async () => {
   expect(j.popular).toBe(true);
 });
 
-test("a USDC launch with a first buy swaps SOL to USDC first, like any non-SOL pair", async () => {
+test("the first USDC launch creates its config key in an optional setup transaction, then swaps SOL to USDC", async () => {
   const USDC = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
   const c = await makeWebContext();
-  c.configKeys[`${USDC}:200`] = "CfgUsdc200";
   (c.jupiter as any).rates.set(USDC, 150);
   const r = await post(prepare, body({ quoteMint: USDC, devBuySol: "1000000000" }));
   const j = await r.json();
-  expect(j.transactions.map((t: any) => t.versioned)).toEqual([true, false]);
-  expect((c.meteora as any).launches[0].quoteMint).toBe(USDC);
+  expect(r.status).toBe(200);
+  expect(j.transactions.map((t: any) => [t.versioned, t.optional ?? false])).toEqual([[false, true], [true, false], [false, false]]);
+  const launch = (c.meteora as any).launches[0];
+  expect(launch.quoteMint).toBe(USDC);
+  expect(launch.createConfig.quote).toEqual({ mint: USDC, decimals: 6, migrationQuoteThreshold: 12_000 });
+  expect(launch.createConfig.keeper).toBe(c.keeperAddress);
+  const [row] = await c.sql`select address, status from config_keys where quote_mint = ${USDC} and fee_bps = 200`;
+  expect(row).toMatchObject({ address: launch.configKey, status: "pending" });
+});
+
+test("a keeper below 0.01 SOL is topped up inside the launch transaction, a funded one is not", async () => {
+  const c = await makeWebContext({ conn: { getBalance: async () => 4_000_000 } as any });
+  await post(prepare, body());
+  expect((c.meteora as any).launches[0].keeperTopUp).toEqual({ to: c.keeperAddress, lamports: 6_000_000n });
+  const funded = await makeWebContext({ conn: { getBalance: async () => 2_000_000_000 } as any });
+  await post(prepare, body());
+  expect((funded.meteora as any).launches[0].keeperTopUp).toBeUndefined();
 });
 
 test("a pair token outside the supported list is refused", async () => {
   await makeWebContext();
   const r = await post(prepare, body({ quoteMint: "BONK111111111111111111111111111111111111111" }));
   expect(r.status).toBe(400);
+});
+
+test("with an upload store set, metadata and images from elsewhere are refused", async () => {
+  await makeWebContext({ uploadPrefix: "https://res.cloudinary.com/demo/" });
+  const bad = await post(prepare, body());
+  expect(bad.status).toBe(400);
+  expect((await bad.json()).error.message).toContain("uploaded through quants");
+  const ok = await post(prepare, body({ uri: "https://res.cloudinary.com/demo/raw/upload/quants/a.json", image: "https://res.cloudinary.com/demo/image/upload/quants/a" }));
+  expect(ok.status).toBe(200);
+  const evil = await post(prepare, body({ uri: "https://res.cloudinary.com/demo/raw/upload/quants/a.json", image: "https://evil.test/a.png" }));
+  expect(evil.status).toBe(400);
 });

@@ -1,6 +1,8 @@
 import { readFileSync } from "node:fs";
 import { z } from "zod";
 import { applyClusterDefaults } from "./cluster";
+import { decodeCodeHash } from "./admin-code";
+import { parsePlatformAddresses } from "./domain/platform-wallets";
 
 const Env = z.object({
   DATABASE_URL: z.string().url(),
@@ -8,8 +10,8 @@ const Env = z.object({
   KEEPER_KEYPAIR: z.string(),
   SPILL_KEYPAIR: z.string(),
   TREASURY_ADDRESS: z.string().min(32),
-  OURTOKEN_MINT: z.string().min(32),
-  KAMINO_GLOBAL_CONFIG: z.string().min(32),
+  // Optional: the keeper creates one on the first staking open and records it in platform_accounts.
+  KAMINO_GLOBAL_CONFIG: z.preprocess((v) => v || undefined, z.string().min(32).optional()),
   DAMM_V2_MIGRATION_CONFIG: z.string().min(32),
   JUPITER_BASE_URL: z.string().url().default("https://api.jup.ag/swap/v1"),
   JUPITER_API_KEY: z.string().optional(),
@@ -57,5 +59,9 @@ export function checkWebEnv(env: RawEnv) {
   if (!/^[0-9a-fA-F]{64,}$/.test(env.ADMIN_SESSION_SECRET ?? "")) {
     throw new Error("Refusing to start: ADMIN_SESSION_SECRET must be at least 32 random bytes as hex (64+ hex characters). Generate one with: openssl rand -hex 32");
   }
+  if (!decodeCodeHash(env.ADMIN_CODE_HASH)) {
+    throw new Error("Refusing to start: ADMIN_CODE_HASH is missing or not an argon2id hash. Generate one with: bun scripts/admin-code.ts");
+  }
+  parsePlatformAddresses(env.PLATFORM_ADDRESSES);
   assertNoDevSwitches(env);
 }

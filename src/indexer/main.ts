@@ -6,6 +6,7 @@ import { JupiterPrices } from "./prices";
 import { applyClusterDefaults } from "../cluster";
 import { pricesFor } from "../jupiter/select";
 import { indexOnce } from "./run";
+import { cachedSettings } from "../domain/settings";
 import { makeAlerter, sqlThrottle, Streaks, indexerPassAlerts } from "../ops/alerts";
 
 const e = applyClusterDefaults(process.env);
@@ -39,13 +40,16 @@ const deps = {
   },
 };
 
-const alert = makeAlerter({ url: e.ALERT_WEBHOOK_URL || undefined, source: "indexer", store: sqlThrottle(sql) });
+// The webhook is an admin setting (seeded from ALERT_WEBHOOK_URL); each pass refreshes it.
+let webhook: string | undefined = e.ALERT_WEBHOOK_URL || undefined;
+const alert = makeAlerter({ url: () => webhook, source: "indexer", store: sqlThrottle(sql) });
 const addressStreaks = new Streaks(5);
 // The first pass always logs, so a deploy can see the indexer reach the RPC and the database.
 let first = true;
 
 while (true) {
   const started = Date.now();
+  webhook = (await cachedSettings(sql, 30_000).catch(() => null))?.alertWebhookUrl || webhook;
   try {
     const { checked, ...r } = await indexOnce(deps);
     if (first || r.trades || r.skipped || r.errors.length) console.log(JSON.stringify({ at: new Date().toISOString(), checked: checked.length, ...r }));

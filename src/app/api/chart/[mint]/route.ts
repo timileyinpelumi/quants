@@ -1,5 +1,5 @@
 import { getContext } from "@/web/server/context";
-import { json, jsonError } from "@/web/server/http";
+import { json, jsonError, rateLimit } from "@/web/server/http";
 import { z } from "zod";
 import { candles, market, TIMEFRAMES } from "@/web/server/chart";
 import { queryOf } from "@/web/server/paging";
@@ -10,6 +10,7 @@ const Query = z.object({ tf: z.enum(TIMEFRAMES).default("5M") });
 
 export async function GET(req: Request, { params }: { params: Promise<{ mint: string }> }) {
   try {
+    rateLimit(req, "chart", 240);
     const { tf } = Query.parse(queryOf(req));
     const { sql } = getContext();
     const [l] = await sql`select id from launches where mint = ${(await params).mint}`;

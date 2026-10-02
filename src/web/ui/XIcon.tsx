@@ -1,5 +1,3 @@
-export const xUrl = () => process.env.NEXT_PUBLIC_X_URL || null;
-
 export function XIcon({ size = 18 }: { size?: number }) {
   return (
     <svg aria-hidden width={size} height={size} viewBox="0 0 24 24" fill="currentColor">

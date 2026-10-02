@@ -22,7 +22,7 @@ async function trade(sql: SQL, id: number, minutesAgo: number, price: number, o:
 
 test("stats count launches, graduations, volume, traders and what stakers earned", async () => {
   const sql = await freshDb();
-  const v = await saveSettings(sql, defaultSettings("OURS"), "test");
+  const v = await saveSettings(sql, defaultSettings("OURS1111111111111111111111111111111111111111"), "test");
   const a = await launch(sql, "AAA", 48);
   const b = await launch(sql, "BBB", 2, "graduated");
   await launch(sql, "CCC", 1);
@@ -98,7 +98,7 @@ test("recent buys are the newest buys across every launch", async () => {
 
 test("the featured platform token shows its market when it launched here, else its pairs", async () => {
   const sql = await freshDb();
-  const coins = [{ mint: "mint-QUANTS", symbol: "QUANTS", name: "quants", decimals: 6, graduation: 1, iconMint: null, platform: true, payoutMin: 0n, kind: "crypto" as const, tradingOnly: false }];
+  const coins = [{ mint: "mint-QUANTS", symbol: "QUANTS", name: "quants", decimals: 6, graduation: 1, iconMint: null, platform: true, payoutMin: 0n, kind: "crypto" as const, tradingOnly: false, enabled: true }];
   await launch(sql, "AAA", 2);
   await sql`update launches set quote_mint = 'mint-QUANTS' where symbol = 'AAA'`;
   expect(await featured(sql, NOW, undefined, coins)).toEqual({ mint: "mint-QUANTS", symbol: "QUANTS", name: "quants", pairs: 1, token: null });

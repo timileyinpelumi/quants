@@ -39,9 +39,9 @@ async function keeperFarm(rewardCount: number, tiers: LockTier[] = [{ id: "7d", 
   const spillAccount = getAssociatedTokenAddressSync(stakeMint, spill.publicKey).toBase58();
   await sql`insert into stake_pools values (${id}, 'kamino', 3000, ${spillAccount}, 'pending')`;
   for (const t of tiers) await sql`insert into stake_tiers (launch_id, tier_id, lock_seconds, multiplier_bps) values (${id}, ${t.id}, ${t.lockSeconds}, ${t.multiplierBps})`;
-  const deps = { sql, chain, staking, wallets: { keeper: keeper.publicKey.toBase58(), spill: spill.publicKey.toBase58(), treasury: "" }, ourtokenMint: stakeMint.toBase58() } as unknown as KeeperDeps;
+  const deps = { sql, chain, staking, wallets: { keeper: keeper.publicKey.toBase58(), spill: spill.publicKey.toBase58(), treasury: "" } } as unknown as KeeperDeps;
   const settings = await loadLatestSettings(sql);
-  const [launch] = await loadLaunches(sql, deps.ourtokenMint);
+  const [launch] = await loadLaunches(sql);
 
   const before = BigInt(await conn.getBalance(keeper.publicKey, "confirmed"));
   let status = "pending";
@@ -64,7 +64,7 @@ test.skipIf(!up)("the keeper registers all 10 reward mints on one farm", async (
 });
 
 test.skipIf(!up)("the launch cost estimate covers what the keeper spends", async () => {
-  const all = defaultSettings("x").tiers;
+  const all = defaultSettings("").tiers;
   for (const [n, t] of [[1, 1], [3, 1], [10, 1], [1, all.length], [3, all.length], [10, all.length]] as const) {
     const s = { tiers: all.slice(0, t) };
     const { spent } = await keeperFarm(n, s.tiers);

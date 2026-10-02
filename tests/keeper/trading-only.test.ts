@@ -21,7 +21,7 @@ test("a trading only launch claims, splits without a basket and pays out, with n
   const { sql, chain, meteora, deps, settings } = await keeperFixture();
   const id = await insertLaunch(sql, { pool: "PS", quote_mint: STOCK, trading_only: true });
   meteora.partnerFee.set("PS", 1_000_000n);
-  const [launch] = await loadLaunches(sql, deps.ourtokenMint);
+  const [launch] = await loadLaunches(sql);
   expect(launch!.tradingOnly).toBe(true);
   await processLaunch(deps, launch!, settings, "r1");
   expect(await getBalance(sql, id, "basket", STOCK)).toBe(0n);
@@ -38,7 +38,7 @@ test("a paused stock skips migrate, claim and payout without recording failures,
   meteora.partnerFee.set("PP", 1_000_000n);
   meteora.curve.set("PP", { migrated: false, complete: true });
   chain.paused.add(STOCK);
-  const [launch] = await loadLaunches(sql, deps.ourtokenMint);
+  const [launch] = await loadLaunches(sql);
   for (const run of ["r1", "r2", "r3"]) await processLaunch(deps, launch!, settings, run);
   expect(await sql`select * from distributions where launch_id = ${id}`).toHaveLength(0);
   expect(chain.sent).toHaveLength(0);
@@ -72,7 +72,7 @@ test("split of a trading only launch ignores a basket split setting of 100%", as
   const { sql, meteora, deps, settings } = await keeperFixture();
   const id = await insertLaunch(sql, { pool: "PB", quote_mint: STOCK, trading_only: true });
   meteora.partnerFee.set("PB", 1_000n);
-  const [launch] = await loadLaunches(sql, deps.ourtokenMint);
+  const [launch] = await loadLaunches(sql);
   await sql`insert into escrow (launch_id, bucket, mint, amount) values (${id}, 'unsplit', ${STOCK}, 1000)`;
   await splitStep(deps, launch!, { ...settings, split: { basketBps: 10_000, platformBps: 0, creatorBps: 0 } }, "r1");
   expect(await getBalance(sql, id, "treasury", STOCK)).toBe(1_000n);

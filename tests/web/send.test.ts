@@ -45,3 +45,13 @@ test("a confirmation that errors reports which signature is still unconfirmed", 
   expect(err.unconfirmed).toBe("sig0");
   expect(err.confirmed).toEqual([]);
 });
+
+test("an optional setup transaction that fails leaves an empty slot and the rest is still sent", async () => {
+  const c = conn();
+  let n = 0;
+  c.sendRawTransaction = async () => { if (n++ === 0) throw new Error("account already in use"); c.sent.push("sig"); return `sig${n}`; };
+  expect(await signAndSendAll(wallet(), c, [{ ...legacy(), optional: true }, legacy()])).toEqual(["", "sig2"]);
+  const failing = conn(true);
+  await expect(signAndSendAll(wallet(), failing, [{ ...legacy(), optional: true }, legacy()])).rejects.toBeInstanceOf(SendError);
+  expect(failing.sent.length).toBe(2);
+});

@@ -87,7 +87,7 @@ Sign in with an allowlisted wallet. Sections: settings form (every setting from 
 | `GET /api/launches/[mint]/positions?owner=` | staker positions per tier with pending rewards |
 | `POST /api/stake/[action]` | `stake`, `claim`, `exit`, `withdraw` → unsigned transaction (base64) for the wallet |
 | `GET /api/chart/[mint]?tf=` | OHLCV proxy with a short cache |
-| `POST /api/admin/session` | verify signed nonce message from an allowlisted wallet → httpOnly session cookie |
+| `POST /api/admin/session` | check the admin access code → httpOnly session cookie backed by an `admin_sessions` row; `DELETE` signs out |
 | `GET/POST /api/admin/settings` | load latest / save new version |
 | `GET /api/admin/status` | keeper status and failed steps |
 | `POST /api/admin/basket` | override a launch's basket |
@@ -97,7 +97,7 @@ Errors return `{ error: { code, message } }` with 400 for `LaunchError` codes, 4
 ## Invariants
 
 - The server never signs for a user. User transactions are built server side and returned unsigned.
-- Admin routes require a valid session cookie; the cookie is issued only for allowlisted wallets after a fresh signed nonce.
+- Admin routes require a valid session cookie and a same origin request; the cookie is issued only for the right access code.
 - Everything the token and stake pages show about rewards and burns comes from the ledger (`distributions`, `escrow`) or chain reads, never client input.
 
 ## Deploy

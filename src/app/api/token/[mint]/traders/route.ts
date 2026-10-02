@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { getContext } from "@/web/server/context";
-import { json, jsonError } from "@/web/server/http";
+import { json, jsonError, rateLimit } from "@/web/server/http";
 import { topTraders } from "@/web/server/live";
 import { page, pageParams, queryOf } from "@/web/server/paging";
 
@@ -10,6 +10,7 @@ const Query = z.object(pageParams(10));
 
 export async function GET(req: Request, { params }: { params: Promise<{ mint: string }> }) {
   try {
+    rateLimit(req, "traders", 120);
     const o = Query.parse(queryOf(req));
     const { sql } = getContext();
     const [l] = await sql`select l.id, (select price from trades where launch_id = l.id order by slot desc, seq desc limit 1) as price

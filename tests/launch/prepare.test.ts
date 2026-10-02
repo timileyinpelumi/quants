@@ -5,6 +5,7 @@ import { FakeMeteora } from "../helpers/fake-meteora";
 import { prepareLaunch, LaunchError } from "../../src/launch/prepare";
 import { defaultSettings, saveSettings } from "../../src/domain/settings";
 import { NATIVE_MINT } from "../../src/domain/types";
+import { staticConfigs } from "../../src/launch/config-keys";
 
 const OURS = "OURS1111111111111111111111111111111111111111";
 const configKeys = { [`${NATIVE_MINT}:200`]: "CfgSol200", [`${OURS}:200`]: "CfgOurs200" };
@@ -18,7 +19,7 @@ async function setup(verified = true, tokenProgram = "TokenkegQfeZyiNwAJbNbGKPFX
   const sql = await freshDb();
   await saveSettings(sql, defaultSettings(OURS), "test");
   const meteora = new FakeMeteora(new FakeChain());
-  return { sql, meteora, deps: { sql, meteora, configKeys, quoteMints: [NATIVE_MINT, OURS], isVerified: async () => verified, tokenProgramOf: async () => tokenProgram } };
+  return { sql, meteora, deps: { sql, meteora, configFor: staticConfigs(configKeys), quoteMints: [NATIVE_MINT, OURS], isVerified: async () => verified, tokenProgramOf: async () => tokenProgram } };
 }
 
 test("prepares a transaction against the right config key with no launch fee", async () => {
@@ -28,6 +29,22 @@ test("prepares a transaction against the right config key with no launch fee", a
   expect(typeof r.transaction).toBe("string");
   expect(meteora.launches[0]!.configKey).toBe("CfgSol200");
   expect(Object.keys(meteora.launches[0]!).filter((k) => /fee/i.test(k))).toEqual([]);
+});
+
+test("paused launches are refused with a clear message", async () => {
+  const { deps, sql } = await setup();
+  await saveSettings(sql, { ...defaultSettings(OURS), launchesPaused: true }, "test");
+  const e = await prepareLaunch(deps, valid).catch((x) => x);
+  expect(e).toBeInstanceOf(LaunchError);
+  expect(e.code).toBe("launches_paused");
+  expect(e.message).toContain("paused");
+});
+
+test("only the fee tiers offered in settings are accepted", async () => {
+  const { deps, sql } = await setup();
+  await saveSettings(sql, { ...defaultSettings(OURS), feeTiersBps: [150, 300] }, "test");
+  const e = await prepareLaunch(deps, valid).catch((x) => x);
+  expect(e.message).toContain("Trading fee must be 1.5% or 3%");
 });
 
 test("rejects bad input", async () => {
@@ -79,7 +96,7 @@ test("the first buy cap is checked against the curve quote, not the client's min
 test("a stock pair is trading only: no basket, and a basket is refused", async () => {
   const { sql, meteora } = await setup();
   const STOCK = "Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh";
-  const deps = { sql, meteora, configKeys: { ...configKeys, [`${STOCK}:200`]: "CfgStock200" }, quoteMints: [NATIVE_MINT, STOCK], tradingOnlyMints: [STOCK],
+  const deps = { sql, meteora, configFor: staticConfigs({ ...configKeys, [`${STOCK}:200`]: "CfgStock200" }), quoteMints: [NATIVE_MINT, STOCK], tradingOnlyMints: [STOCK],
     isVerified: async () => { throw new Error("no basket check for a trading only pair"); }, tokenProgramOf: async () => "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb" };
   const r = await prepareLaunch(deps, { ...valid, quoteMint: STOCK, basket: [] });
   expect(meteora.launches.at(-1)!.configKey).toBe("CfgStock200");

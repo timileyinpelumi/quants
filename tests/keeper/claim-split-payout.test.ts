@@ -13,7 +13,7 @@ test("claim credits the exact pending partner fee, then split moves it by the se
   const { sql, meteora, deps, settings } = await keeperFixture();
   const id = await insertLaunch(sql, { pool: "P1" });
   meteora.partnerFee.set("P1", 1_000_000n);
-  const [launch] = await loadLaunches(sql, deps.ourtokenMint);
+  const [launch] = await loadLaunches(sql);
   expect(await claimStep(deps, launch!, settings, "r1")).toBe("confirmed");
   expect(await getBalance(sql, id, "unsplit", NATIVE_MINT)).toBe(1_000_000n);
   expect(await splitStep(deps, launch!, settings, "r1")).toBe(true);
@@ -26,7 +26,7 @@ test("claim credits the exact pending partner fee, then split moves it by the se
 test("claim is skipped when nothing is pending", async () => {
   const { sql, deps, settings } = await keeperFixture();
   await insertLaunch(sql, { pool: "P2" });
-  const [launch] = await loadLaunches(sql, deps.ourtokenMint);
+  const [launch] = await loadLaunches(sql);
   expect(await claimStep(deps, launch!, settings, "r1")).toBe("skipped");
 });
 
@@ -34,7 +34,7 @@ test("split uses the settings version passed in, even if a newer one is saved mi
   const { sql, meteora, deps, settings } = await keeperFixture();
   const id = await insertLaunch(sql, { pool: "P3" });
   meteora.partnerFee.set("P3", 1_000n);
-  const [launch] = await loadLaunches(sql, deps.ourtokenMint);
+  const [launch] = await loadLaunches(sql);
   await claimStep(deps, launch!, settings, "r1");
   await saveSettings(sql, { ...settings, split: { basketBps: 10_000, platformBps: 0, creatorBps: 0 } }, "admin");
   await splitStep(deps, launch!, settings, "r1");
@@ -47,7 +47,7 @@ test("payout sends treasury every run and creator only above the minimum", async
   const { sql, chain, meteora, deps, settings } = await keeperFixture();
   const id = await insertLaunch(sql, { pool: "P4" });
   meteora.partnerFee.set("P4", 100_000_000n);
-  const [launch] = await loadLaunches(sql, deps.ourtokenMint);
+  const [launch] = await loadLaunches(sql);
   await claimStep(deps, launch!, settings, "r1");
   await splitStep(deps, launch!, settings, "r1");
   await payoutStep(deps, launch!, settings, "r1");
@@ -66,7 +66,7 @@ test("graduated launches claim from the DAMM position and credit the measured am
   const { sql, chain, deps, settings } = await keeperFixture();
   const id = await insertLaunch(sql, { pool: "P5", status: "graduated" });
   await sql`update launches set damm_pool = 'D5', damm_position = 'Pos5', damm_position_nft_account = 'Nft5' where id = ${id}`;
-  const [launch] = await loadLaunches(sql, deps.ourtokenMint);
+  const [launch] = await loadLaunches(sql);
   const orig = chain.tx.bind(chain);
   chain.tx = (label) => { const t = orig(label); chain.receipts.set(t.signature, 777n); return t; };
   expect(await claimStep(deps, launch!, settings, "r1")).toBe("confirmed");
@@ -80,7 +80,7 @@ test("a graduated launch still claims partner fee left on the bonding curve", as
   meteora.partnerFee.set("P6", 500n);
   const orig = chain.tx.bind(chain);
   chain.tx = (label) => { const t = orig(label); if (label?.startsWith("claimpos")) chain.receipts.set(t.signature, 100n); return t; };
-  const [launch] = await loadLaunches(sql, deps.ourtokenMint);
+  const [launch] = await loadLaunches(sql);
   await claimStep(deps, launch!, settings, "r1");
   expect(await getBalance(sql, id, "unsplit", NATIVE_MINT)).toBe(600n);
 });

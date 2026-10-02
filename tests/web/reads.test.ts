@@ -1,18 +1,19 @@
 import { test, expect } from "bun:test";
-import { makeWebContext } from "../helpers/web-context";
+import { OURS, makeWebContext } from "../helpers/web-context";
 import { prepareLaunch } from "../../src/launch/prepare";
 import { confirmLaunch } from "../../src/launch/confirm";
 import { listLaunches, launchDetail, feeSummary } from "../../src/web/server/reads";
 import { beginStep, confirmStep } from "../../src/ledger/ledger";
 import { GET as detailRoute } from "../../src/app/api/launches/[mint]/route";
 import { NATIVE_MINT } from "../../src/domain/types";
+import { staticConfigs } from "../../src/launch/config-keys";
 
 const ZEC = "Zec1111111111111111111111111111111111111111";
 const CREATOR = "Creator111111111111111111111111111111111111";
 
 async function launch(c: Awaited<ReturnType<typeof makeWebContext>>, symbol: string) {
   const p = await prepareLaunch(
-    { sql: c.sql, meteora: c.meteora, configKeys: c.configKeys, quoteMints: [NATIVE_MINT, c.ourtokenMint], isVerified: async () => true, tokenProgramOf: c.tokenProgramOf },
+    { sql: c.sql, meteora: c.meteora, configFor: staticConfigs(c.configKeys), quoteMints: [NATIVE_MINT, OURS], isVerified: async () => true, tokenProgramOf: c.tokenProgramOf },
     { name: `${symbol} Coin`, symbol, uri: "https://ipfs.io/ipfs/m", image: "https://ipfs.io/ipfs/i", creator: CREATOR, quoteMint: NATIVE_MINT, feeTierBps: 200,
       basket: [{ mint: ZEC, weightBps: 10_000, symbol: "ZEC", decimals: 8 }] },
   );

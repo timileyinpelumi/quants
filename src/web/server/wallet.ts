@@ -35,7 +35,7 @@ export async function walletOverview(ctx: WebContext, ownerRaw: string) {
   for (const [mint, h] of held) {
     if (h.amount === 0n) continue;
     const l = lmap.get(mint) as any;
-    const kind: HeldToken["kind"] = l ? "launch" : mint === ctx.ourtokenMint ? "platform" : rmap.has(mint) ? "reward" : "other";
+    const kind: HeldToken["kind"] = l ? "launch" : quotes.some((q) => q.platform && q.mint === mint) ? "platform" : rmap.has(mint) ? "reward" : "other";
     tokens.push({
       mint, amount: h.amount.toString(), decimals: h.decimals, kind, image: l?.image ?? icons[mint] ?? null, name: l?.name ?? null,
       symbol: l?.symbol ?? quoteCoin(mint, quotes)?.symbol ?? rmap.get(mint) ?? null,

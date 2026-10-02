@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Header } from "@/web/ui/Header";
 import { getContext } from "@/web/server/context";
-import { loadLatestSettings } from "@/domain/settings";
+import { cachedSettings } from "@/domain/settings";
 import { fmtAmount, lockLabel, lockShort } from "@/web/ui/format";
-import { quoteCoins, stockPairsEnabled } from "@/domain/quotes";
+import { quoteCoins } from "@/domain/quotes";
 import { launchableQuotes } from "@/web/server/quotes";
 import { launchCost } from "@/domain/launch-cost";
 import { usdPrices } from "@/web/server/prices";
@@ -42,7 +42,9 @@ function Table({ head, rows, text = false }: { head: string[]; rows: React.React
 
 export default async function DocsPage() {
   const ctx = getContext();
-  const s = await loadLatestSettings(ctx.sql);
+  const s = await cachedSettings(ctx.sql);
+  const fees = s.feeTiersBps.map((b) => `${b / 100}%`);
+  const feeList = fees.length > 1 ? `${fees.slice(0, -1).join(", ")} or ${fees.at(-1)}` : fees[0]!;
   const SOL_MINT = "So11111111111111111111111111111111111111112";
   const solUsd = (await usdPrices(ctx, [SOL_MINT]).catch(() => ({} as Record<string, number | null>)))[SOL_MINT] ?? null;
   const sol = (lamports: bigint) => `${fmtAmount(lamports, 9, 3)} SOL${solUsd ? ` (about $${(Number(lamports) / 1e9 * solUsd).toFixed(2)})` : ""}`;
@@ -51,7 +53,9 @@ export default async function DocsPage() {
   const stakerShare = (feeBps: number) => (feeBps / 10_000) * 0.8 * (s.split.basketBps / 10_000);
   const volumeToOpen = (rent: bigint, feeBps: number) => Math.ceil(Number(rent) / 1e9 / stakerShare(feeBps));
   const pct = (bps: number) => `${bps / 100}%`;
-  const solGrad = quoteCoins()[0]!.graduation;
+  const coins = quoteCoins(undefined, s);
+  const pairs = coins.filter((c) => c.enabled);
+  const solGrad = coins[0]!.graduation;
   const stocks = (await launchableQuotes(ctx)).filter((c) => c.tradingOnly);
   const owners = s.split.platformBps + s.split.creatorBps;
   const creatorOnly = owners ? Math.round((s.split.creatorBps * 10_000) / owners) : 0;
@@ -62,7 +66,7 @@ export default async function DocsPage() {
       <div className="grid grid-cols-1 lg:grid-cols-[240px_minmax(0,1fr)] gap-10 lg:gap-16 wrap pt-10 md:pt-14 pb-20">
         <aside className="lg:sticky lg:top-8 self-start">
           <nav aria-label="On this page" className="flex lg:flex-col gap-x-5 gap-y-1 overflow-x-auto lg:overflow-visible text-sm">
-            {sections.filter(([id]) => id !== "stocks" || stockPairsEnabled()).map(([id, label]) => (
+            {sections.filter(([id]) => id !== "stocks" || s.stockPairs).map(([id, label]) => (
               <a key={id} href={`#${id}`} className="text-muted hover:text-ink min-h-10 md:min-h-9 flex items-center shrink-0">{label}</a>
             ))}
           </nav>
@@ -74,10 +78,10 @@ export default async function DocsPage() {
 
           <H2 id="glance">At a glance</H2>
           <Table head={["", "Value"]} rows={[
-            ["Trading fee, set by the creator", "1%, 2% or 3%"],
+            ["Trading fee, set by the creator", feeList],
             ["Share of fees that buys staker rewards", `${pct(s.split.basketBps)} after Meteora's 20%`],
             ["Reward tokens per launch", "Up to 10"],
-            ["Pair tokens", quoteCoins().map((c) => c.symbol).join(", ")],
+            ["Pair tokens", pairs.map((c) => c.symbol).join(", ")],
             ["Supply of every token", "1,000,000,000"],
             ["Graduates to Meteora DAMM v2 at", `${solGrad} SOL raised, or the amount below for other pairs`],
             ["Lock tiers", s.tiers.map((t) => `${lockShort(t.lockSeconds)} ${t.multiplierBps / 10_000}x`).join(", ")],
@@ -90,8 +94,8 @@ export default async function DocsPage() {
           <P>Launches and trading run on Meteora. Staking runs on Kamino Farms. quants never holds anyone&apos;s stake.</P>
 
           <H2 id="launch">Launching a token</H2>
-          <P>Pick a name, a symbol and a square image, then pick the pair token: {quoteCoins().map((c) => c.symbol).join(", ")}. Choose a trading fee of 1%, 2% or 3% and pick your reward basket. An optional first buy of your own token goes in the same approval. It is paid in SOL and swapped to the pair token if needed.</P>
-          <P>Every token has a supply of 1,000,000,000. Launching costs only the network fee for your own transaction and any first buy. A first buy is capped at {pct(s.devBuyCapBps)} of supply.</P>
+          <P>Pick a name, a symbol and a square image, then pick the pair token: {pairs.map((c) => c.symbol).join(", ")}. Choose a trading fee of {feeList} and pick your reward basket. An optional first buy of your own token goes in the same approval. It is paid in SOL and swapped to the pair token if needed.</P>
+          <P>Every token has a supply of 1,000,000,000. Launching costs the Solana network fees and account rent for your transactions, plus any first buy. Your wallet shows the total before you approve. A first buy is capped at {pct(s.devBuyCapBps)} of supply.</P>
           <P>Staking does not open at launch. The staking farms are paid for out of the stakers&apos; share of trading fees, so a token can be staked once it has traded enough. See <a href="#opens" className="text-accent">When staking opens</a>.</P>
 
           <H2 id="fees">Where fees go</H2>
@@ -122,7 +126,7 @@ export default async function DocsPage() {
           <P>Staking a token needs one Kamino farm per lock tier ({s.tiers.length}), with an account for each reward token, plus the transaction fees to set them up. The stakers&apos; share of trading fees is held until it covers that cost, which is then taken from it to create the farms. Staking opens right after, and from then on the whole stakers&apos; share buys rewards.</P>
           <Table head={["Reward tokens", "Farm setup"]} rows={[["1", sol(one)], ["3", sol(three)], ["10", sol(ten)]]} />
           <P>Stakers get {pct(s.split.basketBps)} of each trading fee after Meteora&apos;s 20%. So with 3 reward tokens, staking opens after about this much trading volume:</P>
-          <Table head={["Trading fee", "Volume to open staking"]} rows={[100, 200, 300].map((bps) => [pct(bps), `${volumeToOpen(three, bps).toLocaleString("en-US")} SOL`])} />
+          <Table head={["Trading fee", "Volume to open staking"]} rows={s.feeTiersBps.map((bps) => [pct(bps), `${volumeToOpen(three, bps).toLocaleString("en-US")} SOL`])} />
           <P>Tokens paired with something other than SOL count their stakers&apos; share at its value in SOL. Each token page shows how far along it is, as a percent and as the amount still needed.</P>
 
           <H2 id="staking">Staking and lock tiers</H2>
@@ -139,9 +143,9 @@ export default async function DocsPage() {
 
           <H2 id="graduation">Graduation</H2>
           <P>New tokens trade on a bonding curve. When the curve has raised the amount below in its pair token, the token graduates to a Meteora DAMM v2 pool with permanently locked liquidity. Trading, fees, rewards and staking continue as before.</P>
-          <Table head={["Paired with", "Graduates at"]} rows={quoteCoins().filter((c) => c.graduation > 0).map((c) => [c.name === "quants" ? `${c.symbol} (platform token)` : `${c.symbol} (${c.name})`, `${c.graduation.toLocaleString("en-US")} ${c.symbol}`])} />
+          <Table head={["Paired with", "Graduates at"]} rows={pairs.filter((c) => c.graduation > 0).map((c) => [c.name === "quants" ? `${c.symbol} (platform token)` : `${c.symbol} (${c.name})`, `${c.graduation.toLocaleString("en-US")} ${c.symbol}`])} />
 
-          {stockPairsEnabled() && <>
+          {s.stockPairs && <>
             <H2 id="stocks">Stock pairs</H2>
             <P>A token can also be paired with a tokenized stock from xStocks or Backpack{stocks.length ? `: ${stocks.map((c) => c.symbol).join(", ")}` : ""}. These launches are trading only. They have no reward basket and no staking, because Kamino farms cannot hold stock tokens. The share of fees that would buy rewards goes to the creator and the platform instead, so the creator gets {pct(creatorOnly)} and the platform {pct(10_000 - creatorOnly)} of what is left after Meteora&apos;s 20%.</P>
             <P>The company behind a stock token can pause it, for example around a corporate action. While it is paused nobody can buy or sell tokens paired with it, and quants waits to collect fees, pay creators and graduate those tokens until it is resumed. Nothing is lost while it waits.</P>

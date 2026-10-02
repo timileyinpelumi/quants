@@ -20,7 +20,7 @@ test("swaps the basket share by weight and credits measured output", async () =>
   const id = await insertLaunch(f.sql);
   await f.sql`insert into baskets values (${id}, 'ZEC', 7000), (${id}, 'CATE', 3000)`;
   await seed(f.sql, id, 1_000n);
-  const [launch] = await loadLaunches(f.sql, deps.ourtokenMint);
+  const [launch] = await loadLaunches(f.sql);
   await swapStep(deps, launch!, f.settings, "r1");
   expect(await getBalance(f.sql, id, "basket", NATIVE_MINT)).toBe(0n);
   expect(await getBalance(f.sql, id, "reward", "ZEC")).toBe(1_400n);
@@ -36,7 +36,7 @@ test("no route or too much price impact leaves that token's share in escrow, oth
   const id = await insertLaunch(f.sql);
   await f.sql`insert into baskets values (${id}, 'ZEC', 5000), (${id}, 'CATE', 3000), (${id}, 'ANSEM', 2000)`;
   await seed(f.sql, id, 1_000n);
-  const [launch] = await loadLaunches(f.sql, deps.ourtokenMint);
+  const [launch] = await loadLaunches(f.sql);
   await swapStep(deps, launch!, f.settings, "r1");
   expect(await getBalance(f.sql, id, "reward", "ZEC")).toBe(1_000n);
   expect(await getBalance(f.sql, id, "basket", NATIVE_MINT)).toBe(500n);
@@ -49,7 +49,7 @@ test("a basket token equal to the quote token moves without a swap", async () =>
   const id = await insertLaunch(f.sql);
   await f.sql`insert into baskets values (${id}, ${NATIVE_MINT}, 10000)`;
   await seed(f.sql, id, 1_000n);
-  const [launch] = await loadLaunches(f.sql, deps.ourtokenMint);
+  const [launch] = await loadLaunches(f.sql);
   await swapStep(deps, launch!, f.settings, "r1");
   expect(await getBalance(f.sql, id, "reward", NATIVE_MINT)).toBe(1_000n);
   expect(f.chain.sent.length).toBe(0);
@@ -65,7 +65,7 @@ test("a Jupiter network error for one token does not stop the other swaps", asyn
   const id = await insertLaunch(f.sql);
   await f.sql`insert into baskets values (${id}, 'ZEC', 5000), (${id}, 'CATE', 5000)`;
   await seed(f.sql, id, 1_000n);
-  const [launch] = await loadLaunches(f.sql, deps.ourtokenMint);
+  const [launch] = await loadLaunches(f.sql);
   await swapStep(deps, launch!, f.settings, "r1");
   expect(await getBalance(f.sql, id, "reward", "ZEC")).toBe(1_000n);
   expect(await getBalance(f.sql, id, "basket", NATIVE_MINT)).toBe(500n);

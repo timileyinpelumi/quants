@@ -57,7 +57,7 @@ export class StockRegistry {
     const rows = keyed.size ? await this.d.sql`select * from stock_quotes where ok and mint in ${this.d.sql([...keyed.keys()])} order by symbol` : [];
     const list: QuoteCoin[] = rows.map((r: any) => ({
       mint: r.mint, symbol: r.symbol, name: r.name, decimals: r.decimals, graduation: Number(r.graduation ?? 0), iconMint: r.mint,
-      platform: false, payoutMin: 0n, kind: r.issuer as StockIssuer, tradingOnly: true,
+      platform: false, payoutMin: 0n, kind: r.issuer as StockIssuer, tradingOnly: true, enabled: true,
     }));
     this.memory = { at: this.now(), list };
     setStockQuotes(list);

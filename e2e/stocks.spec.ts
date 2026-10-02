@@ -12,7 +12,7 @@ async function connect(page: Page) {
   await expect(page.getByRole("button", { name: /^Wallet / })).toBeVisible();
 }
 
-// Stock pairs are off by default; run with STOCK_PAIRS=1 set for both the web app and this run.
+// Stock pairs are off by default; turn them on in the admin settings (or seed STOCK_PAIRS=1 on a fresh database) and set STOCK_PAIRS=1 for this run.
 test.skip(process.env.STOCK_PAIRS !== "1", "stock pairs are off");
 
 test("a token paired with a stock launches trading only", async ({ page }) => {

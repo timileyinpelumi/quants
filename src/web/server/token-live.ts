@@ -38,7 +38,7 @@ export class RpcHolderChain implements HolderChain {
   // Jupiter knows holder counts for mainnet tokens; a local validator is small enough to count token accounts directly.
   async count(mint: string) {
     try {
-      const res = await fetch(`${this.tokensBase}/search?query=${mint}`, { headers: this.apiKey ? { "x-api-key": this.apiKey } : {}, signal: AbortSignal.timeout(4_000) });
+      const res = await fetch(`${this.tokensBase}/search?query=${encodeURIComponent(mint)}`, { headers: this.apiKey ? { "x-api-key": this.apiKey } : {}, signal: AbortSignal.timeout(4_000) });
       const t = res.ok ? ((await res.json()) as { id: string; holderCount?: number }[]).find((x) => x.id === mint) : undefined;
       if (t?.holderCount !== undefined) return t.holderCount;
     } catch { /* fall through */ }

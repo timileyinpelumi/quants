@@ -19,7 +19,7 @@ export default async function Image({ params }: { params: Promise<{ mint: string
   const { mint } = await params;
   const [t, mark] = await Promise.all([
     tokenShare(getContext().sql, mint).catch(() => null),
-    readFile(join(process.cwd(), "public/brand/quants-icon.svg"), "utf8"),
+    readFile(join(process.cwd(), "public/brand/quants-icon-tile.svg"), "utf8"),
   ]);
   const markSrc = `data:image/svg+xml;base64,${Buffer.from(mark).toString("base64")}`;
   const symbol = t?.symbol ?? "quants";

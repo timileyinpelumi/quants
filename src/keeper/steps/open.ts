@@ -7,6 +7,8 @@ import { launchCost } from "../../domain/launch-cost";
 import { getBalance } from "../../ledger/ledger";
 import { runDbStep, runTxStep } from "../../ledger/run-step";
 import { swapResolver } from "./swap";
+import { GLOBAL_CONFIG_COST } from "../../domain/launch-cost";
+import { owesGlobalConfig } from "./global-config";
 
 export async function rentFor(sql: SQL, launchId: number): Promise<bigint> {
   const tiers = await sql`select tier_id as id, lock_seconds as "lockSeconds", multiplier_bps as "multiplierBps" from stake_tiers where launch_id = ${launchId}`;
@@ -33,7 +35,8 @@ export async function openStakingStep(deps: KeeperDeps, launch: LaunchRow, s: Ve
   const [pool] = await deps.sql`select status from stake_pools where launch_id = ${launch.id}`;
   if (!pool) return false;
   if (pool.status === "ready" || (await rentTaken(deps.sql, launch.id))) return true;
-  const rent = await rentFor(deps.sql, launch.id);
+  const globalConfig = await owesGlobalConfig(deps, launch.id);
+  const rent = (await rentFor(deps.sql, launch.id)) + (globalConfig ? GLOBAL_CONFIG_COST : 0n);
   // Launches made while the launch fee existed already paid their rent.
   const [prepaid] = await deps.sql`select coalesce((s.data->>'launchFeeLamports')::numeric, 0) > 0 as yes
     from launches l join settings s on s.version = l.settings_version where l.id = ${launch.id}`;
@@ -67,7 +70,7 @@ export async function openStakingStep(deps: KeeperDeps, launch: LaunchRow, s: Ve
 
   await runDbStep(deps.sql, {
     launchId: launch.id, idemKey: `rent:${launch.id}:${runId}`, stepKey: `rent:${launch.id}`, kind: "rent", settingsVersion: s.version,
-    detail: { amount: rent.toString() },
+    detail: { amount: rent.toString(), ...(globalConfig ? { globalConfig: true } : {}) },
     deltas: [{ bucket: "basket", mint: NATIVE_MINT, amount: -rent }],
   });
   if (!(await rentTaken(deps.sql, launch.id))) return false;

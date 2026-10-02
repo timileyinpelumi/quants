@@ -3,7 +3,7 @@ import { launchCost, opensAt, FARM_RENT, TOKEN_ACCOUNT_RENT, TX_FEE } from "../.
 import { defaultSettings } from "../../src/domain/settings";
 
 test("the rent covers farm setup for every lock tier", () => {
-  const s = defaultSettings("OURS");
+  const s = defaultSettings("OURS1111111111111111111111111111111111111111");
   const c = launchCost(s, 3);
   // Farm account, stake vault and a reward vault per reward; create (two signers), one reward batch, configure.
   const perFarm = FARM_RENT + TOKEN_ACCOUNT_RENT * 4n + 2n * TX_FEE * 4n;
@@ -18,7 +18,7 @@ test("ten rewards take two reward batches per farm", () => {
 });
 
 test("default lock tiers run from 24 hours to 30 days", () => {
-  expect(defaultSettings("OURS").tiers.map((t) => t.lockSeconds / 3600)).toEqual([24, 72, 168, 720]);
+  expect(defaultSettings("OURS1111111111111111111111111111111111111111").tiers.map((t) => t.lockSeconds / 3600)).toEqual([24, 72, 168, 720]);
 });
 
 test("opensAt is the stakers' share as a percent of the rent, floored and capped at 100", () => {

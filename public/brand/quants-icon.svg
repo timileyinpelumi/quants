@@ -1,5 +1,4 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="150 150 780 780" role="img" aria-label="quants">
-  <rect x="150" y="150" width="780" height="780" fill="#000000"/>
   <defs>
     <mask id="qi-back" maskUnits="userSpaceOnUse" x="0" y="0" width="1080" height="1080">
       <rect width="1080" height="1080" fill="#fff"/>

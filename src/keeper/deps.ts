@@ -11,5 +11,4 @@ export interface KeeperDeps {
   jupiter: JupiterPort;
   staking: StakingAdapter;
   wallets: { keeper: string; spill: string; treasury: string };
-  ourtokenMint: string;
 }

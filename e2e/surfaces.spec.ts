@@ -112,7 +112,7 @@ test("docs, terms, portfolio and 404 render", async ({ page }) => {
 
 test("admin sign in and settings load", async ({ page }) => {
   await page.goto("/admin");
-  await connect(page);
+  await page.getByLabel("Access code").fill(process.env.E2E_ADMIN_CODE!);
   await page.getByRole("button", { name: "Sign in" }).click();
   await expect(page.getByText(/Current version \d+/)).toBeVisible();
   await page.getByRole("button", { name: "Keeper" }).click();

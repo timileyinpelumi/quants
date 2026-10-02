@@ -1,4 +1,4 @@
-import { Keypair, PublicKey, Transaction, type Connection } from "@solana/web3.js";
+import { Keypair, PublicKey, SystemProgram, Transaction, type Connection } from "@solana/web3.js";
 import BN from "bn.js";
 import { TOKEN_2022_PROGRAM_ID } from "@solana/spl-token";
 import {
@@ -6,12 +6,18 @@ import {
 } from "@meteora-ag/dynamic-bonding-curve-sdk";
 import { CpAmm, getTokenProgram } from "@meteora-ag/cp-amm-sdk";
 import type { SignedTx } from "../chain/port";
+import { buildQuantsConfig, type QuoteSpec } from "./config";
 import type { SolanaChain } from "../chain/solana";
 
 export interface GraduatedPosition { dammPool: string; position: string; positionNftAccount: string }
+/** A config key that does not exist yet: the launcher's setup transaction creates it, signed by `config`. */
+export interface NewConfig { config: Keypair; feeBps: number; quote: QuoteSpec; keeper: string }
 export interface LaunchTxInput {
   name: string; symbol: string; uri: string; creator: string; configKey: string; quoteMint: string;
   devBuyQuoteAmount: bigint; devBuyMinOut: bigint;
+  createConfig?: NewConfig;
+  /** Lamports the launcher sends the keeper in the launch transaction, when the keeper is below its floor. */
+  keeperTopUp?: { to: string; lamports: bigint };
 }
 export interface MeteoraPort {
   pendingPartnerQuoteFee(pool: string): Promise<bigint>;
@@ -22,9 +28,12 @@ export interface MeteoraPort {
   curveProgress(pool: string): Promise<{ quoteReserve: bigint; threshold: bigint; migrated: boolean }>;
   buildMigrate(pool: string): Promise<SignedTx>;
   findGraduatedPosition(configKey: string, baseMint: string, quoteMint: string): Promise<GraduatedPosition | null>;
-  buildLaunchTx(input: LaunchTxInput): Promise<{ tx: Transaction; baseMint: Keypair; pool: string }>;
+  /** `setupTx` creates the config key when `input.createConfig` is set; it must land before `tx`. */
+  buildLaunchTx(input: LaunchTxInput): Promise<{ tx: Transaction; setupTx?: Transaction; baseMint: Keypair; pool: string }>;
   /** Base units a first buy of `quoteAmount` takes from a fresh curve, before fees (an upper bound on what it receives). */
-  firstBuyMaxOut(configKey: string, quoteAmount: bigint): Promise<bigint>;
+  firstBuyMaxOut(config: string | { feeBps: number; quote: QuoteSpec }, quoteAmount: bigint): Promise<bigint>;
+  /** The parts of an on-chain config key quants checks before trusting it, or null when it does not exist. */
+  configState(configKey: string): Promise<{ feeClaimer: string; quoteMint: string; threshold: bigint } | null>;
   /** Quote base units the curve of this config raises before it graduates. */
   configThreshold(configKey: string): Promise<bigint>;
 }
@@ -111,11 +120,25 @@ export class MeteoraLive implements MeteoraPort {
     return { dammPool: dammPool.toBase58(), position: first.position.toBase58(), positionNftAccount: first.positionNftAccount.toBase58() };
   }
 
-  async firstBuyMaxOut(configKey: string, quoteAmount: bigint) {
-    const cfg = await this.dbc.state.getPoolConfig(configKey);
-    if (!cfg) throw new Error(`config ${configKey} not found`);
-    const r = calculateQuoteToBaseFromAmountIn(cfg, cfg.sqrtStartPrice, new BN(quoteAmount.toString()), cfg.migrationSqrtPrice);
+  async firstBuyMaxOut(config: string | { feeBps: number; quote: QuoteSpec }, quoteAmount: bigint) {
+    const amount = new BN(quoteAmount.toString());
+    if (typeof config !== "string") {
+      // Not on chain yet: the curve comes from the parameters the setup transaction creates it with, and ends at the migration price.
+      const p = buildQuantsConfig(config.feeBps, config.quote);
+      const points = p.curve.filter((c) => !c.sqrtPrice.isZero() && !c.liquidity.isZero());
+      const r = calculateQuoteToBaseFromAmountIn({ curve: points } as any, p.sqrtStartPrice, amount, points.at(-1)!.sqrtPrice);
+      return BigInt(r.outputAmount.toString());
+    }
+    const cfg = await this.dbc.state.getPoolConfig(config);
+    if (!cfg) throw new Error(`config ${config} not found`);
+    const r = calculateQuoteToBaseFromAmountIn(cfg, cfg.sqrtStartPrice, amount, cfg.migrationSqrtPrice);
     return BigInt(r.outputAmount.toString());
+  }
+
+  async configState(configKey: string) {
+    const cfg = await this.dbc.state.getPoolConfig(configKey).catch(() => null);
+    if (!cfg) return null;
+    return { feeClaimer: cfg.feeClaimer.toBase58(), quoteMint: cfg.quoteMint.toBase58(), threshold: BigInt(cfg.migrationQuoteThreshold.toString()) };
   }
 
   async configThreshold(configKey: string) {
@@ -127,21 +150,42 @@ export class MeteoraLive implements MeteoraPort {
   async buildLaunchTx(input: LaunchTxInput) {
     const baseMint = Keypair.generate();
     const creator = pk(input.creator);
-    const create = await this.dbc.creator.createPoolWithFirstBuy({
-      createPoolParam: {
-        name: input.name, symbol: input.symbol, uri: input.uri, payer: creator, poolCreator: creator,
-        config: pk(input.configKey), baseMint: baseMint.publicKey, tokenBadge: await quoteTokenBadge(this.chain.conn, pk(input.quoteMint)),
-      },
-      firstBuyParam: input.devBuyQuoteAmount > 0n
-        ? { buyer: creator, buyAmount: new BN(input.devBuyQuoteAmount.toString()), minimumAmountOut: new BN(input.devBuyMinOut.toString()), referralTokenAccount: null }
-        : undefined,
-    });
-    const tx = new Transaction().add(...create.instructions);
+    const tokenBadge = await quoteTokenBadge(this.chain.conn, pk(input.quoteMint));
+    const firstBuyParam = input.devBuyQuoteAmount > 0n
+      ? { buyer: creator, buyAmount: new BN(input.devBuyQuoteAmount.toString()), minimumAmountOut: new BN(input.devBuyMinOut.toString()), referralTokenAccount: null }
+      : undefined;
+    let setupTx: Transaction | undefined;
+    const tx = new Transaction();
+    if (input.createConfig) {
+      const c = input.createConfig;
+      const keeper = pk(c.keeper);
+      const built = await this.dbc.partner.createConfigAndPoolWithFirstBuy({
+        config: c.config.publicKey, feeClaimer: keeper, leftoverReceiver: keeper, quoteMint: pk(input.quoteMint), payer: creator, tokenBadge,
+        preCreatePoolParam: { name: input.name, symbol: input.symbol, uri: input.uri, poolCreator: creator, baseMint: baseMint.publicKey },
+        firstBuyParam,
+        ...buildQuantsConfig(c.feeBps, c.quote),
+      });
+      setupTx = new Transaction().add(...built.createConfigTx.instructions);
+      tx.add(...built.createPoolWithFirstBuyTx.instructions);
+    } else {
+      const create = await this.dbc.creator.createPoolWithFirstBuy({
+        createPoolParam: { name: input.name, symbol: input.symbol, uri: input.uri, payer: creator, poolCreator: creator, config: pk(input.configKey), baseMint: baseMint.publicKey, tokenBadge },
+        firstBuyParam,
+      });
+      tx.add(...create.instructions);
+    }
+    if (input.keeperTopUp && input.keeperTopUp.lamports > 0n) {
+      tx.add(SystemProgram.transfer({ fromPubkey: creator, toPubkey: pk(input.keeperTopUp.to), lamports: input.keeperTopUp.lamports }));
+    }
     const { blockhash } = await this.chain.conn.getLatestBlockhash("confirmed");
-    tx.recentBlockhash = blockhash;
-    tx.feePayer = creator;
+    for (const t of setupTx ? [setupTx, tx] : [tx]) {
+      t.recentBlockhash = blockhash;
+      t.feePayer = creator;
+    }
+    if (setupTx) setupTx.partialSign(input.createConfig!.config);
     tx.partialSign(baseMint);
     const pool = deriveDbcPoolAddress(pk(input.quoteMint), baseMint.publicKey, pk(input.configKey)).toBase58();
-    return { tx, baseMint, pool };
+    return { tx, setupTx, baseMint, pool };
   }
+
 }

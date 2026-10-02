@@ -1,15 +1,23 @@
 import { getContext } from "@/web/server/context";
 import { jsonError, readJson } from "@/web/server/http";
-import { openSession } from "@/web/server/admin";
+import { login, logout } from "@/web/server/admin";
 
 export const dynamic = "force-dynamic";
 
+const withCookie = (setCookie: string) =>
+  new Response(JSON.stringify({ ok: true }), { headers: { "content-type": "application/json", "set-cookie": setCookie, "cache-control": "no-store" } });
+
 export async function POST(req: Request) {
   try {
-    const cookies = await openSession(getContext(), req, await readJson(req));
-    const headers = new Headers({ "content-type": "application/json" });
-    for (const c of cookies) headers.append("set-cookie", c);
-    return new Response(JSON.stringify({ ok: true }), { headers });
+    return withCookie(await login(getContext(), req, await readJson(req)));
+  } catch (e) {
+    return jsonError(e);
+  }
+}
+
+export async function DELETE(req: Request) {
+  try {
+    return withCookie(await logout(getContext(), req));
   } catch (e) {
     return jsonError(e);
   }

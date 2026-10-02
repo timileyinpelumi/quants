@@ -1,6 +1,5 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { useWallet } from "@solana/wallet-adapter-react";
 import { XIcon } from "@/web/ui/XIcon";
 import { shareText, telegramShare, xIntent } from "./share";
 
@@ -90,15 +89,13 @@ function Thumb({ down = false }: { down?: boolean }) {
 type V = "up" | "down" | null;
 
 export function VoteButtons({ mint, symbol }: { mint: string; symbol: string }) {
-  const wallet = useWallet();
-  const owner = wallet.publicKey?.toBase58();
   const [vote, setVote] = useState<V>(null);
   const [busy, setBusy] = useState(false);
   useEffect(() => {
     let live = true;
-    fetch(`/api/token/${mint}/vote${owner ? `?wallet=${owner}` : ""}`).then((r) => (r.ok ? r.json() : null)).then((j) => { if (live && j) setVote(j.vote); }, () => {});
+    fetch(`/api/token/${mint}/vote`).then((r) => (r.ok ? r.json() : null)).then((j) => { if (live && j) setVote(j.vote); }, () => {});
     return () => { live = false; };
-  }, [mint, owner]);
+  }, [mint]);
 
   const cast = async (v: "up" | "down") => {
     if (busy) return;
@@ -107,7 +104,7 @@ export function VoteButtons({ mint, symbol }: { mint: string; symbol: string }) 
     setVote(next);
     setBusy(true);
     try {
-      const r = await fetch(`/api/token/${mint}/vote`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ vote: next, ...(owner ? { wallet: owner } : {}) }) });
+      const r = await fetch(`/api/token/${mint}/vote`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ vote: next }) });
       if (!r.ok) setVote(prev);
     } catch {
       setVote(prev);
