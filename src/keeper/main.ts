@@ -1,3 +1,4 @@
+import { RpcPool, providerOrder } from "../chain/rpc-pool";
 import { Connection } from "@solana/web3.js";
 import { loadEnv } from "../env";
 import { db } from "../db/client";
@@ -16,7 +17,8 @@ const keeper = loadKeypair(env.KEEPER_KEYPAIR);
 const spill = loadKeypair(env.SPILL_KEYPAIR);
 // KEEPER_RPC_URL gives the keeper its own provider so its sends do not share a rate limit with the web app.
 const rpcUrl = process.env.KEEPER_RPC_URL || env.RPC_URL;
-const chain = new SolanaChain(new Connection(rpcUrl, "confirmed"), keeper, spill);
+const pool = new RpcPool(providerOrder(rpcUrl, env.RPC_URL, process.env.INDEXER_RPC_URL));
+const chain = new SolanaChain(new Connection(rpcUrl, { commitment: "confirmed", fetch: pool.fetch }), keeper, spill);
 const deps = {
   sql, chain,
   meteora: new MeteoraLive(chain, env.DAMM_V2_MIGRATION_CONFIG),

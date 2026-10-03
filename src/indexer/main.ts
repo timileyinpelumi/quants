@@ -7,6 +7,7 @@ import { applyClusterDefaults } from "../cluster";
 import { pricesFor } from "../jupiter/select";
 import { indexOnce } from "./run";
 import { pacedFetch, nextWait } from "./pace";
+import { RpcPool, providerOrder } from "../chain/rpc-pool";
 import { cachedSettings } from "../domain/settings";
 import { makeAlerter, sqlThrottle, Streaks, indexerPassAlerts } from "../ops/alerts";
 
@@ -15,10 +16,11 @@ if (!e.DATABASE_URL || !e.RPC_URL) throw new Error("DATABASE_URL and RPC_URL are
 const sql = db(e.DATABASE_URL);
 // No built-in 429 retry and a hard timeout: a slow or throttled address fails this pass and is retried on the next.
 // INDEXER_RPC_URL lets the indexer use its own provider so its reads do not share the keeper's rate limit.
-const conn = new Connection(e.INDEXER_RPC_URL || e.RPC_URL, {
+const pool = new RpcPool(providerOrder(e.INDEXER_RPC_URL, e.RPC_URL, e.KEEPER_RPC_URL));
+const conn = new Connection(pool.primary, {
   commitment: "confirmed",
   disableRetryOnRateLimit: true,
-  fetch: pacedFetch(((url, init) => fetch(url, { ...init, signal: AbortSignal.timeout(20_000) })) as typeof fetch, Number(e.INDEXER_RPC_GAP_MS ?? 150)),
+  fetch: pacedFetch(((url, init) => pool.fetch(url, { ...init, signal: AbortSignal.timeout(20_000) })) as typeof fetch, Number(e.INDEXER_RPC_GAP_MS ?? 150)),
 });
 const prices = pricesFor(e, conn, new JupiterPrices(e.JUPITER_PRICE_URL ?? "https://api.jup.ag/price/v3", e.JUPITER_API_KEY));
 const decimals = new Map<string, number>();

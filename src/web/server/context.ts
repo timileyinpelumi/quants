@@ -1,3 +1,4 @@
+import { RpcPool, providerOrder } from "@/chain/rpc-pool";
 import { withVerifiedCache } from "@/jupiter/verified-cache";
 import type { SQL } from "bun";
 import { existsSync, readFileSync } from "node:fs";
@@ -63,7 +64,8 @@ export function getContext(): WebContext {
   if (g.__quantsCtx) return g.__quantsCtx;
   const e = applyClusterDefaults(process.env);
   checkWebEnv(e);
-  const conn = new Connection(e.RPC_URL!, "confirmed");
+  const pool = new RpcPool(providerOrder(e.RPC_URL, e.KEEPER_RPC_URL, e.INDEXER_RPC_URL));
+  const conn = new Connection(pool.primary, { commitment: "confirmed", fetch: pool.fetch });
   // The web server never signs: these throwaway keypairs only satisfy constructors whose signing paths it never calls.
   const chain = new SolanaChain(conn, Keypair.generate(), Keypair.generate());
   const sql = sharedDb();
