@@ -27,7 +27,7 @@ test("uploads image then metadata and returns the uri", async () => {
   expect(meta.image).toBe("https://res.cloudinary.com/demo/image/upload/quants/u1");
 });
 
-test("rejects non square, too large, wrong type, bad links and a missing image before uploading", async () => {
+test("rejects non square, too large, wrong type and bad links before uploading", async () => {
   const c = await makeWebContext();
   const cases = [
     form({ image: new File([png(512, 300)], "a.png", { type: "image/png" }), name: "Cat", symbol: "CAT" }),
@@ -35,7 +35,6 @@ test("rejects non square, too large, wrong type, bad links and a missing image b
     form({ image: new File(["GIF89a"], "a.gif", { type: "image/gif" }), name: "Cat", symbol: "CAT" }),
     form({ image: new File([png(64, 64)], "a.png", { type: "image/png" }), name: "Cat", symbol: "CAT", x: "https://evil.com/cat" }),
     form({ image: new File([png(64, 64)], "a.png", { type: "image/png" }), name: "Cat", symbol: "CAT", website: "http://cat.xyz" }),
-    form({ name: "Cat", symbol: "CAT" }),
   ];
   for (const req of cases) {
     const r = await POST(req);
@@ -76,4 +75,12 @@ test("uploads are rate limited per address", async () => {
     codes.push((await POST(new Request("http://x/api/metadata", { method: "POST", headers: { "x-forwarded-for": "9.9.9.9", "content-length": "1000" }, body: f }))).status);
   }
   expect(codes.filter((c) => c === 429).length).toBeGreaterThan(0);
+});
+
+test("a launch without an image gets generated art", async () => {
+  const c = await makeWebContext();
+  const r = await POST(form({ name: "Cat", symbol: "CAT" }));
+  expect(r.status).toBe(200);
+  const files = (c.uploads as FakeUploads).files;
+  expect(files.some((f: any) => String(f.name ?? f.filename ?? f).includes("CAT"))).toBe(true);
 });
