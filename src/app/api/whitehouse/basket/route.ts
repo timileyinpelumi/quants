@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { getContext } from "@/web/server/context";
-import { json, jsonError, readJson } from "@/web/server/http";
+import { adminJson, jsonError, readJson } from "@/web/server/http";
 import { requireAdmin } from "@/web/server/admin";
 import { LaunchError } from "@/launch/prepare";
 
@@ -18,7 +18,7 @@ const Body = z.object({
 export async function POST(req: Request) {
   try {
     const c = getContext();
-    await requireAdmin(c, req);
+    await requireAdmin(c, req, "full");
     const b = Body.parse(await readJson(req));
     const [l] = await c.sql`select l.id, l.trading_only from launches l where l.mint = ${b.mint}`;
     if (!l) throw new LaunchError("invalid_input", "Token not found");
@@ -43,7 +43,7 @@ export async function POST(req: Request) {
       )
       select yes from started`;
     if (r.yes) throw new LaunchError("invalid_input", "Farms already exist for this launch");
-    return json({ ok: true });
+    return adminJson({ ok: true });
   } catch (e) {
     return jsonError(e);
   }

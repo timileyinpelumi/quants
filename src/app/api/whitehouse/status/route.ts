@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { getContext } from "@/web/server/context";
-import { json, jsonError } from "@/web/server/http";
+import { adminJson, jsonError } from "@/web/server/http";
 import { requireAdmin } from "@/web/server/admin";
 import { page, pageParams, queryOf } from "@/web/server/paging";
 
@@ -14,7 +14,7 @@ const Query = z.object({
 export async function GET(req: Request) {
   try {
     const c = getContext();
-    await requireAdmin(c, req);
+    await requireAdmin(c, req, "read");
     const o = Query.parse(queryOf(req));
     const before = o.before ?? null;
     const [last] = await c.sql`select max(updated_at) as at from distributions`;
@@ -26,7 +26,7 @@ export async function GET(req: Request) {
       order by d.id desc limit ${o.limit + 1}`, o.limit);
     const inFlight = await c.sql`
       select distinct l.mint, l.symbol from distributions d join launches l on l.id = d.launch_id where d.status = 'sent' limit 50`;
-    return json({
+    return adminJson({
       lastActivity: last?.at ? new Date(last.at).toISOString() : null,
       failed: failed.rows.map((f: any) => ({ id: Number(f.id), mint: f.mint, symbol: f.symbol, kind: f.kind, error: f.error, attempts: f.attempts, at: new Date(f.updated_at).toISOString() })),
       failedNext: failed.more ? Number((failed.rows.at(-1) as { id: string }).id) : null,

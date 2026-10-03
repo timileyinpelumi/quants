@@ -9,10 +9,12 @@ export function generateCode(length = CODE_LENGTH): string {
 
 export const normalizeCode = (s: string) => s.toUpperCase().replace(/[^A-Z0-9]/g, "");
 
+/** The argon2id PHC string of a code, as stored for read only codes. */
+export const hashCodePhc = (code: string) => Bun.password.hash(normalizeCode(code), { algorithm: "argon2id", memoryCost: 19_456, timeCost: 2 });
+
 /** Base64 so the `$` signs of the PHC string survive env files and compose interpolation. */
 export async function hashCode(code: string): Promise<string> {
-  const phc = await Bun.password.hash(normalizeCode(code), { algorithm: "argon2id", memoryCost: 19_456, timeCost: 2 });
-  return Buffer.from(phc, "utf8").toString("base64");
+  return Buffer.from(await hashCodePhc(code), "utf8").toString("base64");
 }
 
 /** The argon2id PHC string from ADMIN_CODE_HASH (base64 or raw), or "" when it is missing or not argon2id. */

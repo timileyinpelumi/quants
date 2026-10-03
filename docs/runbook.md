@@ -198,10 +198,20 @@ bun scripts/admin-code.ts                       # mainnet; --cluster devnet or l
 
 It writes the plain code to `~/.config/quants/<cluster>/admin-code.txt` (mode 600, in a mode 700 folder) and prints the `ADMIN_CODE_HASH=` line for the env file. The server only ever sees the hash. The script refuses to overwrite an existing code file; `--rotate` makes a new code, and deploying its hash ends every admin session at once (sessions are tied to the hash they were made with).
 
-- A session lasts 12 hours. The cookie is httpOnly, SameSite=Strict, Secure in production, and signed with `ADMIN_SESSION_SECRET`; the session itself is a row in `admin_sessions`, so Sign out ends it on the server.
+- A session lasts 12 hours. The cookie (`__Host-quants_admin` in production) is httpOnly, SameSite=Strict, Secure in production, and signed with `ADMIN_SESSION_SECRET`; the session itself is a row in `admin_sessions`, so Sign out ends it on the server.
 - Five wrong codes from one address in 15 minutes lock that address for the rest of the window. Fifty wrong codes in an hour from anywhere lock sign in for everyone until the hour passes. Every attempt is a row in `admin_logins` and a log line (`adminLogin`). To unlock early: `delete from admin_logins where not ok`.
 - Admin API requests from another origin are refused (Origin and Sec-Fetch-Site checks).
 - Lost the code: run the script with `--rotate`, put the new hash in the env file and deploy.
+
+#### Read only codes
+
+The full code (from `ADMIN_CODE_HASH`) can make read only codes on the Access codes tab: give it a label, and the new code is shown once with a copy button. Only its argon2id hash is stored (`admin_codes`). The list shows each code's label, when it was made, when it was last used, and a Revoke button.
+
+- A read only session sees Settings, Analytics, Keeper, Wallets and Votes with every control disabled and no save step. The Baskets and Access codes tabs are not shown. The server refuses every write route with 403 for it, whatever the browser sends.
+- The Wallets response leaves out derivation paths for a read only session, and the settings response replaces the alert webhook URL with `hidden`.
+- Revoking a code ends every session made with it at once. Rotating the full code ends every session, full and read only; read only codes themselves keep working under the new full code until revoked.
+- At most 10 read only codes are live at a time, since every sign in checks the code against each of them. Wrong codes count toward the same lockout whichever code they were meant for.
+- Each session row records its `role` (`full` or `read`) and, for read only, the `code_id` it was made with.
 
 ## Deploying to a VPS
 

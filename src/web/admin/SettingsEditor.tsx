@@ -83,9 +83,11 @@ function Section({ title, note, children }: { title: string; note?: string; chil
 const units = (base: string | undefined, decimals: number) => Number(base ?? "0") / 10 ** decimals;
 const toBase = (v: number, decimals: number) => String(Math.round(v * 10 ** decimals));
 
-export function SettingsEditor({ initial, version, pairs, onSave }: {
+export function SettingsEditor({ initial, version, pairs, onSave, readOnly = false }: {
   initial: AdminSettings; version: number; pairs: Pair[];
   onSave: (s: AdminSettings) => Promise<void>;
+  /** Read only sessions see every value with every control disabled and no save step. */
+  readOnly?: boolean;
 }) {
   const [s, setS] = useState(initial);
   const [fees, setFees] = useState(initial.feeTiersBps.map((b) => b / 100).join(", "));
@@ -119,7 +121,12 @@ export function SettingsEditor({ initial, version, pairs, onSave }: {
 
   return (
     <section className="flex flex-col gap-7 max-w-4xl">
-      <p className="m-0 text-sm text-muted">Current version {version}. Saving creates a new version. Pages pick it up within a few seconds and the keeper on its next run. Earlier launches keep the tiers and penalty they started with.</p>
+      <p className="m-0 text-sm text-muted">
+        {readOnly
+          ? `Current version ${version}. Read only access shows the settings without changing them.`
+          : `Current version ${version}. Saving creates a new version. Pages pick it up within a few seconds and the keeper on its next run. Earlier launches keep the tiers and penalty they started with.`}
+      </p>
+      <fieldset disabled={readOnly} data-settings-fields className="m-0 p-0 border-0 min-w-0 flex flex-col gap-7 disabled:opacity-90">
 
       <Section title="Launches">
         <Check label="Pause new launches" checked={s.launchesPaused} onChange={(v) => set({ launchesPaused: v })} hint="The launch page says launches are paused and prepare refuses. Trading, staking and the keeper carry on." />
@@ -178,10 +185,10 @@ export function SettingsEditor({ initial, version, pairs, onSave }: {
             <Text label="Name" value={t.id} onChange={(v) => set({ tiers: s.tiers.map((x, j) => (j === i ? { ...x, id: v } : x)) })} />
             <Num label="Lock (0.5 is 12 hours)" suffix="days" value={t.lockSeconds / 86_400} onChange={(v) => set({ tiers: s.tiers.map((x, j) => (j === i ? { ...x, lockSeconds: Math.round(v * 86_400) } : x)) })} />
             <Num label="Multiplier" suffix="x" value={t.multiplierBps / 10_000} onChange={(v) => set({ tiers: s.tiers.map((x, j) => (j === i ? { ...x, multiplierBps: Math.round(v * 10_000) } : x)) })} />
-            <button type="button" aria-label={`Remove tier ${t.id}`} onClick={() => set({ tiers: s.tiers.filter((_, j) => j !== i) })} className="w-11 h-11 rounded-full border border-white/10 text-muted hover:text-ink cursor-pointer">×</button>
+            {!readOnly && <button type="button" aria-label={`Remove tier ${t.id}`} onClick={() => set({ tiers: s.tiers.filter((_, j) => j !== i) })} className="w-11 h-11 rounded-full border border-white/10 text-muted hover:text-ink cursor-pointer">×</button>}
           </div>
         ))}
-        {s.tiers.length < 8 && <button type="button" onClick={() => set({ tiers: [...s.tiers, { id: "new", lockSeconds: 86_400, multiplierBps: 10_000 }] })} className="self-start text-sm font-semibold text-accent min-h-11 cursor-pointer">Add a tier</button>}
+        {!readOnly && s.tiers.length < 8 && <button type="button" onClick={() => set({ tiers: [...s.tiers, { id: "new", lockSeconds: 86_400, multiplierBps: 10_000 }] })} className="self-start text-sm font-semibold text-accent min-h-11 cursor-pointer">Add a tier</button>}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Num label="Max early exit penalty" suffix="%" value={pct(s.maxPenaltyBps)} onChange={(v) => set({ maxPenaltyBps: toBps(v) })} />
           <Num label="Reward stream period" suffix="hours" value={s.rewardPeriodSeconds / 3600} onChange={(v) => set({ rewardPeriodSeconds: Math.round(v * 3600) })} />
@@ -191,7 +198,9 @@ export function SettingsEditor({ initial, version, pairs, onSave }: {
       <Section title="Keeper">
         <div className="grid grid-cols-1 md:grid-cols-[200px_minmax(0,1fr)] gap-4">
           <Num label="Run every" suffix="minutes" value={s.keeperIntervalSeconds / 60} onChange={(v) => set({ keeperIntervalSeconds: Math.round(v * 60) })} />
-          <Text label="Alert webhook" value={s.alertWebhookUrl} onChange={(v) => set({ alertWebhookUrl: v.trim() })} placeholder="https://hooks.slack.com/..." hint="The keeper and indexer post alerts here. Empty sends none." />
+          {readOnly
+            ? <Text label="Alert webhook" value={s.alertWebhookUrl ? "Set, hidden from read only access" : "Not set"} onChange={() => {}} />
+            : <Text label="Alert webhook" value={s.alertWebhookUrl} onChange={(v) => set({ alertWebhookUrl: v.trim() })} placeholder="https://hooks.slack.com/..." hint="The keeper and indexer post alerts here. Empty sends none." />}
         </div>
       </Section>
 
@@ -202,7 +211,9 @@ export function SettingsEditor({ initial, version, pairs, onSave }: {
         <Text label="X link" value={s.xUrl} onChange={(v) => set({ xUrl: v.trim() })} placeholder="Empty uses NEXT_PUBLIC_X_URL" />
       </Section>
 
-      <div className="flex flex-col gap-4 pt-7 border-t line">
+      </fieldset>
+
+      {!readOnly && <div className="flex flex-col gap-4 pt-7 border-t line">
         {problem && <p className="m-0 text-sm text-burn">{problem}</p>}
         {!review ? (
           <Button className="self-start" disabled={!!problem || changed.length === 0} onClick={() => setReview(true)}>
@@ -220,7 +231,7 @@ export function SettingsEditor({ initial, version, pairs, onSave }: {
             </div>
           </div>
         )}
-      </div>
+      </div>}
     </section>
   );
 }
