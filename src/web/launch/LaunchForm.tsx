@@ -29,16 +29,31 @@ const LABELS: Record<Status, string> = {
   idle: "", uploading: "Uploading image", preparing: "Preparing", signing: "Approve in your wallet", confirming: "Confirming",
 };
 
-async function imageProblem(file: File): Promise<string | null> {
+const MAX_UPLOAD = 2 * 1024 * 1024;
+const MAX_SIDE = 1024;
+
+const encode = (canvas: HTMLCanvasElement, type: string, quality?: number) =>
+  new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, type, quality));
+
+/** Crops any picture to its centred square, shrinks it to at most 1024px and re-encodes it under the upload limit. */
+async function squareImage(file: File): Promise<File | string> {
   if (!["image/png", "image/jpeg", "image/webp"].includes(file.type)) return "Image must be PNG, JPEG or WebP";
-  if (file.size > 2 * 1024 * 1024) return "Image must be 2 MB or smaller";
-  try {
-    const bmp = await createImageBitmap(file);
-    if (bmp.width !== bmp.height) return "Image must be square";
-  } catch {
-    return "Image could not be read. Try another file.";
+  if (file.size > 15 * 1024 * 1024) return "Image must be 15 MB or smaller";
+  let bmp: ImageBitmap;
+  try { bmp = await createImageBitmap(file); } catch { return "Image could not be read. Try another file."; }
+  const side = Math.min(bmp.width, bmp.height);
+  const out = Math.min(side, MAX_SIDE);
+  const canvas = document.createElement("canvas");
+  canvas.width = out;
+  canvas.height = out;
+  canvas.getContext("2d")!.drawImage(bmp, (bmp.width - side) / 2, (bmp.height - side) / 2, side, side, 0, 0, out, out);
+  bmp.close();
+  // WebP keeps transparency and stays small; browsers that cannot encode it fall back to PNG, then JPEG.
+  for (const [type, q] of [["image/webp", 0.92], ["image/webp", 0.8], ["image/png", undefined], ["image/jpeg", 0.88], ["image/jpeg", 0.75]] as const) {
+    const blob = await encode(canvas, type, q);
+    if (blob && blob.type === type && blob.size <= MAX_UPLOAD) return new File([blob], `image.${type.split("/")[1]}`, { type });
   }
-  return null;
+  return "Image could not be prepared. Try another file.";
 }
 
 async function postJson<T>(url: string, body: unknown): Promise<T> {
@@ -84,11 +99,11 @@ export function LaunchForm({ split, tiers, maxPenaltyBps, quotes, initialPair, f
 
   const pickImage = async (file: File | undefined) => {
     if (!file) return;
-    const problem = await imageProblem(file);
-    setImageError(problem);
-    if (problem) return;
-    setImage(file);
-    setPreview(URL.createObjectURL(file));
+    const ready = await squareImage(file);
+    if (typeof ready === "string") { setImageError(ready); return; }
+    setImageError(null);
+    setImage(ready);
+    setPreview(URL.createObjectURL(ready));
   };
 
   const tradingOnly = quotes.find((q) => q.mint === pair)?.tradingOnly ?? false;
@@ -241,7 +256,7 @@ export function LaunchForm({ split, tiers, maxPenaltyBps, quotes, initialPair, f
                   ) : (
                     <>
                       <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 16V4" /><path d="M6 10l6-6 6 6" /><path d="M4 20h16" /></svg>
-                      <span className="text-center px-2">Square image</span>
+                      <span className="text-center px-2">Any image, cropped to a square</span>
                     </>
                   )}
                   <input type="file" accept="image/png,image/jpeg,image/webp" className="sr-only" onChange={(e) => pickImage(e.target.files?.[0])} />
