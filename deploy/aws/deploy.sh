@@ -36,10 +36,16 @@ echo "deploying $tag to $h"
 list="$(mktemp)"; trap 'rm -f "$list"' EXIT
 { git ls-files; printf '%s\n' .env.production secrets/keeper.json secrets/spill.json; } > "$list"
 rsync -az --timeout=120 --files-from="$list" -e "ssh ${ssh_opts[*]}" ./ "$SSH_USER@$h:$REMOTE_DIR/"
+# The file list goes along so the server can drop files that left the repo; rsync --files-from never deletes.
+rsync -az --timeout=120 -e "ssh ${ssh_opts[*]}" "$list" "$SSH_USER@$h:$REMOTE_DIR/.deploy-files"
 
 remote bash -s -- "$tag" "$REMOTE_DIR" <<'REMOTE'
 set -euo pipefail
 tag="$1"; cd "$2"
+# Remove tracked-type files that are no longer in the repo; runtime folders (backups, secrets) are left alone.
+find src db scripts public assets e2e tests deploy docs -type f 2>/dev/null | sort > .deploy-present
+sort .deploy-files | comm -23 .deploy-present - | while IFS= read -r f; do rm -f -- "$f"; done
+rm -f .deploy-present
 chmod 600 .env.production secrets/*.json
 mkdir -p backups
 export IMAGE_TAG="$tag"
