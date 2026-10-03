@@ -129,6 +129,45 @@ test("read only codes are capped and need a label", async () => {
   expect((await make("one too many")).status).toBe(400);
 });
 
+test("in production the session cookie is __Host- prefixed, Secure, httpOnly and SameSite=Strict", async () => {
+  await makeWebContext();
+  const env = process.env as Record<string, string | undefined>;
+  const was = env.NODE_ENV;
+  env.NODE_ENV = "production";
+  try {
+    const r = await login(ADMIN_CODE);
+    const set = r.headers.get("set-cookie")!;
+    expect(set).toStartWith("__Host-quants_admin=");
+    for (const flag of ["HttpOnly", "Secure", "SameSite=Strict", "Path=/"]) expect(set).toContain(flag);
+    expect(set).not.toContain("Domain");
+    expect(r.headers.get("cache-control")).toBe("no-store");
+    // the dev cookie name is not accepted in production
+    const plain = `quants_admin=${set.split(";")[0]!.split("=").slice(1).join("=")}`;
+    expect((await getSettings(req(plain))).status).toBe(401);
+    expect((await getSettings(req(set.split(";")[0]!))).status).toBe(200);
+  } finally {
+    env.NODE_ENV = was;
+  }
+});
+
+test("a forged, truncated or expired session all get the same 401", async () => {
+  const c = await makeWebContext();
+  const good = await signIn();
+  const [name, value] = good.split("=") as [string, string];
+  const [token, mac] = value.split(".") as [string, string];
+  const bodies = new Set<string>();
+  for (const cookie of [`${name}=${token}.${mac.slice(0, -2)}xx`, `${name}=${token}`, `${name}=garbage`, `other=${value}`]) {
+    const r = await getSettings(req(cookie));
+    expect(r.status).toBe(401);
+    bodies.add(await r.text());
+  }
+  await c.sql`update admin_sessions set expires_at = now() - interval '1 second'`;
+  const expired = await getSettings(req(good));
+  expect(expired.status).toBe(401);
+  bodies.add(await expired.text());
+  expect(bodies.size).toBe(1);
+});
+
 // Every admin route file, walked from disk so a new route cannot skip these checks.
 const DIR = join(import.meta.dir, "../../src/app/api/whitehouse");
 const WRITES = ["POST", "PUT", "PATCH", "DELETE"] as const;
