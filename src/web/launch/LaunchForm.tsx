@@ -57,6 +57,22 @@ async function squareImage(file: File): Promise<File | string> {
 }
 
 type Estimate = { key: string; tokens: string | null; overCap: boolean };
+type CostParts = { config: string; accounts: string; network: string; keeper: string };
+
+/** What the launch itself costs in SOL for the chosen pair and fee, before any first buy. */
+function useLaunchCost(pair: string, fee: number): CostParts | null {
+  const [parts, setParts] = useState<CostParts | null>(null);
+  useEffect(() => {
+    if (!pair) return;
+    const ctl = new AbortController();
+    fetch(`/api/launch/cost?quoteMint=${pair}&fee=${fee}`, { signal: ctl.signal })
+      .then((r) => (r.ok ? r.json() : null)).then((j) => j && setParts(j)).catch(() => {});
+    return () => ctl.abort();
+  }, [pair, fee]);
+  return parts;
+}
+
+const sol3 = (lamports: bigint) => (Number(lamports) / 1e9).toFixed(3).replace(/0+$/, "").replace(/\.$/, "");
 
 /** Tokens the first buy gets at launch, fetched a moment after typing stops. */
 function useFirstBuyEstimate(pair: string, fee: number, lamports: bigint | null): Estimate | null {
@@ -168,6 +184,13 @@ export function LaunchForm({ split, tiers, maxPenaltyBps, quotes, initialPair, f
   const solText = (lamports: bigint) => `${fmtAmount(lamports, 9, 3)} SOL`;
   const usdOf = (lamports: bigint) => usdText(Number(lamports) / 1e9, solUsd);
   const estimate = useFirstBuyEstimate(pair, fee, devBuyLamports);
+  const costParts = useLaunchCost(pair, fee);
+  const costItems: [string, bigint][] = costParts ? ([
+    ["Meteora config", BigInt(costParts.config)], ["Token accounts", BigInt(costParts.accounts)], ["Network", BigInt(costParts.network)],
+    ["Keeper", BigInt(costParts.keeper)], ["First buy", devBuyLamports ?? 0n],
+  ] as [string, bigint][]).filter(([, v]) => v > 0n) : [];
+  const costTotal = costItems.reduce((a, [, v]) => a + v, 0n);
+  const costLine = costItems.length ? costItems.map(([l, v]) => `${l} ${sol3(v)}`).join(" · ") : "";
   const buyUsd = devBuyLamports && devBuyLamports > 0n ? usdOf(devBuyLamports) : null;
   const firstBuyLine = !devBuyLamports || devBuyLamports === 0n ? ""
     : estimate?.overCap ? "That is more than the first buy cap allows. Lower the first buy. "
@@ -418,6 +441,10 @@ export function LaunchForm({ split, tiers, maxPenaltyBps, quotes, initialPair, f
           </span>}
           <span className="flex justify-between py-1.5"><span className="text-muted">Graduates at</span><span className="font-mono">{pairQuote ? `${pairQuote.graduation.toLocaleString("en-US")} ${pairQuote.symbol} raised` : ""}</span></span>
           <span className="flex justify-between py-1.5"><span className="text-muted">Supply</span><span className="font-mono">1,000,000,000</span></span>
+          {costLine && <span className="flex flex-col gap-0.5 py-1.5" data-launch-cost>
+            <span className="flex justify-between"><span className="text-muted">You pay</span><span className="font-mono text-right">{solText(costTotal)}{usdOf(costTotal) && <span className="block text-[12px] text-faint">≈ {usdOf(costTotal)}</span>}</span></span>
+            <span className="text-[12px] text-faint font-mono leading-normal">{costLine} SOL</span>
+          </span>}
         </div>
 
         {error && <p role="alert" className="max-md:hidden m-0 text-sm text-burn">{error}</p>}
@@ -430,7 +457,7 @@ export function LaunchForm({ split, tiers, maxPenaltyBps, quotes, initialPair, f
           <span className="flex flex-1 flex-col min-w-0">
             <span className="font-display font-bold truncate">{symbol || "Your token"} / {pairLabel} · {fee / 100}% fee</span>
             <span className="text-[13px] text-muted truncate">
-              {devBuyLamports && devBuyLamports > 0n ? `First buy ${solText(devBuyLamports)}${usdOf(devBuyLamports) ? `, ${usdOf(devBuyLamports)}` : ""}` : "No first buy"}
+              {costLine ? `You pay ${solText(costTotal)}${usdOf(costTotal) ? `, ${usdOf(costTotal)}` : ""}` : devBuyLamports && devBuyLamports > 0n ? `First buy ${solText(devBuyLamports)}` : "No first buy"}
             </span>
           </span>
           <Button onClick={launch} disabled={busy || paused} className="shrink-0 max-w-[55%] truncate">{action}</Button>

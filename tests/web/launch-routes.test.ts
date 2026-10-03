@@ -265,3 +265,14 @@ test("tx status reports a signature's state from the server's providers", async 
   const r = await status(new Request(`http://x/api/tx/status?sig=${"5".repeat(64)}`));
   expect(await r.json()).toEqual({ state: "confirmed" });
 });
+
+test("launch cost lists config rent only while that pair and fee has no live config", async () => {
+  const { GET: cost } = await import("../../src/app/api/launch/cost/route");
+  const c = await makeWebContext({ conn: { getBalance: async () => 1_000_000_000 } as any });
+  const ask = async () => (await cost(new Request(`http://x/api/launch/cost?quoteMint=${NATIVE_MINT}&fee=200`))).json();
+  const before = await ask();
+  expect(before).toMatchObject({ accounts: "20000000", network: "1000000", keeper: "0" });
+  await c.sql`update config_keys set status = 'live' where quote_mint = ${NATIVE_MINT} and fee_bps = 200`;
+  const live = (await c.sql`select count(*)::int as n from config_keys where quote_mint = ${NATIVE_MINT} and fee_bps = 200 and status = 'live'`)[0].n;
+  expect((await ask()).config).toBe(live > 0 ? "0" : before.config);
+});
