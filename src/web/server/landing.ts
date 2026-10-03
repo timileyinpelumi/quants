@@ -28,7 +28,7 @@ export type TradeRow = {
 };
 export type Featured = { mint: string; symbol: string; name: string; pairs: number; token: TokenRow | null };
 export type Landing = {
-  stats: { launches: number; graduated: number; volume24hUsd: number; volumeAllUsd: number; traders24h: number; stakersUsd: number };
+  stats: { launches: number; graduated: number; volume24hUsd: number; volumeAllUsd: number; traders24h: number; stakersUsd: number; hourly: number[] };
   tokens: TokenRow[]; nextOffset: number | null;
 };
 export type ExploreSort = "trending" | "mcap" | "new" | "gainers" | "graduating" | "active";
@@ -129,12 +129,16 @@ export async function landing(sql: SQL, now = Date.now(), icons?: Icons): Promis
       (select coalesce(sum((d.detail->>'amount')::float8 * (s.data->'split'->>'basketBps')::float8 / 10000 * px.unit * px.quote_usd), 0)
          from distributions d join settings s on s.version = d.settings_version join px on px.launch_id = d.launch_id
          where d.kind = 'split' and d.status = 'confirmed' and d.detail->>'tradingOnly' is null) as stakers`;
+  const hours = await sql`
+    select floor(extract(epoch from (${new Date(now)}::timestamptz - block_time)) / 3600)::int as h, sum(quote_value * quote_usd)::float8 as v
+    from trades where block_time > ${since} and quote_usd is not null group by 1`;
+  const hourly = Array.from({ length: 24 }, (_, i) => Number(hours.find((r: any) => r.h === 23 - i)?.v ?? 0));
   const first = HOME_TABS[0]!;
   const rows = await toTokenRows(await tokenQuery(sql, { sort: first.sort, filter: first.filter, limit: HOME_PAGE + 1 }, now), icons);
   return {
     stats: {
       launches: stats.launches, graduated: stats.graduated, volume24hUsd: Number(stats.v24), volumeAllUsd: Number(stats.vall),
-      traders24h: stats.traders, stakersUsd: Number(stats.stakers),
+      traders24h: stats.traders, stakersUsd: Number(stats.stakers), hourly,
     },
     tokens: rows.slice(0, HOME_PAGE), nextOffset: rows.length > HOME_PAGE ? HOME_PAGE : null,
   };

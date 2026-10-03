@@ -34,7 +34,9 @@ test("stats count launches, graduations, volume, traders and what stakers earned
     values (${a}, 'split:1', 'split:1', 'split', 'confirmed', ${JSON.stringify({ amount: "500000000" })}::text::jsonb, ${v}),
            (${a}, 'split:2', 'split:2', 'split', 'failed', ${JSON.stringify({ amount: "900000000" })}::text::jsonb, ${v})`;
   const { stats } = await landing(sql, NOW);
-  expect({ ...stats, stakersUsd: Math.round(stats.stakersUsd * 1e6) / 1e6 }).toEqual({ launches: 3, graduated: 1, volume24hUsd: 800, volumeAllUsd: 1800, traders24h: 1, stakersUsd: 30 });
+  expect({ ...stats, hourly: undefined, stakersUsd: Math.round(stats.stakersUsd * 1e6) / 1e6 }).toEqual({ launches: 3, graduated: 1, volume24hUsd: 800, volumeAllUsd: 1800, traders24h: 1, stakersUsd: 30, hourly: undefined });
+  expect(stats.hourly).toHaveLength(24);
+  expect(stats.hourly.reduce((a, b) => a + b, 0)).toBe(800);
 });
 
 test("home serves the first tab, and each tab is an explore query", async () => {

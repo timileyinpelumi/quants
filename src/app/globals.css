@@ -62,3 +62,8 @@ input::placeholder, textarea::placeholder { color: var(--color-faint); }
 @media (max-width: 767.98px) {
   body:has([data-phone-bars]) footer[data-site-footer] { display: none; }
 }
+
+.stats-ring { background: conic-gradient(from var(--stats-angle, 0deg), rgba(76,157,255,0.15), #4C9DFF, #9D8CFF, rgba(76,157,255,0.15) 60%); box-shadow: 0 0 60px -12px rgba(76,157,255,0.45); }
+@property --stats-angle { syntax: "<angle>"; initial-value: 0deg; inherits: false; }
+@keyframes stats-spin { to { --stats-angle: 360deg; } }
+@media (prefers-reduced-motion: no-preference) { .stats-ring { animation: stats-spin 6s linear infinite; } }

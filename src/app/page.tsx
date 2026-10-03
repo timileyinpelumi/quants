@@ -9,6 +9,7 @@ import { clusterOf } from "@/cluster";
 import { HomeGrid } from "@/web/home/HomeGrid";
 import { BuyTicker } from "@/web/home/BuyTicker";
 import { FeaturedCard } from "@/web/home/FeaturedCard";
+import { StatsCard } from "@/web/home/StatsCard";
 import { PrelaunchCard } from "@/web/home/PrelaunchCard";
 import { cachedSettings, fillSymbol, xUrlOf } from "@/domain/settings";
 
@@ -46,20 +47,7 @@ export default async function HomePage() {
             </div>
             <BuyTicker />
           </div>
-          <div className="flex flex-col gap-6 bg-surface border line rounded-[28px] p-6 md:p-7">
-            <div className="flex flex-col gap-1.5">
-              <span className="text-[13px] text-muted">Fees set aside for stakers</span>
-              <span className="font-display font-black text-[44px] md:text-[56px] leading-none tracking-tight text-accent">{usd(d.stats.stakersUsd)}</span>
-            </div>
-            <div className="grid grid-cols-2 gap-x-6 gap-y-4 pt-5 border-t line">
-              {[["Volume today", usd(d.stats.volume24hUsd)], ["Volume all time", usd(d.stats.volumeAllUsd)], ["Tokens launched", fmtCompact(d.stats.launches)], ["Traders today", fmtCompact(d.stats.traders24h)]].map(([l, v]) => (
-                <div key={l} className="flex flex-col gap-1">
-                  <span className="text-[13px] text-muted">{l}</span>
-                  <span className="font-display font-bold text-xl">{v}</span>
-                </div>
-              ))}
-            </div>
-          </div>
+          <StatsCard s={d.stats} />
         </section>
 
         {card && <FeaturedCard c={card} links={platformLinks(card.mint, clusterOf(), launchedHere)} headline={text(s.featured.headline)} body={text(s.featured.body)} />}
