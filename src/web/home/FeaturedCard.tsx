@@ -66,8 +66,8 @@ export function FeaturedCard({ c, links, headline, body }: { c: PlatformCard; li
           </div>
           {p.pairs === 0 ? (
             <div data-no-pairs className="flex-1 flex flex-col justify-center gap-3 rounded-2xl border border-dashed border-white/15 p-6 md:p-8">
-              <span className="font-display font-black text-[30px] md:text-[38px] leading-none tracking-tight">No pairs yet</span>
-              <p className="m-0 text-[15px] text-muted leading-relaxed max-w-md">Be the first to launch with {c.symbol} as the pair. Your curve fills in {c.symbol}, so every buy of your token is a buy of {c.symbol}.</p>
+              <span className="font-display font-black text-[30px] md:text-[38px] leading-none tracking-tight">Launch the first {c.symbol} pair</span>
+              <p className="m-0 text-[15px] text-muted leading-relaxed max-w-md">Pair your token with {c.symbol}. Your curve fills in {c.symbol}, so every buy of your token is a buy of {c.symbol}.</p>
               <Link href={links.launch} className="self-start text-[15px] font-semibold text-accent hover:text-ink min-h-11 flex items-center">Launch the first {c.symbol} pair</Link>
             </div>
           ) : (
