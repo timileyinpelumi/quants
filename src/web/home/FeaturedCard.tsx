@@ -53,22 +53,22 @@ export function FeaturedCard({ c, links, headline, body }: { c: PlatformCard; li
           <Link href={links.launch} className="font-display font-bold rounded-full px-4 md:px-6 min-h-12 text-sm md:text-base flex items-center justify-center text-center border-2 border-ground hover:bg-ground/10">Launch with {c.symbol}</Link>
         </div>
       </div>
-      <div className="flex flex-col gap-4 md:gap-6 bg-surface p-5 md:p-8">
+      <div className="flex flex-col justify-center gap-4 md:gap-6 bg-surface p-5 md:p-8">
         {market.length > 0 && (
           <div className="grid grid-cols-[1.5fr_1fr_1fr_0.9fr] sm:grid-cols-4 gap-x-3 sm:gap-x-5 gap-y-5 pb-4 md:pb-6 border-b line">
             {market.map(([l, v]) => <Stat key={l} label={l}>{v}</Stat>)}
           </div>
         )}
-        <div className="flex flex-col gap-3 md:gap-5 flex-1">
+        <div className="flex flex-col gap-3 md:gap-4">
           <div className="flex items-center justify-between gap-3">
             <h2 className="m-0 font-display font-bold text-lg">{c.symbol} pairs</h2>
             {p.pairs > 0 && <Link href={`/explore?quote=${c.mint}`} className="text-sm font-semibold text-accent hover:text-ink min-h-11 flex items-center">See all pairs</Link>}
           </div>
           {p.pairs === 0 ? (
-            <div data-no-pairs className="flex-1 flex flex-col justify-center gap-3 rounded-2xl border border-dashed border-white/15 p-4 md:p-8">
-              <span className="max-md:hidden font-display font-black text-[38px] leading-none tracking-tight">Launch the first {c.symbol} pair</span>
-              <p className="max-md:hidden m-0 text-[15px] text-muted leading-relaxed max-w-md">Pair your token with {c.symbol}. Your curve fills in {c.symbol}, so every buy of your token is a buy of {c.symbol}.</p>
-              <Link href={links.launch} className="self-start text-[15px] font-semibold text-accent hover:text-ink min-h-11 flex items-center">Launch the first {c.symbol} pair</Link>
+            <div data-no-pairs className="flex flex-col gap-2 rounded-2xl border border-dashed border-white/15 p-4 md:p-5">
+              <span className="font-display font-bold text-lg md:text-xl">Be the first {c.symbol} pair</span>
+              <p className="max-md:hidden m-0 text-sm text-muted leading-relaxed">Your curve fills in {c.symbol}, so every buy of your token is a buy of {c.symbol}.</p>
+              <Link href={links.launch} className="self-start text-sm font-semibold text-accent hover:text-ink min-h-10 flex items-center">Start a launch</Link>
             </div>
           ) : (
             <>
