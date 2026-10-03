@@ -7,7 +7,7 @@ import { Avatar } from "@/web/ui/Avatar";
 import { Button } from "@/web/ui/Button";
 import { Field, Suffixed, TextArea, TextInput, inputClass } from "@/web/ui/Field";
 import { Segmented } from "@/web/ui/Segmented";
-import { fmtAmount, lockLabel, lockShort } from "@/web/ui/format";
+import { fmtAmount, fmtCompact, lockLabel, lockShort } from "@/web/ui/format";
 import { sendSequence, SendError, type UnsignedTx } from "@/web/wallet/send";
 import { reportSendFailure } from "@/web/wallet/report";
 import { BasketPicker, basketTotal, type BasketItem } from "./BasketPicker";
@@ -55,6 +55,36 @@ async function squareImage(file: File): Promise<File | string> {
   }
   return "Image could not be prepared. Try another file.";
 }
+
+type Estimate = { key: string; tokens: string | null; overCap: boolean };
+
+/** Tokens the first buy gets at launch, fetched a moment after typing stops. */
+function useFirstBuyEstimate(pair: string, fee: number, lamports: bigint | null): Estimate | null {
+  const key = lamports && lamports > 0n ? `${pair}:${fee}:${lamports}` : "";
+  const [est, setEst] = useState<Estimate | null>(null);
+  useEffect(() => {
+    if (!key) return;
+    const ctl = new AbortController();
+    const t = setTimeout(async () => {
+      try {
+        const r = await fetch(`/api/launch/first-buy?quoteMint=${pair}&fee=${fee}&sol=${lamports}`, { signal: ctl.signal });
+        if (!r.ok) return;
+        const j = await r.json();
+        setEst({ key, tokens: j.tokens, overCap: j.overCap });
+      } catch {
+        // An estimate that fails to load just leaves the line without a token count.
+      }
+    }, 400);
+    return () => { clearTimeout(t); ctl.abort(); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key]);
+  return est?.key === key ? est : null;
+}
+
+const tokenCount = (base: string) => {
+  const n = Number(base) / 1e6;
+  return n >= 1000 ? fmtCompact(n) : fmtAmount(base, 6, 2);
+};
 
 async function postJson<T>(url: string, body: unknown): Promise<T> {
   const r = await fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
@@ -137,6 +167,12 @@ export function LaunchForm({ split, tiers, maxPenaltyBps, quotes, initialPair, f
   const { rent } = launchCost({ tiers }, Math.max(1, basket.length));
   const solText = (lamports: bigint) => `${fmtAmount(lamports, 9, 3)} SOL`;
   const usdOf = (lamports: bigint) => usdText(Number(lamports) / 1e9, solUsd);
+  const estimate = useFirstBuyEstimate(pair, fee, devBuyLamports);
+  const buyUsd = devBuyLamports && devBuyLamports > 0n ? usdOf(devBuyLamports) : null;
+  const firstBuyLine = !devBuyLamports || devBuyLamports === 0n ? ""
+    : estimate?.overCap ? "That is more than the first buy cap allows. Lower the first buy. "
+    : estimate?.tokens ? `About ${tokenCount(estimate.tokens)} ${symbol || "tokens"}${buyUsd ? ` for ${buyUsd}` : ""}. `
+    : buyUsd ? `About ${buyUsd}. ` : "";
 
   async function settle(p: { mint: string; sig: string }) {
     setStatus("confirming");
@@ -316,8 +352,8 @@ export function LaunchForm({ split, tiers, maxPenaltyBps, quotes, initialPair, f
                   <input inputMode="decimal" value={devBuy} onChange={(e) => setDevBuy(e.target.value)} placeholder="0" className="flex-1 min-w-0 font-mono text-xl text-ink bg-transparent border-0 py-[18px] outline-none" />
                 </Suffixed>
               </Field>
-              <p className="m-0 text-sm text-muted md:pb-[18px]">
-                {devBuyLamports && devBuyLamports > 0n && usdOf(devBuyLamports) ? `About ${usdOf(devBuyLamports)}. ` : ""}
+              <p data-first-buy className="m-0 text-sm text-muted md:pb-[18px]">
+                {firstBuyLine && <span className={estimate?.overCap ? "text-burn" : "text-ink"}>{firstBuyLine}</span>}
                 {pair === SOL ? "Bought on the curve in the same approval as the launch." : `Swapped to ${pairLabel} first, then bought on the curve with the launch. Your wallet asks twice.`}
               </p>
             </div>
