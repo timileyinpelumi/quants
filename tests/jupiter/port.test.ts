@@ -30,25 +30,36 @@ test("sends the api key header when one is set", async () => {
   expect(seen).toBe("k123");
 });
 
-test("searchVerified keeps verified classic SPL tokens only", async () => {
+test("searchVerified keeps verified classic and Token-2022 tokens", async () => {
   let url = "";
   const j = new JupiterLive("https://api.jup.ag/swap/v1", {} as any, async (u) => { url = String(u); return new Response(JSON.stringify([
     { id: "A", symbol: "AAA", name: "A", icon: "https://i/a.png", decimals: 6, isVerified: true, tokenProgram: "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA" },
     { id: "B", symbol: "BBB", name: "B", icon: null, decimals: 6, isVerified: false, tokenProgram: "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA" },
     { id: "C", symbol: "CCC", name: "C", icon: null, decimals: 6, isVerified: true, tokenProgram: "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb" },
+    { id: "D", symbol: "DDD", name: "D", icon: null, decimals: 6, isVerified: true, tokenProgram: "SomethingElse111111111111111111111111111111" },
   ])); });
-  expect((await j.searchVerified("a")).map((t) => t.mint)).toEqual(["A"]);
+  expect((await j.searchVerified("a")).map((t) => [t.mint, t.tokenProgram])).toEqual([
+    ["A", "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"], ["C", "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"],
+  ]);
   expect(url).toBe("https://api.jup.ag/tokens/v2/search?query=a");
 });
 
-test("popularVerified reads top tokens and keeps verified classic SPL only", async () => {
-  let url = "";
-  const j = new JupiterLive("https://api.jup.ag/swap/v1", {} as any, async (u) => { url = String(u); return new Response(JSON.stringify([
-    { id: "S", symbol: "SOL", name: "Solana", icon: null, decimals: 9, isVerified: true, tokenProgram: "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA" },
-    { id: "P", symbol: "PUMP", name: "Pump", icon: null, decimals: 6, isVerified: true, tokenProgram: "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb" },
-  ])); });
-  expect((await j.popularVerified()).map((t) => t.symbol)).toEqual(["SOL"]);
-  expect(url).toBe("https://api.jup.ag/tokens/v2/toporganicscore/24h?limit=100");
+test("popularVerified ranks the verified list by organic score, keeps a few spare past 200 and caches it", async () => {
+  const urls: string[] = [];
+  const rows = Array.from({ length: 450 }, (_, i) => ({
+    id: `M${i}`, symbol: `T${i}`, name: `Token ${i}`, icon: null, decimals: 6, isVerified: i !== 7, organicScore: i % 97,
+    tokenProgram: i % 5 === 0 ? "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb" : "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+  }));
+  const j = new JupiterLive("https://api.jup.ag/swap/v1", {} as any, async (u) => { urls.push(String(u)); return new Response(JSON.stringify(rows)); });
+  const list = await j.popularVerified();
+  expect(urls).toEqual(["https://api.jup.ag/tokens/v2/tag?query=verified"]);
+  expect(list).toHaveLength(300);
+  const scores = list.map((t) => rows.find((r) => r.id === t.mint)!.organicScore);
+  expect(scores).toEqual([...scores].sort((a, b) => b - a));
+  expect(list.some((t) => t.mint === "M7")).toBe(false);
+  expect(list.some((t) => t.tokenProgram === "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb")).toBe(true);
+  await j.popularVerified();
+  expect(urls).toHaveLength(1);
 });
 
 test("isVerified retries a failed lookup once, then reports Jupiter as unavailable instead of unverified", async () => {

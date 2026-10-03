@@ -109,9 +109,24 @@ test("a stock pair is trading only: no basket, and a basket is refused", async (
   await expect(prepareLaunch(deps, { ...valid, quoteMint: STOCK })).rejects.toMatchObject({ code: "invalid_input", message: expect.stringContaining("no reward basket") });
 });
 
-test("rejects basket tokens that are not classic SPL tokens", async () => {
+test("rejects Token-2022 basket tokens when it cannot check their extensions, and other programs always", async () => {
   const { deps } = await setup(true, "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb");
   await expect(prepareLaunch(deps, valid)).rejects.toMatchObject({ code: "basket_unsupported" });
+  const other = await setup(true, "SomeOtherProgram111111111111111111111111111");
+  const checked: string[] = [];
+  const rewardMints = async (m: string[]) => { checked.push(...m); return new Map(m.map((x) => [x, { program: "", problem: null }])); };
+  await expect(prepareLaunch({ ...other.deps, rewardMints }, valid)).rejects.toMatchObject({ code: "basket_unsupported" });
+  expect(checked).toEqual([]);
+});
+
+test("takes Token-2022 basket tokens whose extensions pass the on-chain check and names the extension of one that fails", async () => {
+  const { deps } = await setup(true, "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb");
+  const problems: Record<string, string | null> = { [valid.basket[0]!.mint]: null, [valid.basket[1]!.mint]: null };
+  const rewardMints = async (m: string[]) => new Map(m.map((x) => [x, { program: "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb", problem: problems[x] ?? null }]));
+  expect(launchOnly(await prepareLaunch({ ...deps, rewardMints }, valid)).mint).toBeDefined();
+  problems[valid.basket[1]!.mint] = "has the transfer fee config extension";
+  await expect(prepareLaunch({ ...deps, rewardMints }, { ...valid, basket: [valid.basket[0]!, { ...valid.basket[1]!, symbol: "FEE" }] }))
+    .rejects.toMatchObject({ code: "basket_unsupported", message: "FEE has the transfer fee config extension, which reward pools do not take. Pick another reward token." });
 });
 
 test("stopping before the launch validates everything but builds and records nothing", async () => {

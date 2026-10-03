@@ -5,6 +5,7 @@ import type { Keypair } from "@solana/web3.js";
 import { z } from "zod";
 import type { MeteoraPort } from "../meteora/port";
 import type { ConfigFor } from "./config-keys";
+import type { RewardMintCheck } from "../chain/reward-mint";
 import { loadLatestSettings } from "../domain/settings";
 import { NATIVE_MINT } from "../domain/types";
 
@@ -42,8 +43,8 @@ const launchInput = (quoteMints: string[], tradingOnly: boolean, fees: number[])
 });
 export type LaunchInput = z.infer<ReturnType<typeof launchInput>>;
 
-// Kamino farms are configured with the classic Token program for every reward mint.
 const CLASSIC_TOKEN_PROGRAM = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
+const TOKEN_2022_PROGRAM = "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb";
 const SUPPLY_BASE_UNITS = 1_000_000_000n * 1_000_000n;
 
 /**
@@ -67,7 +68,9 @@ export async function prepareLaunch(
     keeperTopUp?: () => Promise<{ to: string; lamports: bigint } | null>;
     /** Pair tokens that cannot back staking farms (tokenized stocks): their launches have no basket and no stake pool. */
     tradingOnlyMints?: string[];
-    isVerified: (mint: string) => Promise<boolean>; tokenProgramOf: (mint: string) => Promise<string> },
+    isVerified: (mint: string) => Promise<boolean>; tokenProgramOf: (mint: string) => Promise<string>;
+    /** Checks a Token-2022 reward mint's extensions; without it only classic reward mints are taken. */
+    rewardMints?: RewardMintCheck },
   raw: unknown,
   opts: { stopBeforeLaunch?: boolean } = {},
 ): Promise<PreparedStep> {
@@ -85,8 +88,11 @@ export async function prepareLaunch(
       throw e;
     });
     if (!verified) throw new LaunchError("basket_not_verified", `${b.symbol ?? b.mint} is not on the Jupiter verified list. Pick another reward token.`);
-    if ((await deps.tokenProgramOf(b.mint)) !== CLASSIC_TOKEN_PROGRAM) {
-      throw new LaunchError("basket_unsupported", `${b.symbol ?? b.mint} is not a classic SPL token, which Kamino farms require. Pick another reward token.`);
+    const program = await deps.tokenProgramOf(b.mint);
+    if (program !== CLASSIC_TOKEN_PROGRAM) {
+      const found = program === TOKEN_2022_PROGRAM && deps.rewardMints ? (await deps.rewardMints([b.mint])).get(b.mint) : undefined;
+      const problem = found ? found.problem : "is not a classic SPL token or a Token-2022 token with metadata only";
+      if (problem) throw new LaunchError("basket_unsupported", `${b.symbol ?? b.mint} ${problem}, which reward pools do not take. Pick another reward token.`);
     }
   }
   if (input.devBuyMinOut * 10_000n > SUPPLY_BASE_UNITS * BigInt(settings.devBuyCapBps)) {

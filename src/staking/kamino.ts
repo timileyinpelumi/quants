@@ -55,7 +55,12 @@ export class KaminoBackend implements StakingAdapter {
   async buildAddRewards(farm: string, rewardMints: string[]) {
     const admin = kitSigner(this.chain.keeper);
     const tx = new Transaction();
-    for (const m of rewardMints) tx.add(fromKitInstruction(await this.farms.addRewardToFarmIx(admin, this.gc(), address(farm), address(m), TOKEN_PROGRAM)));
+    // Each reward vault is made under its own mint's token program; funding and claims read it back from the farm.
+    for (const m of rewardMints) {
+      const info = await this.chain.mintInfo(m);
+      if (!info) throw new Error(`reward mint ${m} not found`);
+      tx.add(fromKitInstruction(await this.farms.addRewardToFarmIx(admin, this.gc(), address(farm), address(m), address(info.program.toBase58()))));
+    }
     return this.chain.signLegacy(tx, []);
   }
 

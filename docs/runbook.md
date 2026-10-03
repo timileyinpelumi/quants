@@ -72,6 +72,14 @@ The target is fixed into the DBC config key a pool is created from, and every po
 
 `CONFIG_KEYS` (or `config-keys.json` at `CONFIG_KEYS_PATH`) is an optional seed: keys made by `scripts/create-configs.ts` are recorded on the first prepare with the threshold read from chain and reused when it matches. Stock pairs still need keys made by the script, since their graduation is set per stock.
 
+### Reward tokens
+
+A basket token must be on Jupiter's verified list and be either a classic SPL mint or a Token-2022 mint whose extensions are all metadata pointer, token metadata, mint close authority or confidential transfer mint (most new Token-2022 launches carry only the first two). Kamino Farms also accepts transfer fee, transfer hook, permanent delegate and default account state mints, and quants refuses those: a transfer fee taxes every fund and claim, a hook program can block or change transfers, a permanent delegate can move tokens out of the reward vault, and a default frozen state would freeze the vault and stakers' accounts. Scaled UI amount, pausable and interest bearing mints (tokenized stocks among them) are refused by Kamino itself.
+
+- The reward picker browses the top 200 verified tokens by Jupiter organic score, read from Jupiter's full verified list every 10 minutes, and search covers the rest. Token-2022 results are checked on chain (extensions are fixed when a mint is made, so each mint is read once per process) and only allowed ones are shown.
+- Prepare and the admin basket override check every Token-2022 reward the same way and name the extension that keeps a token out.
+- The keeper registers each reward on the farm under its own token program, so its vault is a Token-2022 account for a Token-2022 mint. Funding and claims read the program back from the farm, and a stake page claim creates the staker's account for each reward under that reward's program. One claim transaction covers all of a farm's rewards, classic and Token-2022 alike. `tests/staking/kamino-token2022.test.ts` runs this against the cloned Kamino program on the local validator: a farm with one classic and one Token-2022 (metadata pointer and token metadata) reward, funded, staked and harvested twice.
+
 ### Stock pairs
 
 Tokenized stocks (xStocks from Backed, and Backpack stocks such as `SPCX.US`) can be pair tokens. New stock launches are off by default because these launches have no staking: the launch form shows crypto pairs only, the docs page leaves out the stock section, and `/api/launch/prepare` refuses a stock pair. Turn on Stock pairs on the admin page (or seed it with `STOCK_PAIRS=1`). Stock launches that already exist keep trading either way, the registry keeps refreshing, and `e2e/stocks.spec.ts` runs only when `STOCK_PAIRS=1` is set for the Playwright run and the setting is on. They are Token-2022 mints, so:

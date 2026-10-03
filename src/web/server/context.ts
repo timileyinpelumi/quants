@@ -19,6 +19,7 @@ import { checkWebEnv } from "@/env";
 import { decodeCodeHash } from "@/admin-code";
 import { parsePlatformAddresses, type Role } from "@/domain/platform-wallets";
 import { StockRegistry } from "@/stocks/registry";
+import { rewardMintChecker, type RewardMintCheck } from "@/chain/reward-mint";
 import type { StockListing } from "@/stocks/sources";
 
 export interface WebContext {
@@ -42,6 +43,8 @@ export interface WebContext {
   platformAddresses: Partial<Record<Role, string>>;
   sessionSecret: Uint8Array;
   tokenProgramOf(mint: string): Promise<string>;
+  /** Each mint's token program and why it cannot be a reward token (null when it can), read from chain and remembered. */
+  rewardMints: RewardMintCheck;
   stocks: Pick<StockRegistry, "list" | "icons">;
 }
 
@@ -91,6 +94,7 @@ export function getContext(): WebContext {
     platformAddresses: parsePlatformAddresses(e.PLATFORM_ADDRESSES),
     sessionSecret: new TextEncoder().encode(e.ADMIN_SESSION_SECRET!),
     tokenProgramOf: async (mint) => (await conn.getAccountInfo(new PublicKey(mint)))?.owner.toBase58() ?? "",
+    rewardMints: rewardMintChecker(conn),
     // LOCAL_STOCKS (local validator only) lists stand-in stock mints in place of the xStocks and Backpack lists.
     stocks: new StockRegistry({
       sql, conn, fetch, configKeys, threshold: (k) => meteora.configThreshold(k),
