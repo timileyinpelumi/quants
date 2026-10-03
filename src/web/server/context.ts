@@ -1,3 +1,4 @@
+import { withVerifiedCache } from "@/jupiter/verified-cache";
 import type { SQL } from "bun";
 import { existsSync, readFileSync } from "node:fs";
 import { Connection, Keypair, PublicKey } from "@solana/web3.js";
@@ -75,7 +76,7 @@ export function getContext(): WebContext {
     conn,
     meteora,
     staking: new KaminoBackend(chain, e.RPC_URL!, e.KAMINO_GLOBAL_CONFIG ?? ""),
-    jupiter: withLocalTokens(swapPortFor(e, chain), e.LOCAL_TOKEN_LIST),
+    jupiter: withVerifiedCache(withLocalTokens(swapPortFor(e, chain), e.LOCAL_TOKEN_LIST), sql),
     uploads: uploadsFrom(e),
     uploadPrefix: uploadPrefix(e),
     trade: new TradeLive(conn),
