@@ -128,7 +128,7 @@ export function LaunchForm({ split, tiers, maxPenaltyBps, quotes, initialPair, f
   const [imageError, setImageError] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [symbol, setSymbol] = useState("");
-  const [pair, setPair] = useState<string>(initialPair ?? quotes[0]?.mint ?? SOL);
+  const [pair, setPair] = useState<string>(initialPair ?? (quotes.some((q) => q.mint === SOL) ? SOL : quotes[0]?.mint ?? SOL));
   const [fee, setFee] = useState(feeTiers.includes(200) ? 200 : feeTiers[0]!);
   const [mode, setMode] = useState<"pair" | "basket">("basket");
   const [picked, setBasket] = useState<BasketItem[]>([]);

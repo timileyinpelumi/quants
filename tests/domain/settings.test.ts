@@ -112,7 +112,7 @@ test("quote coins follow the loaded settings", async () => {
   expect(coins[2]).toMatchObject({ enabled: false, graduation: 40_000 });
   await saveSettings(sql, s, "t");
   await loadLatestSettings(sql);
-  expect(quoteCoins().at(-1)).toMatchObject({ mint: OURS, platform: true });
+  expect(quoteCoins()[0]).toMatchObject({ mint: OURS, platform: true });
 });
 
 test("saved settings that still list a dropped pair load, with that pair left out", async () => {

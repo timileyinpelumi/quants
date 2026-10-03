@@ -80,8 +80,9 @@ export function quoteCoins(env?: Env, s?: QuoteSettings): QuoteCoin[] {
     platform: false, kind: "crypto", tradingOnly: false,
   }));
   const p = q.platformToken;
+  // The platform token leads the list so every launch form shows it first.
   if (p.mint) {
-    list.push({
+    list.unshift({
       mint: p.mint, symbol: p.symbol, name: "quants", decimals: p.decimals, graduation: p.graduation, enabled: p.enabled,
       iconMint: null, platform: true, payoutMin: 0n, kind: "crypto", tradingOnly: false,
     });
