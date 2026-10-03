@@ -72,6 +72,15 @@ function useLaunchCost(pair: string, fee: number): CostParts | null {
   return parts;
 }
 
+function Row({ label, children, sub, hint }: { label: string; children: React.ReactNode; sub?: string | null; hint?: string }) {
+  return (
+    <span className="flex justify-between gap-4 py-1.5">
+      <span className="flex flex-col"><span className="text-muted">{label}</span>{hint && <span className="text-[12px] text-faint">{hint}</span>}</span>
+      <span className="font-mono text-right">{children}{sub && <span className="block text-[12px] text-faint">≈ {sub}</span>}</span>
+    </span>
+  );
+}
+
 const sol3 = (lamports: bigint) => (Number(lamports) / 1e9).toFixed(3).replace(/0+$/, "").replace(/\.$/, "");
 
 /** Tokens the first buy gets at launch, fetched a moment after typing stops. */
@@ -434,18 +443,25 @@ export function LaunchForm({ split, tiers, maxPenaltyBps, quotes, initialPair, f
 
         <div className="flex flex-col text-sm border-t line pt-3">
           {tradingOnly ? (
-            <span className="flex justify-between py-1.5"><span className="text-muted">Staking</span><span>None, trading only</span></span>
-          ) : <span className="flex flex-col gap-0.5 py-1.5">
-            <span className="flex justify-between"><span className="text-muted">Staking opens</span><span className="font-mono text-right">after {solText(rent)}{usdOf(rent) && <span className="block text-[12px] text-faint">≈ {usdOf(rent)}</span>}</span></span>
-            <span className="text-[13px] text-muted leading-normal">The stakers&apos; share of trading fees first pays for the staking farms, one per lock tier ({tiers.length}). Staking opens once it covers that.</span>
-          </span>}
-          <span className="flex justify-between py-1.5"><span className="text-muted">Graduates at</span><span className="font-mono">{pairQuote ? `${pairQuote.graduation.toLocaleString("en-US")} ${pairQuote.symbol} raised` : ""}</span></span>
-          <span className="flex justify-between py-1.5"><span className="text-muted">Supply</span><span className="font-mono">1,000,000,000</span></span>
-          {costLine && <span className="flex flex-col gap-0.5 py-1.5" data-launch-cost>
-            <span className="flex justify-between"><span className="text-muted">You pay</span><span className="font-mono text-right">{solText(costTotal)}{usdOf(costTotal) && <span className="block text-[12px] text-faint">≈ {usdOf(costTotal)}</span>}</span></span>
-            <span className="text-[12px] text-faint font-mono leading-normal">{costLine} SOL</span>
-          </span>}
+            <Row label="Staking">None, trading only</Row>
+          ) : (
+            <Row label="Staking opens" sub={usdOf(rent)} hint="Paid from the stakers' share of fees">after {solText(rent)}</Row>
+          )}
+          <Row label="Graduates at">{pairQuote ? `${pairQuote.graduation.toLocaleString("en-US")} ${pairQuote.symbol}` : ""}</Row>
+          <Row label="Supply">1,000,000,000</Row>
         </div>
+
+        {costItems.length > 0 && (
+          <div className="flex flex-col gap-2 rounded-[18px] bg-white/[0.03] border line p-4 text-[13px]" data-launch-cost>
+            {costItems.map(([l, v]) => (
+              <span key={l} className="flex justify-between gap-4"><span className="text-muted">{l}</span><span className="font-mono">{sol3(v)} SOL</span></span>
+            ))}
+            <span className="flex justify-between gap-4 pt-2 border-t line text-sm">
+              <span className="font-semibold">You pay</span>
+              <span className="font-mono font-semibold text-right">{solText(costTotal)}{usdOf(costTotal) && <span className="block text-[12px] font-normal text-faint">≈ {usdOf(costTotal)}</span>}</span>
+            </span>
+          </div>
+        )}
 
         {error && <p role="alert" className="max-md:hidden m-0 text-sm text-burn">{error}</p>}
         <Button size="lg" onClick={launch} disabled={busy || paused} className="max-md:hidden">{action}</Button>
