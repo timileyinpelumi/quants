@@ -68,7 +68,7 @@ test("during a launch, any shortage of SOL says how much the launch needs", asyn
   ];
   for (const value of cases) {
     const err = await checkTx(sim(value).conn, walletTx(presigned().serialize({ requireAllSignatures: false }).toString("base64")), 41_000_000n).catch((e) => e);
-    expect(err.message).toBe("Your wallet needs about 0.05 SOL for this launch. Add SOL and try again.");
+    expect(err.message).toBe("Your wallet needs about 0.041 SOL for this launch. Add SOL and try again.");
   }
   const other = await checkTx(sim({ err: { InstructionError: [1, { Custom: 42 }] }, logs: [] }).conn, walletTx(presigned().serialize({ requireAllSignatures: false }).toString("base64")), 41_000_000n).catch((e) => e);
   expect(other.message).toContain("would fail on chain");

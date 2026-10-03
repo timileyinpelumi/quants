@@ -38,9 +38,9 @@ export function walletNeed(o: { config: boolean; firstBuy: bigint; keeperTopUp?:
 /** Errors that mean the wallet is short of SOL, from a simulation or a wallet's own send. */
 export const SHORT_OF_SOL = /AccountNotFound|InsufficientFundsForFee|InsufficientFundsForRent|insufficient lamports|insufficient funds|no record of a prior credit/i;
 
-/** `need` is rounded up to 0.01 SOL. */
+/** `need` is rounded up to 0.001 SOL. */
 export const needSolMessage = (need: bigint) =>
-  `Your wallet needs about ${(Number((need + 9_999_999n) / 10_000_000n) / 100).toFixed(2)} SOL for this launch. Add SOL and try again.`;
+  `Your wallet needs about ${(Number((need + 999_999n) / 1_000_000n) / 1000).toFixed(3)} SOL for this launch. Add SOL and try again.`;
 
 /** Percent of the farm rent the stakers' share covers, floored so it reads 100 only once staking can open. */
 export function opensAt(p: { valueLamports: bigint; rentLamports: bigint }): number {
