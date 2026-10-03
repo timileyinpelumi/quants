@@ -1,3 +1,4 @@
+import { isReservedName, RESERVED_MESSAGE } from "../domain/reserved";
 import { EXCLUDED_MINTS } from "../domain/quotes";
 import { JupiterUnavailable } from "../jupiter/port";
 import type { SQL } from "bun";
@@ -30,8 +31,8 @@ const feeList = (fees: number[]) => {
 };
 
 const launchInput = (quoteMints: string[], tradingOnly: boolean, fees: number[]) => z.object({
-  name: z.string().trim().min(1, "Add a name").max(32, "Name is 32 characters at most"),
-  symbol: z.string().regex(/^[A-Za-z0-9]{1,10}$/, "Symbol is 1 to 10 letters or numbers"),
+  name: z.string().trim().min(1, "Add a name").max(32, "Name is 32 characters at most").refine((v) => !isReservedName(v), RESERVED_MESSAGE),
+  symbol: z.string().regex(/^[A-Za-z0-9]{1,10}$/, "Symbol is 1 to 10 letters or numbers").refine((v) => !isReservedName(v), RESERVED_MESSAGE),
   uri: z.string().url().refine(publicUri, "Metadata link must be HTTPS"),
   image: z.string().url().refine(publicUri, "Image link must be HTTPS").optional(),
   creator: addr,

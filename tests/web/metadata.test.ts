@@ -84,3 +84,13 @@ test("a launch without an image gets generated art", async () => {
   const files = (c.uploads as FakeUploads).files;
   expect(files.some((f: any) => String(f.name ?? f.filename ?? f).includes("CAT"))).toBe(true);
 });
+
+test("names and symbols with quants in them are refused", async () => {
+  const c = await makeWebContext();
+  for (const f of [{ name: "Quants Two", symbol: "QTWO" }, { name: "Cat", symbol: "QUANTS" }]) {
+    const r = await POST(form(f));
+    expect(r.status).toBe(400);
+    expect((await r.json()).error.message).toContain("reserved");
+  }
+  expect((c.uploads as FakeUploads).files.length).toBe(0);
+});

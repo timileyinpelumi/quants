@@ -1,4 +1,5 @@
 "use client";
+import { isReservedName, RESERVED_MESSAGE } from "@/domain/reserved";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
@@ -171,6 +172,7 @@ export function LaunchForm({ split, tiers, maxPenaltyBps, quotes, initialPair, f
 
   const problems = [
     !name.trim() && "Add a name",
+    (isReservedName(name) || isReservedName(symbol)) && RESERVED_MESSAGE,
     !/^[A-Za-z0-9]{1,10}$/.test(symbol) && "Symbol is 1 to 10 letters or numbers",
     !tradingOnly && basket.length === 0 && "Pick at least one reward token",
     !tradingOnly && basket.length > 0 && basketTotal(basket) !== 100 && "Basket weights must add up to 100",
