@@ -13,13 +13,15 @@ export interface PoolSwap {
 }
 export interface IndexedTx { signature: string; failed: boolean; blockTime: number; slot: number; trader: string; swaps: PoolSwap[] }
 export interface MissingTx { signature: string; missing: true }
+/** The RPC refused this one transaction (for example a version it cannot serve); it is skipped so the pool keeps indexing. */
+export interface UnreadableTx { signature: string; unreadable: true }
 export interface SignatureInfo { signature: string; blockTime: number | null }
 
 export interface ChainHistory {
   /** Signatures after `until` (all of them when null), oldest first. */
   signaturesSince(address: string, until: string | null): Promise<SignatureInfo[]>;
   /** The given transactions in the same order, with only the swaps that hit `address`. */
-  transactions(signatures: string[], address: string): Promise<(IndexedTx | MissingTx)[]>;
+  transactions(signatures: string[], address: string): Promise<(IndexedTx | MissingTx | UnreadableTx)[]>;
 }
 
 export interface IndexerDeps {
@@ -79,6 +81,11 @@ export async function indexOnce(d: IndexerDeps): Promise<{ trades: number; skipp
         const ready: IndexedTx[] = [];
         let waitOn: string | null = null;
         for (const t of got) {
+          if ("unreadable" in t) {
+            skipped++;
+            console.error(JSON.stringify({ at: new Date().toISOString(), unreadableTx: t.signature, address }));
+            continue;
+          }
           if (!("missing" in t)) { ready.push(t); continue; }
           const at = times.get(t.signature);
           if (at && now - at * 1000 > MISSING_GRACE_MS) { skipped++; continue; }

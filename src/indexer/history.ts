@@ -3,7 +3,7 @@ import { BorshCoder } from "@coral-xyz/anchor";
 import bs58 from "bs58";
 import { DynamicBondingCurveIdl } from "@meteora-ag/dynamic-bonding-curve-sdk";
 import { CpAmmIdl } from "@meteora-ag/cp-amm-sdk";
-import type { ChainHistory, IndexedTx, MissingTx, PoolSwap, SignatureInfo } from "./run";
+import type { ChainHistory, IndexedTx, MissingTx, PoolSwap, SignatureInfo, UnreadableTx } from "./run";
 
 const DBC = "dbcij3LWUppWqq96dh6gJWwBifmcGfLSB5D4DuSMaqN";
 const DAMM = "cpamdpZCGKUy5JxQXB4dcpGPiikHawvSWAd6mEn1sGG";
@@ -63,16 +63,23 @@ export class RpcHistory implements ChainHistory {
     return out.reverse();
   }
 
-  async transactions(signatures: string[], address: string): Promise<(IndexedTx | MissingTx)[]> {
-    const txs = await this.conn.getTransactions(signatures, { maxSupportedTransactionVersion: 0, commitment: "confirmed" });
-    return txs.map((tx, i): IndexedTx | MissingTx => {
-      if (!tx?.meta || !tx.blockTime) return { signature: signatures[i]!, missing: true };
-      const keys = tx.transaction.message.getAccountKeys({ accountKeysFromLookups: tx.meta.loadedAddresses });
+  // Raw JSON so every transaction version decodes the same way; web3.js cannot parse version 1 messages.
+  async transactions(signatures: string[], address: string): Promise<(IndexedTx | MissingTx | UnreadableTx)[]> {
+    const replies: { result?: any; error?: { message?: string } }[] = await (this.conn as any)._rpcBatchRequest(signatures.map((sig) => ({
+      methodName: "getTransaction",
+      args: [sig, { encoding: "json", maxSupportedTransactionVersion: 1, commitment: "confirmed" }],
+    })));
+    return replies.map((reply, i): IndexedTx | MissingTx | UnreadableTx => {
+      const signature = signatures[i]!;
+      if (reply?.error) return { signature, unreadable: true };
+      const tx = reply?.result;
+      if (!tx?.meta || !tx.blockTime) return { signature, missing: true };
+      const keys: string[] = [...tx.transaction.message.accountKeys, ...(tx.meta.loadedAddresses?.writable ?? []), ...(tx.meta.loadedAddresses?.readonly ?? [])];
       const swaps: PoolSwap[] = [];
       let eventIndex = 0;
       for (const group of tx.meta.innerInstructions ?? []) {
         for (const ix of group.instructions) {
-          const program = keys.get(ix.programIdIndex)?.toBase58();
+          const program = keys[ix.programIdIndex];
           const coder = program ? coders[program] : undefined;
           if (!coder) continue;
           const raw = Buffer.from(bs58.decode(ix.data));
@@ -84,7 +91,7 @@ export class RpcHistory implements ChainHistory {
           if (ev.name === "EvtSwap2" && ev.data.pool.toBase58() === address) swaps.push(toSwap(program!, ev.data, at));
         }
       }
-      return { signature: signatures[i]!, failed: tx.meta.err !== null, blockTime: tx.blockTime, slot: tx.slot, trader: keys.get(0)!.toBase58(), swaps };
+      return { signature, failed: tx.meta.err !== null, blockTime: tx.blockTime, slot: tx.slot, trader: keys[0]!, swaps };
     });
   }
 }
