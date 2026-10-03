@@ -74,5 +74,5 @@ test("bad input, unknown tokens and floods are refused", async () => {
 test("the admin votes list needs an admin session", async () => {
   await makeWebContext();
   const { GET: adminVotes } = await import("../../src/app/api/whitehouse/votes/route");
-  expect((await adminVotes(new Request("http://x/api/admin/votes"))).status).toBe(401);
+  expect((await adminVotes(new Request("http://x/api/whitehouse/votes"))).status).toBe(401);
 });

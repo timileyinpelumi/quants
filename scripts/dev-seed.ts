@@ -34,11 +34,8 @@ for (const k of [keeper, spill, treasury, creator, trader, tester, admin].map((x
 }
 const ours = await createMint(conn, keeper, keeper.publicKey, null, 6);
 // Stand-ins for the mainnet quote coins, which do not exist on a local validator.
-const localQuotes: Record<string, PublicKey> = {
-  USDC: await createMint(conn, keeper, keeper.publicKey, null, 6),
-  USDT: await createMint(conn, keeper, keeper.publicKey, null, 6),
-  JUP: await createMint(conn, keeper, keeper.publicKey, null, 6),
-};
+const localQuotes: Record<string, PublicKey> = {};
+for (const c of quoteCoins({}).filter((c) => c.mint !== NATIVE_MINT)) localQuotes[c.symbol] = await createMint(conn, keeper, keeper.publicKey, null, c.decimals);
 const quoteEnv = {
   OURTOKEN_MINT: ours.toBase58(), OURTOKEN_SYMBOL: "QUANTS", OURTOKEN_DECIMALS: "6", OURTOKEN_GRADUATION: "100000",
   QUOTE_MINTS: JSON.stringify(Object.fromEntries(Object.entries(localQuotes).map(([k, v]) => [k, v.toBase58()]))),
@@ -59,7 +56,9 @@ log("wallets and mints ready");
 const client = DynamicBondingCurveClient.create(conn, "confirmed");
 const configKeys: Record<string, string> = {};
 const pairSpecs = [
-  ...quoteCoins(quoteEnv).map((c) => ({ mint: c.mint, decimals: c.decimals, migrationQuoteThreshold: c.graduation })),
+  // The other crypto pairs get their config keys on demand, as on mainnet.
+  ...quoteCoins(quoteEnv).filter((c) => ["SOL", "USDC", "USDT"].includes(c.symbol) || c.platform)
+    .map((c) => ({ mint: c.mint, decimals: c.decimals, migrationQuoteThreshold: c.graduation })),
   ...localStocks.map((c) => ({ mint: c.mint.toBase58(), decimals: c.decimals, migrationQuoteThreshold: c.graduation })),
 ];
 for (const q of pairSpecs) {

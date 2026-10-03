@@ -1,8 +1,10 @@
 import { getContext } from "@/web/server/context";
 import { adminJson, jsonError, readJson } from "@/web/server/http";
 import { requireAdmin, type AdminRole } from "@/web/server/admin";
-import { loadLatestSettings, saveSettings, parseSettings } from "@/domain/settings";
+import { loadLatestSettings, saveSettings, parseSettings, type Settings } from "@/domain/settings";
 import { quoteCoins } from "@/domain/quotes";
+import { curveProblem } from "@/meteora/config";
+import { LaunchError } from "@/launch/prepare";
 
 export const dynamic = "force-dynamic";
 
@@ -13,6 +15,16 @@ const pairs = () => quoteCoins().filter((c) => !c.platform)
 // The alert webhook URL lets anyone post to that channel, so read only sessions only learn whether one is set.
 const forRole = <T extends { alertWebhookUrl: string }>(s: T, role: AdminRole) =>
   role === "full" ? s : { ...s, alertWebhookUrl: s.alertWebhookUrl ? "hidden" : "" };
+
+/** A target the curve builder refuses would break every launch on that pair, so it is refused at save. */
+function checkCurves(s: Settings) {
+  for (const c of quoteCoins(undefined, s)) {
+    if (!c.enabled || c.tradingOnly || !(c.graduation > 0)) continue;
+    if (curveProblem({ mint: c.mint, decimals: c.decimals, migrationQuoteThreshold: c.graduation }, s.feeTiersBps)) {
+      throw new LaunchError("invalid_input", `${c.symbol} cannot graduate at ${c.graduation.toLocaleString("en-US")}: no valid curve has that target. Pick another one.`);
+    }
+  }
+}
 
 export async function GET(req: Request) {
   try {
@@ -29,7 +41,9 @@ export async function POST(req: Request) {
   try {
     const c = getContext();
     const { by } = await requireAdmin(c, req, "full");
-    await saveSettings(c.sql, parseSettings(await readJson(req)), by);
+    const next = parseSettings(await readJson(req));
+    checkCurves(next);
+    await saveSettings(c.sql, next, by);
     const { version, ...settings } = await loadLatestSettings(c.sql);
     return adminJson({ version, settings, pairs: pairs() });
   } catch (e) {

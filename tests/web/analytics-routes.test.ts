@@ -5,7 +5,7 @@ import { GET as analyticsRoute } from "../../src/app/api/whitehouse/analytics/ro
 import { resetAnalyticsCache } from "../../src/web/server/analytics";
 
 const ORIGIN = "http://x";
-const url = (q = "") => `${ORIGIN}/api/admin/analytics${q}`;
+const url = (q = "") => `${ORIGIN}/api/whitehouse/analytics${q}`;
 
 async function signIn() {
   const r = await loginRoute(new Request(ORIGIN, { method: "POST", headers: { origin: ORIGIN }, body: JSON.stringify({ code: ADMIN_CODE }) }));
