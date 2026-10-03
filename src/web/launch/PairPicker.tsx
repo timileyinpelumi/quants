@@ -1,7 +1,6 @@
 "use client";
 import { useMemo, useState } from "react";
 import { Avatar } from "@/web/ui/Avatar";
-import { TradingOnly } from "@/web/ui/StakingAt";
 
 export type PairKind = "crypto" | "xstocks" | "backpack";
 export type PairOption = { mint: string; symbol: string; name: string; decimals: number; graduation: number; icon: string | null; kind: PairKind; tradingOnly: boolean };
@@ -48,23 +47,17 @@ export function PairPicker({ quotes, value, onChange }: { quotes: PairOption[]; 
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Name, symbol or address" className="flex-1 min-w-0 bg-transparent py-3 text-base outline-none" />
         </label>
       )}
-      <div role="radiogroup" aria-label="Paired with" className="flex flex-col max-h-[312px] overflow-y-auto border-t line">
-        {shown.length === 0 && <p className="m-0 py-4 text-sm text-muted">No pair matches.</p>}
+      <div role="radiogroup" aria-label="Paired with" data-pair-grid className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-2 max-h-[344px] overflow-y-auto pr-0.5">
+        {shown.length === 0 && <p className="col-span-full m-0 py-4 text-sm text-muted">No pair matches.</p>}
         {shown.map((c) => {
           const on = c.mint === value;
           return (
-            <button key={c.mint} type="button" role="radio" aria-checked={on} onClick={() => onChange(c.mint)}
-              className={`grid grid-cols-[28px_minmax(0,1fr)_auto] gap-3 items-center px-2 py-2.5 min-h-12 border-b line text-left cursor-pointer ${on ? "bg-accent/[0.06]" : "hover:bg-white/[0.03]"}`}>
+            <button key={c.mint} type="button" role="radio" aria-checked={on} aria-label={`${c.symbol}, ${c.name}`} title={c.name} onClick={() => onChange(c.mint)}
+              className={`grid grid-cols-[28px_minmax(0,1fr)] gap-2.5 items-center px-3 py-2.5 min-h-14 rounded-2xl border text-left cursor-pointer ${on ? "bg-accent/[0.08] border-accent/70" : "bg-surface border-white/[0.08] hover:border-white/20"}`}>
               <Avatar seed={c.mint} label={c.symbol} image={c.icon} size={28} />
-              <span className="flex items-baseline gap-2 min-w-0">
-                <span className="font-semibold shrink-0">{c.symbol}</span>
-                <span className="text-[13px] text-muted truncate">{c.name}</span>
-              </span>
-              <span className="flex items-center gap-2.5">
-                {c.tradingOnly && <TradingOnly />}
-                <span aria-hidden className={`w-5 h-5 rounded-full border flex items-center justify-center ${on ? "bg-accent border-accent" : "border-white/25"}`}>
-                  {on && <span className="w-2 h-2 rounded-full bg-ground" />}
-                </span>
+              <span className="flex flex-col min-w-0 leading-tight">
+                <span className="font-semibold truncate">{c.symbol}</span>
+                {c.tradingOnly ? <span className="text-[11px] text-muted truncate">Trading only</span> : <span className="text-[12px] text-muted truncate">{c.name}</span>}
               </span>
             </button>
           );
