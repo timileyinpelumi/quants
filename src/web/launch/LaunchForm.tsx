@@ -421,10 +421,11 @@ export function LaunchForm({ split, tiers, maxPenaltyBps, quotes, initialPair, f
 
         {!tradingOnly && <div className="flex flex-col gap-2">
           <span className="text-[13px] text-muted">Lock tiers</span>
-          <div className="flex flex-wrap gap-1.5">
+          <div className="grid grid-cols-4 gap-2">
             {tiers.map((t) => (
-              <span key={t.id} className="px-2.5 py-1 rounded-full bg-stake/[0.08] border border-stake/20 text-[12px]">
-                <span className="font-display font-bold text-stake-light">{t.multiplierBps / 10_000}x</span> <span className="text-muted">{lockLabel(t.lockSeconds)}</span>
+              <span key={t.id} className="flex flex-col items-center gap-0.5 py-2 rounded-[14px] bg-stake/[0.08] border border-stake/20">
+                <span className="font-display font-black text-lg leading-tight text-stake-light">{t.multiplierBps / 10_000}x</span>
+                <span className="text-[12px] text-muted">{lockLabel(t.lockSeconds)}</span>
               </span>
             ))}
           </div>
