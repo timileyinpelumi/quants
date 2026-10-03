@@ -1,4 +1,3 @@
-import { isReservedName, RESERVED_MESSAGE } from "@/domain/reserved";
 import { z } from "zod";
 import { getContext } from "@/web/server/context";
 import { json, jsonError, limitBody, rateLimit } from "@/web/server/http";
@@ -14,8 +13,8 @@ const link = (hosts: string[] | null, label: string) => z.string().max(200).refi
 }, `${label} must be a public HTTPS link${hosts ? ` on ${hosts.join(" or ")}` : ""}`);
 
 const Fields = z.object({
-  name: z.string().trim().min(1, "Add a name").max(32, "Name is 32 characters at most").refine((v) => !isReservedName(v), RESERVED_MESSAGE),
-  symbol: z.string().regex(/^[A-Za-z0-9]{1,10}$/, "Symbol is 1 to 10 letters or numbers").refine((v) => !isReservedName(v), RESERVED_MESSAGE),
+  name: z.string().trim().min(1, "Add a name").max(32, "Name is 32 characters at most"),
+  symbol: z.string().regex(/^[A-Za-z0-9]{1,10}$/, "Symbol is 1 to 10 letters or numbers"),
   description: z.string().max(500, "Description is 500 characters at most").optional(),
   website: link(null, "Website").optional(),
   x: link(["x.com", "twitter.com"], "X").optional(),
