@@ -250,9 +250,9 @@ export function LaunchForm({ split, tiers, maxPenaltyBps, quotes, initialPair, f
             <div className="grid grid-cols-[112px_minmax(0,1fr)] md:grid-cols-[132px_minmax(0,1fr)_200px] gap-5 items-start md:items-end">
               <div className="flex flex-col gap-2.5 text-[13px] text-muted row-span-2 md:row-span-1">
                 <span>Image</span>
-                <label className="w-28 h-28 md:w-[132px] md:h-[132px] rounded-[28px] border-[1.5px] border-dashed border-accent/45 bg-accent/5 flex flex-col items-center justify-center gap-2 text-accent text-[13px] cursor-pointer overflow-hidden focus-within:border-accent">
+                <label className="w-28 h-28 md:w-[132px] md:h-[132px] rounded-[28px] border-[1.5px] border-dashed border-accent/45 bg-surface flex flex-col items-center justify-center gap-2 text-accent text-[13px] cursor-pointer overflow-hidden focus-within:border-accent">
                   {preview ? (
-                    <img src={preview} alt="Token image preview" className="w-full h-full object-cover" />
+                    <img src={preview} alt="Token image preview" className="w-full h-full object-cover bg-surface" />
                   ) : (
                     <>
                       <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 16V4" /><path d="M6 10l6-6 6 6" /><path d="M4 20h16" /></svg>
@@ -339,7 +339,7 @@ export function LaunchForm({ split, tiers, maxPenaltyBps, quotes, initialPair, f
 
       <aside className="panel flex flex-col gap-7 self-start p-6 md:p-8 lg:sticky lg:top-8">
         <div className="flex items-center gap-4">
-          {preview ? <img src={preview} alt="" className="w-16 h-16 rounded-[20px] object-cover puff" /> : <Avatar seed={symbol || "quants"} label={symbol || "Q"} size={64} />}
+          {preview ? <img src={preview} alt="" className="w-16 h-16 rounded-[20px] object-cover bg-surface puff" /> : <Avatar seed={symbol || "quants"} label={symbol || "Q"} size={64} />}
           <span className="flex flex-col gap-1 min-w-0">
             <span className="font-display font-black text-[26px] tracking-tight truncate">{symbol || "Your token"}</span>
             <span className="text-sm text-muted truncate">{name || "Name"} · {symbol || "TOKEN"} / {pairLabel} · {fee / 100}% fee</span>
