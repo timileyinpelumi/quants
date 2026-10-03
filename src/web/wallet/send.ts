@@ -55,15 +55,41 @@ async function walletSignsFirst(wallet: Wallet, t: UnsignedTx & { cosign: string
 export async function sendOne(wallet: Wallet, conn: Connection, t: UnsignedTx, cosign: Cosign = postCosign): Promise<string> {
   if (!wallet.publicKey) throw new SendError("Connect a wallet first.");
   const sig = t.cosign ? await walletSignsFirst(wallet, { ...t, cosign: t.cosign }, cosign) : await walletSends(wallet, conn, t);
-  let res: Awaited<ReturnType<Connection["confirmTransaction"]>>;
+  const state = await (typeof window === "undefined" ? confirmOnConnection(conn, sig) : confirmOnServer(sig));
+  if (state === "failed") throw new SendError("Transaction failed on chain. Nothing changed. Try again.");
+  if (state === "pending") throw new SendError("Transaction not confirmed yet. Check your wallet before trying again.", [], sig);
+  return sig;
+}
+
+type TxState = "confirmed" | "failed" | "pending";
+
+// RETRY-LOOP-SAFETY: polls the server's status route every 1.5s for at most 90s (about the blockhash lifetime); a
+//   failed request counts as "not yet". The server checks through its own providers with failover, so the browser
+//   never depends on a public RPC or a websocket to learn that a transaction landed.
+async function confirmOnServer(sig: string): Promise<TxState> {
+  const until = Date.now() + 90_000;
+  while (Date.now() < until) {
+    try {
+      const r = await fetch(`/api/tx/status?sig=${encodeURIComponent(sig)}`, { cache: "no-store" });
+      if (r.ok) {
+        const { state } = await r.json() as { state: TxState };
+        if (state !== "pending") return state;
+      }
+    } catch {}
+    await new Promise((res) => setTimeout(res, 1500));
+  }
+  return "pending";
+}
+
+// Outside a browser (tests and scripts) the connection itself confirms.
+async function confirmOnConnection(conn: Connection, sig: string): Promise<TxState> {
   try {
     const { blockhash, lastValidBlockHeight } = await conn.getLatestBlockhash("confirmed");
-    res = await conn.confirmTransaction({ signature: sig, blockhash, lastValidBlockHeight }, "confirmed");
+    const res = await conn.confirmTransaction({ signature: sig, blockhash, lastValidBlockHeight }, "confirmed");
+    return res.value.err ? "failed" : "confirmed";
   } catch {
-    throw new SendError("Transaction not confirmed yet. Check your wallet before trying again.", [], sig);
+    return "pending";
   }
-  if (res.value.err) throw new SendError(`Transaction failed: ${JSON.stringify(res.value.err)}`);
-  return sig;
 }
 
 /**

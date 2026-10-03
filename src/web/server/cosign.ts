@@ -65,7 +65,7 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
  * with signature checks and sends it. Returns the signature for the client to confirm.
  */
 export async function cosignAndSend(
-  deps: { sql: SQL; conn: Pick<Connection, "simulateTransaction" | "sendRawTransaction">; retryDelayMs?: number },
+  deps: { sql: SQL; conn: Pick<Connection, "simulateTransaction" | "sendRawTransaction"> & Partial<Pick<Connection, "getSignatureStatuses">>; retryDelayMs?: number },
   i: { id: string; transaction: string },
 ): Promise<string> {
   const [row] = await deps.sql`select transaction, signers, need_lamports, created_at from cosign_requests where id = ${i.id}`;
@@ -107,9 +107,27 @@ export async function cosignAndSend(
     throw simulationError(err, res.value.logs ?? [], need);
   }
   try {
-    return await deps.conn.sendRawTransaction(tx.serialize(), { skipPreflight: true, maxRetries: 3 });
+    const raw = tx.serialize();
+    const sig = await deps.conn.sendRawTransaction(raw, { skipPreflight: true, maxRetries: 3 });
+    if (deps.conn.getSignatureStatuses) void rebroadcast(deps.conn as Pick<Connection, "sendRawTransaction" | "getSignatureStatuses">, raw, sig);
+    return sig;
   } catch (e) {
     console.error(JSON.stringify({ at: new Date().toISOString(), cosignSendFailed: String(e).slice(0, 300) }));
     throw new LaunchError("simulation_failed", "The network did not accept this transaction. Nothing was sent. Try again in a moment.");
+  }
+}
+
+// RETRY-LOOP-SAFETY: at most 30 resends, 2s apart (about a minute, inside the blockhash lifetime); stops as soon as the
+//   signature is confirmed or failed. Resending the same signed bytes cannot double spend: it is one transaction.
+async function rebroadcast(conn: Pick<Connection, "sendRawTransaction" | "getSignatureStatuses">, raw: Uint8Array, sig: string) {
+  for (let i = 0; i < 30; i++) {
+    await sleep(2000);
+    try {
+      const st = (await conn.getSignatureStatuses([sig])).value[0];
+      if (st?.err || st?.confirmationStatus === "confirmed" || st?.confirmationStatus === "finalized") return;
+      await conn.sendRawTransaction(raw, { skipPreflight: true, maxRetries: 0 });
+    } catch (e) {
+      if (/blockhash not found|expired/i.test(String(e))) return;
+    }
   }
 }

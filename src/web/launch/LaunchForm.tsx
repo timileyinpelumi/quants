@@ -174,25 +174,18 @@ export function LaunchForm({ split, tiers, maxPenaltyBps, quotes, initialPair, f
     : estimate?.tokens ? `About ${tokenCount(estimate.tokens)} ${symbol || "tokens"}${buyUsd ? ` for ${buyUsd}` : ""}. `
     : buyUsd ? `About ${buyUsd}. ` : "";
 
+  // The server waits for the launch through its own providers and records it the moment it lands, so the token page
+  // exists when this resolves. Bounded: four calls of up to ~40s each.
   async function settle(p: { mint: string; sig: string }) {
     setStatus("confirming");
-    for (let i = 0; i < 20; i++) {
-      const { value } = await connection.getSignatureStatuses([p.sig], { searchTransactionHistory: true });
-      const st = value[0];
-      if (st?.err) { setPending(null); setError("The launch transaction failed on chain. Nothing was created. Try again."); setStatus("idle"); return; }
-      if (st && (st.confirmationStatus === "confirmed" || st.confirmationStatus === "finalized")) {
-        try {
-          await postJson("/api/launch/confirm", { signature: p.sig, mint: p.mint });
-        } catch {
-          // The keeper records launches that landed but were never confirmed, so the page will exist shortly either way.
-        }
-        router.push(`/t/${p.mint}`);
-        return;
-      }
-      await new Promise((r) => setTimeout(r, 3000));
+    for (let i = 0; i < 4; i++) {
+      let state = "pending";
+      try { state = (await postJson<{ state: string }>("/api/launch/settle", { signature: p.sig, mint: p.mint })).state; } catch {}
+      if (state === "recorded") { setPending(null); router.push(`/t/${p.mint}`); return; }
+      if (state === "failed") { setPending(null); setError("The launch transaction failed on chain. Nothing was created. Try again."); setStatus("idle"); return; }
     }
     setPending(p);
-    setError("Launch not confirmed yet. Don't launch again. If it landed, it shows on Explore within a few minutes.");
+    setError("Your launch is still confirming on the network. Check its status in a moment.");
     setStatus("idle");
   }
 
@@ -292,7 +285,7 @@ export function LaunchForm({ split, tiers, maxPenaltyBps, quotes, initialPair, f
                   ) : (
                     <>
                       <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 16V4" /><path d="M6 10l6-6 6 6" /><path d="M4 20h16" /></svg>
-                      <span className="text-center px-2">Any image, cropped to a square</span>
+                      <span className="text-center px-2">Add image</span>
                     </>
                   )}
                   <input type="file" accept="image/png,image/jpeg,image/webp" className="sr-only" onChange={(e) => pickImage(e.target.files?.[0])} />

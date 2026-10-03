@@ -62,7 +62,7 @@ export function StatsCard({ s }: { s: Stats }) {
           </span>
         </div>
         <div className="relative grid grid-cols-3 gap-4 pt-5 border-t line">
-          {[["Set aside for stakers", usd(s.stakersUsd)], ["Tokens launched", fmtCompact(s.launches)], ["Traders today", fmtCompact(s.traders24h)]].map(([l, v]) => (
+          {[["Rewards", usd(s.stakersUsd)], ["Tokens launched", fmtCompact(s.launches)], ["Traders today", fmtCompact(s.traders24h)]].map(([l, v]) => (
             <div key={l} className="flex flex-col gap-1 min-w-0">
               <span className="text-[12px] text-muted">{l}</span>
               <span className="font-display font-bold text-lg md:text-xl">{v}</span>

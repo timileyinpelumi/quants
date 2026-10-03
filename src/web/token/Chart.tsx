@@ -12,10 +12,10 @@ const SUPPLY = 1_000_000_000;
 
 export function Chart({ mint, quoteSymbol }: { mint: string; quoteSymbol: string }) {
   const el = useRef<HTMLDivElement>(null);
-  const [tf, setTf] = useState<(typeof TFS)[number]>("5M");
+  const [tf, setTf] = useState<(typeof TFS)[number]>("1M");
   const [candles, setCandles] = useState<Candle[] | null>(null);
   const [unit, setUnit] = useState<"usd" | "quote">("usd");
-  const [mode, setMode] = useState<"price" | "mcap">("price");
+  const [mode, setMode] = useState<"price" | "mcap">("mcap");
 
   useEffect(() => {
     let live = true;

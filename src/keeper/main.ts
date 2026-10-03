@@ -1,3 +1,4 @@
+import { sweepPreparedLaunches } from "./steps/sweep";
 import { RpcPool, providerOrder } from "../chain/rpc-pool";
 import { Connection } from "@solana/web3.js";
 import { loadEnv } from "../env";
@@ -31,6 +32,15 @@ const deps = {
 let webhook: string | undefined = env.ALERT_WEBHOOK_URL;
 const alert = makeAlerter({ url: () => webhook, source: "keeper", store: sqlThrottle(sql) });
 const launchStreaks = new Streaks(3);
+
+// Launches that landed but were not recorded by the web app show up within ~15s instead of waiting for the next run.
+// Reads chain and database only, so it needs no SOL. Bounded: one sweep of at most 50 rows every 15s.
+void (async () => {
+  while (true) {
+    await sweepPreparedLaunches(deps, { minAgeSeconds: 20 }).catch((e) => console.error("quick sweep failed", e));
+    await Bun.sleep(15_000);
+  }
+})();
 
 // A ReconcileError exits so a supervisor restart loop is visible and no funds move while the ledger is wrong.
 while (true) {

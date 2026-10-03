@@ -194,3 +194,17 @@ test("an unfunded keeper skips the run without touching any launch or burning at
   expect(r2.skipped).toBeUndefined();
   expect(await getBalance(f.sql, id, "unsplit", NATIVE_MINT) + await getBalance(f.sql, id, "basket", NATIVE_MINT)).toBeGreaterThan(0n);
 });
+
+test("the quick sweep records a landed launch after 20 seconds, even with an unfunded keeper", async () => {
+  const f = await full();
+  const { Keypair } = await import("@solana/web3.js");
+  const { sweepPreparedLaunches } = await import("../../src/keeper/steps/sweep");
+  const MINT = Keypair.generate().publicKey.toBase58();
+  f.deps.wallets = { ...f.deps.wallets, spill: Keypair.generate().publicKey.toBase58() };
+  f.chain.balances.set(`Keeper:${NATIVE_MINT}`, 0n);
+  await f.sql`insert into prepared_launches (mint, pool, quote_mint, fee_tier_bps, config_key, creator, basket, settings_version, name, symbol, uri, created_at)
+    values (${MINT}, 'QuickPool', ${NATIVE_MINT}, 200, 'Cfg', 'Creator111111111111111111111111111111111111', '[]'::jsonb, 1, 'Q', 'Q', 'https://x', now() - interval '30 seconds')`;
+  f.meteora.pools.set("QuickPool", { baseMint: MINT, config: "Cfg", creator: "Creator111111111111111111111111111111111111" });
+  await sweepPreparedLaunches(f.deps, { minAgeSeconds: 20 });
+  expect((await f.sql`select 1 from launches where mint = ${MINT}`).length).toBe(1);
+});

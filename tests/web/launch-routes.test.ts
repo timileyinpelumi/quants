@@ -235,3 +235,33 @@ test("with an upload store set, metadata and images from elsewhere are refused",
   const evil = await post(prepare, body({ uri: "https://res.cloudinary.com/demo/raw/upload/quants/a.json", image: "https://evil.test/a.png" }));
   expect(evil.status).toBe(400);
 });
+
+test("settle waits for the launch on the server and records it, so the token shows without the browser's RPC", async () => {
+  const { POST: settle } = await import("../../src/app/api/launch/settle/route");
+  let checks = 0;
+  const c = await makeWebContext({ conn: {
+    sendRawTransaction: async () => "sig-launch",
+    getSignatureStatuses: async () => ({ value: [++checks < 2 ? null : { confirmationStatus: "confirmed", err: null }] }),
+  } as any });
+  const user = Keypair.generate();
+  const j = await (await post(prepare, body({ creator: user.publicKey.toBase58() }))).json();
+  const [prep] = await c.sql`select pool, config_key, creator from prepared_launches where mint = ${j.mint}`;
+  (c.meteora as any).pools.set(prep.pool, { baseMint: j.mint, config: prep.config_key, creator: prep.creator });
+  const r = await post(settle, { signature: "5".repeat(64), mint: j.mint });
+  const out = await r.json();
+  expect(out.state).toBe("recorded");
+  expect((await c.sql`select id from launches where mint = ${j.mint}`).length).toBe(1);
+});
+
+test("settle says failed for a launch that failed on chain, and pending when the chain has not caught up", async () => {
+  const { POST: settle } = await import("../../src/app/api/launch/settle/route");
+  await makeWebContext({ conn: { getSignatureStatuses: async () => ({ value: [{ confirmationStatus: "confirmed", err: { InstructionError: [0, 1] } }] }) } as any });
+  expect((await (await post(settle, { signature: "5".repeat(64), mint: "Mint1111111111111111111111111111111111111111" })).json()).state).toBe("failed");
+});
+
+test("tx status reports a signature's state from the server's providers", async () => {
+  const { GET: status } = await import("../../src/app/api/tx/status/route");
+  await makeWebContext({ conn: { getSignatureStatuses: async () => ({ value: [{ confirmationStatus: "finalized", err: null }] }) } as any });
+  const r = await status(new Request(`http://x/api/tx/status?sig=${"5".repeat(64)}`));
+  expect(await r.json()).toEqual({ state: "confirmed" });
+});
