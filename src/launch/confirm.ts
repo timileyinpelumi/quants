@@ -5,7 +5,7 @@ import { LaunchError } from "./prepare";
 import { markConfigLive } from "./config-keys";
 import type { MeteoraPort } from "../meteora/port";
 import { launchCost } from "../domain/launch-cost";
-import { parseSettings } from "../domain/settings";
+import { parseSavedSettings } from "../domain/settings";
 
 // Everything except the mint and signature comes from what prepareLaunch stored, checked against the pool on-chain.
 export async function confirmLaunch(
@@ -36,7 +36,7 @@ export async function recordLaunch(sql: SQL, prep: any, spillWallet: PublicKey):
   const [sv] = await sql`select data from settings where version = ${prep.settings_version}`;
   const basket = typeof prep.basket === "string" ? JSON.parse(prep.basket) : prep.basket;
   const tradingOnly = prep.trading_only === true;
-  const rent = sv ? launchCost(parseSettings(sv.data), basket.length).rent.toString() : null;
+  const rent = sv ? launchCost(parseSavedSettings(sv.data), basket.length).rent.toString() : null;
   const [row] = await deps.sql`
     with s as (select data from settings where version = ${prep.settings_version} and not ${tradingOnly}),
     l as (

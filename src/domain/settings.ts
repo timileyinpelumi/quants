@@ -118,6 +118,14 @@ export async function saveSettings(sql: SQL, s: Settings, by: string): Promise<n
 }
 
 /** A fresh database gets its first version from the env; after that the admin page owns these values. */
+// Pairs dropped from the platform may still sit in older saved versions; loading leaves them out instead of failing.
+export const parseSavedSettings = (data: unknown): Settings => parseSettings(withoutDroppedPairs(data));
+
+function withoutDroppedPairs(data: any) {
+  if (!data?.quotes) return data;
+  return { ...data, quotes: Object.fromEntries(Object.entries(data.quotes).filter(([k]) => BUILTIN_QUOTE_SYMBOLS.includes(k))) };
+}
+
 export async function loadLatestSettings(sql: SQL): Promise<VersionedSettings> {
   let [row] = await sql`select version, data from settings order by version desc limit 1`;
   if (!row) {
@@ -125,7 +133,7 @@ export async function loadLatestSettings(sql: SQL): Promise<VersionedSettings> {
     await sql`insert into settings (data, created_by) select ${seed}::text::jsonb, 'env seed' where not exists (select 1 from settings)`;
     [row] = await sql`select version, data from settings order by version desc limit 1`;
   }
-  const s = { ...parseSettings(row.data), version: row.version };
+  const s = { ...parseSettings(withoutDroppedPairs(row.data)), version: row.version };
   setQuoteSettings(s);
   return s;
 }

@@ -5,10 +5,10 @@ import type { WebContext } from "./context";
 
 export type PlatformWallet = {
   role: string; index: number; path: string; address: string | null; solscan: string | null;
-  lamports: string | null; low: boolean;
+  lamports: string | null; low: boolean; usd: number | null;
 };
 
-export async function platformWallets(ctx: Pick<WebContext, "conn" | "platformAddresses">): Promise<PlatformWallet[]> {
+export async function platformWallets(ctx: Pick<WebContext, "conn" | "platformAddresses">, solUsd: number | null = null): Promise<PlatformWallet[]> {
   const cluster = clusterOf();
   return Promise.all(ROLES.map(async (role, index) => {
     const address = ctx.platformAddresses[role] ?? null;
@@ -20,6 +20,7 @@ export async function platformWallets(ctx: Pick<WebContext, "conn" | "platformAd
       solscan: address ? solscanAccount(address, cluster) : null,
       lamports: lamports === null ? null : lamports.toString(),
       low: role === "keeper" && lamports !== null && lamports < KEEPER_LOW_LAMPORTS,
+      usd: lamports === null || solUsd === null ? null : (Number(lamports) / 1e9) * solUsd,
     };
   }));
 }

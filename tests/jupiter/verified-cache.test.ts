@@ -32,3 +32,12 @@ test("tokens shown as verified in search are trusted without a lookup; unverifie
   expect(await a.isVerified("BAD")).toBe(false);
   expect(calls).toEqual(["BAD", "BAD"]);
 });
+
+test("excluded tokens never show as rewards and are never verified", async () => {
+  const sql = await freshDb();
+  const jup = "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN";
+  const inner = { async isVerified() { return true; }, async searchVerified() { return [{ mint: jup, symbol: "JUP", name: "Jupiter", icon: null, decimals: 6, tokenProgram: "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA" }]; }, async popularVerified() { return []; } } as unknown as JupiterPort;
+  const j = withVerifiedCache(inner, sql);
+  expect(await j.searchVerified("jup")).toEqual([]);
+  expect(await j.isVerified(jup)).toBe(false);
+});

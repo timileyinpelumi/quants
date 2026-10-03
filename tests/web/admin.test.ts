@@ -223,6 +223,7 @@ test("platform wallets list each role with its path, address and balance, and fl
   await makeWebContext({
     platformAddresses: { keeper, treasury },
     conn: { getBalance: async (k: any) => (k.toBase58() === keeper ? 5_000_000 : 2_000_000_000) } as any,
+    prices: { usd: async () => 150, usdMany: async (ms: string[]) => Object.fromEntries(ms.map((m) => [m, 150])) } as any,
   });
   const cookie = await signIn();
   const r = await walletsRoute(withCookie(cookie));
@@ -232,7 +233,9 @@ test("platform wallets list each role with its path, address and balance, and fl
   expect(wallets[0]).toMatchObject({ index: 0, path: "m/44'/501'/0'/0'", address: keeper, lamports: "5000000", low: true });
   expect(wallets[0].solscan).toBe(`https://solscan.io/account/${keeper}`);
   expect(wallets[1]).toMatchObject({ address: null, lamports: null, low: false });
-  expect(wallets[2]).toMatchObject({ path: "m/44'/501'/2'/0'", lamports: "2000000000", low: false });
+  expect(wallets[2]).toMatchObject({ path: "m/44'/501'/2'/0'", lamports: "2000000000", low: false, usd: 300 });
+  expect(wallets[0].usd).toBe(0.75);
+  expect(wallets[1].usd).toBeNull();
   expect((await walletsRoute(new Request(ORIGIN))).status).toBe(401);
 });
 

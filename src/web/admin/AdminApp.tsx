@@ -10,7 +10,7 @@ import { SettingsEditor, type AdminSettings, type Pair } from "./SettingsEditor"
 import { AnalyticsPanel } from "./AnalyticsPanel";
 
 type Settings = AdminSettings;
-type WalletRow = { role: string; index: number; path: string; address: string | null; solscan: string | null; lamports: string | null; low: boolean };
+type WalletRow = { role: string; index: number; path: string; address: string | null; solscan: string | null; lamports: string | null; low: boolean; usd: number | null };
 type VoteRow = { mint: string; symbol: string | null; up: number; down: number; score: number };
 type Status = { lastActivity: string | null; failed: { id: number; mint: string; symbol: string | null; kind: string; error: string; attempts: number; at: string }[]; failedNext: number | null; inFlight: { mint: string; symbol: string | null }[] };
 
@@ -207,6 +207,7 @@ export function AdminApp({ pairs }: { pairs: Pair[] }) {
                   ) : <span className="text-muted">Not set</span>}
                   <span className={`font-mono md:text-right ${w.low ? "text-burn" : ""}`}>
                     {w.lamports === null ? (w.address ? "Unavailable" : "") : `${(Number(w.lamports) / 1e9).toLocaleString("en-US", { maximumFractionDigits: 4 })} SOL`}
+                    {w.usd !== null && <span className="block text-[12px] text-muted">${w.usd.toLocaleString("en-US", { maximumFractionDigits: 2, minimumFractionDigits: 2 })}</span>}
                     {w.low && <span className="block text-[12px]">Below 0.01 SOL. Top it up.</span>}
                   </span>
                 </div>

@@ -5,7 +5,7 @@ const env = { OURTOKEN_MINT: "Ours111111111111111111111111111111111111111", OURT
 
 test("mainnet list is SOL, USDC, USDT, JUP and the platform token", () => {
   const q = quoteCoins(env);
-  expect(q.map((c) => c.symbol)).toEqual(["SOL", "USDC", "USDT", "JUP", "QUANTS"]);
+  expect(q.map((c) => c.symbol)).toEqual(["SOL", "USDC", "USDT", "QUANTS"]);
   expect(q[1]).toMatchObject({ mint: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", decimals: 6, iconMint: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v" });
   expect(q.at(-1)).toMatchObject({ mint: env.OURTOKEN_MINT, decimals: 6, graduation: 100_000, platform: true, iconMint: null });
   expect(q.every((c) => c.graduation > 0)).toBe(true);
@@ -19,7 +19,7 @@ test("a local validator swaps in its own mints but keeps mainnet icons", () => {
 
 test("QUOTE_GRADUATIONS overrides graduation targets by symbol", () => {
   const q = quoteCoins({ ...env, QUOTE_GRADUATIONS: JSON.stringify({ SOL: 120, QUANTS: 250000 }) });
-  expect(q.map((c) => [c.symbol, c.graduation])).toEqual([["SOL", 120], ["USDC", 12_000], ["USDT", 12_000], ["JUP", 30_000], ["QUANTS", 250_000]]);
+  expect(q.map((c) => [c.symbol, c.graduation])).toEqual([["SOL", 120], ["USDC", 12_000], ["USDT", 12_000], ["QUANTS", 250_000]]);
 });
 
 test("QUOTE_GRADUATIONS rejects unknown symbols and targets that are not positive", () => {
@@ -33,5 +33,5 @@ test("the platform token ticker defaults to QUANTS", () => {
 });
 
 test("the platform token is left out when it is not configured", () => {
-  expect(quoteCoins({}).map((c) => c.symbol)).toEqual(["SOL", "USDC", "USDT", "JUP"]);
+  expect(quoteCoins({}).map((c) => c.symbol)).toEqual(["SOL", "USDC", "USDT"]);
 });

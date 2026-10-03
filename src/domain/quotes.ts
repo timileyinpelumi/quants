@@ -31,7 +31,6 @@ const MAINNET: Pick<QuoteCoin, "mint" | "symbol" | "name" | "decimals" | "gradua
   { mint: NATIVE_MINT, symbol: "SOL", name: "Solana", decimals: 9, graduation: 85, iconMint: NATIVE_MINT, payoutMin: 50_000_000n },
   { mint: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", symbol: "USDC", name: "USD Coin", decimals: 6, graduation: 12_000, iconMint: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", payoutMin: 5_000_000n },
   { mint: "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB", symbol: "USDT", name: "Tether USD", decimals: 6, graduation: 12_000, iconMint: "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB", payoutMin: 5_000_000n },
-  { mint: "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN", symbol: "JUP", name: "Jupiter", decimals: 6, graduation: 30_000, iconMint: "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN", payoutMin: 10_000_000n },
 ];
 export const BUILTIN_QUOTE_SYMBOLS = MAINNET.map((c) => c.symbol);
 
@@ -81,3 +80,6 @@ export const setStockQuotes = (list: QuoteCoin[]) => { g.__quantsStocks = list; 
 export const stockQuotes = (): QuoteCoin[] => g.__quantsStocks ?? [];
 
 export const quoteCoin = (mint: string, list = [...quoteCoins(), ...stockQuotes()]) => list.find((c) => c.mint === mint);
+
+/** Tokens the platform does not offer as a pair or as a reward. */
+export const EXCLUDED_MINTS = new Set(["JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN"]);

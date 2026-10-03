@@ -1,3 +1,4 @@
+import { EXCLUDED_MINTS } from "../domain/quotes";
 import { JupiterUnavailable } from "../jupiter/port";
 import type { SQL } from "bun";
 import type { Keypair } from "@solana/web3.js";
@@ -77,6 +78,7 @@ export async function prepareLaunch(
   if (!parsed.success) throw new LaunchError("invalid_input", parsed.error.issues.map((i) => i.message).join("; "));
   const input = parsed.data;
   for (const b of input.basket) {
+    if (EXCLUDED_MINTS.has(b.mint)) throw new LaunchError("basket_not_verified", `${b.symbol ?? b.mint} is not offered as a reward token. Pick another one.`);
     // The pair token is already vetted as a pair; paying it out needs no swap.
     const verified = b.mint === input.quoteMint || await deps.isVerified(b.mint).catch((e) => {
       if (e instanceof JupiterUnavailable) throw new LaunchError("jupiter_unavailable", "We couldn't check the reward tokens with Jupiter right now. Try again in a moment.");

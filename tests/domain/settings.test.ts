@@ -104,12 +104,22 @@ test("new settings are validated", () => {
 test("quote coins follow the loaded settings", async () => {
   const sql = await freshDb();
   const s = defaultSettings(OURS);
-  await saveSettings(sql, { ...s, quotes: { ...s.quotes, JUP: { enabled: false, graduation: 40_000 } }, platformToken: { ...s.platformToken, mint: "", enabled: false } }, "t");
+  await saveSettings(sql, { ...s, quotes: { ...s.quotes, USDT: { enabled: false, graduation: 40_000 } }, platformToken: { ...s.platformToken, mint: "", enabled: false } }, "t");
   await loadLatestSettings(sql);
   const coins = quoteCoins();
-  expect(coins.map((c) => c.symbol)).toEqual(["SOL", "USDC", "USDT", "JUP"]);
-  expect(coins[3]).toMatchObject({ enabled: false, graduation: 40_000 });
+  expect(coins.map((c) => c.symbol)).toEqual(["SOL", "USDC", "USDT"]);
+  expect(coins[2]).toMatchObject({ enabled: false, graduation: 40_000 });
   await saveSettings(sql, s, "t");
   await loadLatestSettings(sql);
   expect(quoteCoins().at(-1)).toMatchObject({ mint: OURS, platform: true });
+});
+
+test("saved settings that still list a dropped pair load, with that pair left out", async () => {
+  const sql = await freshDb();
+  const s = defaultSettings(OURS);
+  const data = JSON.stringify({ ...s, quotes: { ...s.quotes, JUP: { enabled: true, graduation: 30_000 } } }, (_k, v) => (typeof v === "bigint" ? v.toString() : v));
+  await sql`insert into settings (data, created_by) values (${data}::text::jsonb, 't')`;
+  const loaded = await loadLatestSettings(sql);
+  expect(Object.keys(loaded.quotes)).not.toContain("JUP");
+  expect(Object.keys(loaded.quotes)).toContain("SOL");
 });
