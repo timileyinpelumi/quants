@@ -6,6 +6,7 @@ import { NATIVE_MINT } from "@/domain/types";
 import { walletNeed } from "@/domain/launch-cost";
 import { allQuotes, launchableQuotes } from "./quotes";
 import { resolveConfig, seedConfigKeys } from "@/launch/config-keys";
+import { keeperTopUp } from "./keeper-topup";
 import { checkTx, walletTx, type WalletTx } from "./tx-check";
 import { issueCosign } from "./cosign";
 
@@ -76,13 +77,14 @@ export async function prepareWithSwap(ctx: WebContext, raw: unknown): Promise<La
         const coin = launchable.find((c) => c.mint === mint);
         return coin ? resolveConfig({ sql: ctx.sql, meteora: ctx.meteora, keeper: ctx.keeperAddress }, coin, fee) : null;
       },
+      keeperTopUp: () => keeperTopUp(ctx),
       tradingOnlyMints: quotes.filter((c) => c.tradingOnly).map((c) => c.mint),
       isVerified: (m) => ctx.jupiter.isVerified(m), tokenProgramOf: ctx.tokenProgramOf,
     },
     { ...rest, devBuyQuoteAmount: devBuyQuoteAmount.toString(), devBuyMinOut: "0" },
     { stopBeforeLaunch: swap !== undefined },
   );
-  const need = walletNeed({ config: p.step === "config", firstBuy: sol });
+  const need = walletNeed({ config: p.step === "config", firstBuy: sol, keeperTopUp: (await keeperTopUp(ctx))?.lamports });
   const needLamports = need.toString();
   if (p.step === "config") {
     const transaction = walletTx(p.transaction);

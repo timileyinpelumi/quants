@@ -104,7 +104,7 @@ Nothing has to be paid for up front:
 
 - **Config keys** are created by the first launch that needs one, in that launcher's setup transaction (see Graduation targets).
 - **The Kamino global config.** Without `KAMINO_GLOBAL_CONFIG`, the first launch to open staking covers it: its rent includes the global config (about 0.016 SOL), its `rent` row carries `detail.globalConfig = true`, and the keeper creates the global config (keeper as admin, treasury fee 0) before that launch's farms and records it in `platform_accounts`. Other launches wait for it and pay only their own rent. Set `KAMINO_GLOBAL_CONFIG` to use an existing one instead.
-- **Keeper float.** Launches never pay the keeper. Send it about 0.01 SOL yourself (its address is on the admin Wallets tab). Until it holds 0.005 SOL the keeper skips every run without counting failed attempts; fees wait in the pools and the first funded run claims everything that built up, across all launches.
+- **Keeper float.** While the keeper holds under 0.01 SOL, the launch transaction tops it up to 0.01 SOL from the launcher (never more than 0.01 SOL, nothing once it is funded). Below 0.005 SOL the keeper skips its runs without counting failed attempts; fees wait in the pools and the first funded run claims everything that built up.
 - **The platform token** is launched by the operator from their own wallet, like any launch: leave its mint empty until then, then set it on the admin page.
 
 The remaining minimum is about 0.01 SOL in the keeper for its first fee claim, which the first launch provides. After that the keeper pays farm rent from each launch's stakers' share and its fees from claimed fees; keep an eye on the Wallets tab, which turns the keeper red below 0.01 SOL.
