@@ -86,8 +86,6 @@ export default async function TokenPage({ params }: { params: Promise<{ mint: st
             </div>
             <div className="col-span-2 md:col-span-1 md:col-start-2 md:self-start flex gap-2.5 text-[13px] md:flex-wrap no-scrollbar max-md:overflow-x-auto max-md:-mx-4 max-md:px-4 [&>*]:shrink-0 max-md:[&>*]:min-h-10">
               <span className={`${pill} gap-1.5 pl-1.5 pr-3 py-1`}><Avatar seed={launch.quoteMint} label={pairSymbol} image={icons[launch.quoteMint]} size={20} />{symbol} / {pairSymbol}</span>
-              <ShareMenu mint={mint} symbol={symbol} stakes={!tradingOnly} />
-              <VoteButtons mint={mint} symbol={symbol} />
               <span className={`${pill} px-3 py-1.5`}>{launch.feeTierBps / 100}% trading fee</span>
               {tradingOnly && <span className="flex items-center"><TradingOnly /></span>}
               <CopyButton value={mint} label={shortAddr(mint)} />
@@ -95,6 +93,8 @@ export default async function TokenPage({ params }: { params: Promise<{ mint: st
                 DexScreener
                 {external}
               </a>
+              <ShareMenu mint={mint} symbol={symbol} stakes={!tradingOnly} />
+              <VoteButtons mint={mint} symbol={symbol} />
             </div>
           </div>
           <TabPanel show="chart">
