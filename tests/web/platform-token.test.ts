@@ -94,4 +94,5 @@ test("buy goes to Jupiter on mainnet and stays on site elsewhere; launch presele
   expect(platformLinks(Q, "mainnet", false)).toEqual({ buy: `https://jup.ag/swap/SOL-${Q}`, buyExternal: true, launch: `/launch?pair=${Q}` });
   expect(platformLinks(Q, "devnet", false)).toEqual({ buy: `/explore?quote=${Q}`, buyExternal: false, launch: `/launch?pair=${Q}` });
   expect(platformLinks(Q, "localnet", true).buy).toBe(`/t/${Q}`);
+  expect(platformLinks(Q, "mainnet", true)).toEqual({ buy: `/t/${Q}`, buyExternal: false, launch: `/launch?pair=${Q}` });
 });

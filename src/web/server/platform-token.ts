@@ -110,8 +110,10 @@ export async function platformCard(d: PlatformDeps): Promise<PlatformCard | null
 
 export function platformLinks(mint: string, cluster: Cluster, launchedHere: boolean) {
   const launch = `/launch?pair=${mint}`;
+  // Launched here, it trades on its own token page; otherwise Jupiter on mainnet, or the explore list elsewhere.
+  if (launchedHere) return { buy: `/t/${mint}`, buyExternal: false, launch };
   if (cluster === "mainnet") return { buy: `https://jup.ag/swap/SOL-${mint}`, buyExternal: true, launch };
-  return { buy: launchedHere ? `/t/${mint}` : `/explore?quote=${mint}`, buyExternal: false, launch };
+  return { buy: `/explore?quote=${mint}`, buyExternal: false, launch };
 }
 
 const g = globalThis as { __quantsDex?: DexScreener; __quantsSupply?: ReturnType<typeof ttlCache<number | null>> };
