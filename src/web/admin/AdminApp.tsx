@@ -163,7 +163,6 @@ export function AdminApp() {
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
         <span className="flex items-center gap-4">
           <h1 className="m-0 font-display font-black text-[40px] md:text-[56px] tracking-[-0.03em] leading-none">Admin</h1>
-          {readOnly && <span data-read-only className="px-3 py-1 rounded-full border border-white/15 text-[13px] font-semibold text-muted">Read only</span>}
         </span>
         <div className="flex flex-wrap items-center gap-3">
           <Segmented label="Section" value={tab} onChange={setTab} options={tabs} />

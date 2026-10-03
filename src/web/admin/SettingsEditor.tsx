@@ -123,10 +123,10 @@ export function SettingsEditor({ initial, version, pairs, onSave, readOnly = fal
     <section className="flex flex-col gap-7 max-w-4xl">
       <p className="m-0 text-sm text-muted">
         {readOnly
-          ? `Current version ${version}. Read only access shows the settings without changing them.`
+          ? `Current version ${version}.`
           : `Current version ${version}. Saving creates a new version. Pages pick it up within a few seconds and the keeper on its next run. Earlier launches keep the tiers and penalty they started with.`}
       </p>
-      <fieldset disabled={readOnly} data-settings-fields className="m-0 p-0 border-0 min-w-0 flex flex-col gap-7 disabled:opacity-90">
+      <fieldset disabled={readOnly} data-settings-fields className="m-0 p-0 border-0 min-w-0 flex flex-col gap-7">
 
       <Section title="Launches">
         <Check label="Pause new launches" checked={s.launchesPaused} onChange={(v) => set({ launchesPaused: v })} hint="The launch page says launches are paused and prepare refuses. Trading, staking and the keeper carry on." />
@@ -199,7 +199,7 @@ export function SettingsEditor({ initial, version, pairs, onSave, readOnly = fal
         <div className="grid grid-cols-1 md:grid-cols-[200px_minmax(0,1fr)] gap-4">
           <Num label="Run every" suffix="minutes" value={s.keeperIntervalSeconds / 60} onChange={(v) => set({ keeperIntervalSeconds: Math.round(v * 60) })} />
           {readOnly
-            ? <Text label="Alert webhook" value={s.alertWebhookUrl ? "Set, hidden from read only access" : "Not set"} onChange={() => {}} />
+            ? <Text label="Alert webhook" value={s.alertWebhookUrl ? "Set" : "Not set"} onChange={() => {}} />
             : <Text label="Alert webhook" value={s.alertWebhookUrl} onChange={(v) => set({ alertWebhookUrl: v.trim() })} placeholder="https://hooks.slack.com/..." hint="The keeper and indexer post alerts here. Empty sends none." />}
         </div>
       </Section>

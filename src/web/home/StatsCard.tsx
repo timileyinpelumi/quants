@@ -53,11 +53,7 @@ export function StatsCard({ s }: { s: Stats }) {
         <div className="pointer-events-none absolute -top-24 -right-16 h-64 w-64 rounded-full bg-accent/25 blur-3xl" aria-hidden="true" />
         <Spark points={s.hourly} />
         <div className="relative flex flex-col gap-2">
-          <span className="flex items-center gap-2 text-[13px] text-muted">
-            <span className="relative flex h-2 w-2" aria-hidden="true">
-              <span className="absolute inline-flex h-full w-full rounded-full bg-up opacity-75 motion-safe:animate-ping" />
-              <span className="relative inline-flex h-2 w-2 rounded-full bg-up" />
-            </span>
+          <span className="text-[13px] text-muted">
             Total volume traded
           </span>
           <span className="font-display font-black text-[48px] md:text-[64px] leading-none tracking-tight bg-gradient-to-r from-white via-[#BFE0FF] to-accent bg-clip-text text-transparent tabular-nums">{usd(total)}</span>
