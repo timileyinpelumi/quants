@@ -9,6 +9,8 @@ export interface QuoteCoin {
   graduation: number;
   /** Mainnet mint used to look up the logo; differs from `mint` on a local validator. */
   iconMint: string | null;
+  /** A logo served by quants itself, for pairs whose Jupiter logo sits on an IPFS gateway that rate limits. */
+  iconUrl?: string;
   platform: boolean;
   /** Default smallest creator payout, in base units, when settings do not set one for this mint. */
   payoutMin: bigint;
@@ -27,10 +29,21 @@ export type QuoteSettings = {
   platformToken: { mint: string; symbol: string; decimals: number; graduation: number; enabled: boolean };
 };
 
-const MAINNET: Pick<QuoteCoin, "mint" | "symbol" | "name" | "decimals" | "graduation" | "iconMint" | "payoutMin">[] = [
+const MAINNET: Pick<QuoteCoin, "mint" | "symbol" | "name" | "decimals" | "graduation" | "iconMint" | "iconUrl" | "payoutMin">[] = [
   { mint: NATIVE_MINT, symbol: "SOL", name: "Solana", decimals: 9, graduation: 85, iconMint: NATIVE_MINT, payoutMin: 50_000_000n },
   { mint: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", symbol: "USDC", name: "USD Coin", decimals: 6, graduation: 12_000, iconMint: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", payoutMin: 5_000_000n },
   { mint: "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB", symbol: "USDT", name: "Tether USD", decimals: 6, graduation: 12_000, iconMint: "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB", payoutMin: 5_000_000n },
+  // Classic SPL, Jupiter verified, checked on mainnet 2026-10-03. Targets are near $10,000 and payout minimums near $5 at
+  // that day's prices. BONK's target stays at 2B because the DBC curve does not build above about 2.0B BONK (5 decimals).
+  ...([
+    ["JitoSOL", "J1toso1uCk3RLmjorhTtrVwY9HJ7X8V9yYac6Y7kGCPn", "Jito Staked SOL", 9, 64, 40_000_000n],
+    ["mSOL", "mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So", "Marinade staked SOL", 9, 60, 40_000_000n],
+    ["cbBTC", "cbbtcf3aa214zXHbiAZQwf4122FBYbraNdFqgw4iMij", "Coinbase Wrapped BTC", 8, 0.12, 6_000n, "/tokens/cbbtc.png"],
+    ["ETH", "7vfCXTUXx5WJV5JADk17DUJ4ksgau7utNKj4b963voxs", "Ether (Wormhole)", 8, 3.7, 200_000n],
+    ["BONK", "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263", "Bonk", 5, 2_000_000_000, 150_000_000_000n],
+    ["WIF", "EKpQGSJtjMFqKZ9KQanSqYXRcF8fBopzLHYxdM65zcjm", "dogwifhat", 6, 40_000, 20_000_000n, "/tokens/wif.png"],
+    ["RAY", "4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R", "Raydium", 6, 4_800, 2_500_000n],
+  ] as [string, string, string, number, number, bigint, string?][]).map(([symbol, mint, name, decimals, graduation, payoutMin, iconUrl]) => ({ mint, symbol, name, decimals, graduation, iconMint: mint, payoutMin, ...(iconUrl ? { iconUrl } : {}) })),
 ];
 export const BUILTIN_QUOTE_SYMBOLS = MAINNET.map((c) => c.symbol);
 

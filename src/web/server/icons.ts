@@ -38,9 +38,10 @@ export class TokenIcons {
 const PLATFORM_ICON = "/brand/quants-icon.svg";
 
 /** Icons for any mix of mints; quote coins resolve through their mainnet mint so local stand-ins still get real logos. */
-export async function iconsFor(icons: TokenIcons, mints: string[], quotes: { mint: string; iconMint: string | null; platform: boolean }[]) {
+export async function iconsFor(icons: TokenIcons, mints: string[], quotes: { mint: string; iconMint: string | null; platform: boolean; iconUrl?: string }[]) {
   const byMint = new Map(quotes.map((q) => [q.mint, q]));
+  const own = (m: string) => (byMint.get(m)?.platform ? PLATFORM_ICON : byMint.get(m)?.iconUrl ?? null);
   const lookup = mints.map((m) => byMint.get(m)?.iconMint ?? m);
-  const found = await icons.get(lookup.filter((m) => !byMint.get(m)?.platform));
-  return Object.fromEntries(mints.map((m, i) => [m, byMint.get(m)?.platform ? PLATFORM_ICON : found[lookup[i]!] ?? null])) as Record<string, string | null>;
+  const found = await icons.get(lookup.filter((_m, i) => !own(mints[i]!)));
+  return Object.fromEntries(mints.map((m, i) => [m, own(m) ?? found[lookup[i]!] ?? null])) as Record<string, string | null>;
 }

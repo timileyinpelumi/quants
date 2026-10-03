@@ -11,10 +11,10 @@ export function proxy(req: NextRequest) {
   return NextResponse.next();
 }
 
-// Pages only: no API, admin, build assets or files. Router prefetches never reach the proxy.
+// Pages only: no API, build assets or files. Router prefetches never reach the proxy.
 export const config = {
   matcher: [{
-    source: "/((?!api/|admin|_next/|__next|.*\\.[a-z0-9]+$).*)",
+    source: "/((?!api/|_next/|__next|.*\\.[a-z0-9]+$).*)",
     missing: [
       { type: "header", key: "next-router-prefetch" },
       { type: "header", key: "purpose", value: "prefetch" },

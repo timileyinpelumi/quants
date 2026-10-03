@@ -46,4 +46,16 @@ export function buildQuantsConfig(feeBps: number, quote: QuoteSpec): ConfigParam
   });
 }
 
+/** Why this target cannot become a config key at one of these fees (the SDK refuses some), or null when it can. */
+export function curveProblem(quote: QuoteSpec, feesBps: number[]): string | null {
+  for (const fee of feesBps) {
+    try {
+      buildQuantsConfig(fee, quote);
+    } catch (e) {
+      return e instanceof Error ? e.message : String(e);
+    }
+  }
+  return null;
+}
+
 export const configKeyName = (quoteMint: string, feeBps: number) => `${quoteMint}:${feeBps}`;

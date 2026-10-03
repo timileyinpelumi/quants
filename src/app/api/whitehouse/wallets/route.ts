@@ -1,5 +1,5 @@
 import { getContext } from "@/web/server/context";
-import { json, jsonError } from "@/web/server/http";
+import { adminJson, jsonError } from "@/web/server/http";
 import { requireAdmin } from "@/web/server/admin";
 import { platformWallets } from "@/web/server/platform-wallets";
 import { usdPrices } from "@/web/server/prices";
@@ -10,9 +10,11 @@ export const dynamic = "force-dynamic";
 export async function GET(req: Request) {
   try {
     const c = getContext();
-    await requireAdmin(c, req);
+    const { role } = await requireAdmin(c, req, "read");
     const sol = (await usdPrices(c, [NATIVE_MINT]).catch(() => ({} as Record<string, number | null>)))[NATIVE_MINT] ?? null;
-    return json({ wallets: await platformWallets(c, sol) });
+    const wallets = await platformWallets(c, sol);
+    // Derivation paths never reach a read only session.
+    return adminJson({ wallets: role === "full" ? wallets : wallets.map(({ path: _path, ...w }) => w) });
   } catch (e) {
     return jsonError(e);
   }

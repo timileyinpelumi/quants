@@ -79,7 +79,7 @@ export async function prepareWithSwap(ctx: WebContext, raw: unknown): Promise<La
       },
       keeperTopUp: () => keeperTopUp(ctx),
       tradingOnlyMints: quotes.filter((c) => c.tradingOnly).map((c) => c.mint),
-      isVerified: (m) => ctx.jupiter.isVerified(m), tokenProgramOf: ctx.tokenProgramOf,
+      isVerified: (m) => ctx.jupiter.isVerified(m), tokenProgramOf: ctx.tokenProgramOf, rewardMints: ctx.rewardMints,
     },
     { ...rest, devBuyQuoteAmount: devBuyQuoteAmount.toString(), devBuyMinOut: "0" },
     { stopBeforeLaunch: swap !== undefined },

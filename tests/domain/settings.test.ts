@@ -90,7 +90,7 @@ test("new settings are validated", () => {
   expect(() => parseSettings({ ...s, feeTiersBps: [5000] })).toThrow();
   expect(parseSettings({ ...s, feeTiersBps: [300, 50] }).feeTiersBps).toEqual([50, 300]);
   expect(() => parseSettings({ ...s, quotes: { ...s.quotes, SOL: { enabled: true, graduation: 0 } } })).toThrow();
-  expect(() => parseSettings({ ...s, quotes: { ...s.quotes, BONK: { enabled: true, graduation: 5 } } })).toThrow();
+  expect(() => parseSettings({ ...s, quotes: { ...s.quotes, PEPE: { enabled: true, graduation: 5 } } })).toThrow();
   expect(() => parseSettings({ ...s, platformToken: { ...s.platformToken, mint: "", enabled: true } })).toThrow();
   expect(() => parseSettings({ ...s, platformToken: { ...s.platformToken, mint: "not a mint" } })).toThrow();
   expect(parseSettings({ ...s, platformToken: { ...s.platformToken, mint: "", enabled: false } }).platformToken.mint).toBe("");
@@ -107,7 +107,8 @@ test("quote coins follow the loaded settings", async () => {
   await saveSettings(sql, { ...s, quotes: { ...s.quotes, USDT: { enabled: false, graduation: 40_000 } }, platformToken: { ...s.platformToken, mint: "", enabled: false } }, "t");
   await loadLatestSettings(sql);
   const coins = quoteCoins();
-  expect(coins.map((c) => c.symbol)).toEqual(["SOL", "USDC", "USDT"]);
+  expect(coins.map((c) => c.symbol).slice(0, 3)).toEqual(["SOL", "USDC", "USDT"]);
+  expect(coins.some((c) => c.platform)).toBe(false);
   expect(coins[2]).toMatchObject({ enabled: false, graduation: 40_000 });
   await saveSettings(sql, s, "t");
   await loadLatestSettings(sql);

@@ -1,4 +1,5 @@
 "use client";
+import { ADMIN_API } from "./api";
 import { useCallback, useEffect, useState } from "react";
 import type { FeeFlow, Health, Overview, Range, Report, Stat, TopToken, Traffic } from "@/web/server/analytics";
 import { Segmented } from "@/web/ui/Segmented";
@@ -315,7 +316,7 @@ export function AnalyticsPanel() {
   const load = useCallback(async (r: Range) => {
     setError(null);
     try {
-      const res = await fetch(`/api/admin/analytics?range=${r}`);
+      const res = await fetch(`${ADMIN_API}/analytics?range=${r}`);
       const j = await res.json();
       if (!res.ok) throw new Error(j.error?.message ?? "Something went wrong");
       setData(j as Report);

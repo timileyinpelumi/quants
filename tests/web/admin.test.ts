@@ -1,10 +1,10 @@
 import { test, expect } from "bun:test";
 import { makeWebContext, ADMIN_CODE } from "../helpers/web-context";
-import { POST as loginRoute, DELETE as logoutRoute } from "../../src/app/api/admin/session/route";
-import { GET as getSettings, POST as postSettings } from "../../src/app/api/admin/settings/route";
-import { GET as statusRoute } from "../../src/app/api/admin/status/route";
-import { POST as basketRoute } from "../../src/app/api/admin/basket/route";
-import { GET as walletsRoute } from "../../src/app/api/admin/wallets/route";
+import { POST as loginRoute, DELETE as logoutRoute } from "../../src/app/api/whitehouse/session/route";
+import { GET as getSettings, POST as postSettings } from "../../src/app/api/whitehouse/settings/route";
+import { GET as statusRoute } from "../../src/app/api/whitehouse/status/route";
+import { POST as basketRoute } from "../../src/app/api/whitehouse/basket/route";
+import { GET as walletsRoute } from "../../src/app/api/whitehouse/wallets/route";
 import { parsePlatformAddresses } from "../../src/domain/platform-wallets";
 import { loadLatestSettings } from "../../src/domain/settings";
 import { beginStep, failStep } from "../../src/ledger/ledger";
@@ -125,6 +125,27 @@ test("saving settings validates and creates a new version", async () => {
   const after = await loadLatestSettings(c.sql);
   expect(after.version).toBe(before + 1);
   expect(after.split.basketBps).toBe(7000);
+});
+
+test("saving refuses a graduation target the curve builder cannot make", async () => {
+  const c = await makeWebContext();
+  const cookie = await signIn();
+  const current = (await (await getSettings(withCookie(cookie))).json()).settings;
+  const before = (await loadLatestSettings(c.sql)).version;
+  const bad = await postSettings(withCookie(cookie, { method: "POST", body: JSON.stringify({ ...current, quotes: { ...current.quotes, BONK: { enabled: true, graduation: 2_500_000_000 } } }) }));
+  expect(bad.status).toBe(400);
+  expect((await bad.json()).error.message).toContain("BONK cannot graduate at 2,500,000,000");
+  expect((await loadLatestSettings(c.sql)).version).toBe(before);
+  const off = await postSettings(withCookie(cookie, { method: "POST", body: JSON.stringify({ ...current, quotes: { ...current.quotes, BONK: { enabled: false, graduation: 2_500_000_000 } } }) }));
+  expect(off.status).toBe(200);
+});
+
+test("the settings response lists every pair with its default target, including pairs older settings never saved", async () => {
+  await makeWebContext();
+  const cookie = await signIn();
+  const { pairs } = await (await getSettings(withCookie(cookie))).json();
+  expect(pairs.find((p: any) => p.symbol === "cbBTC")).toMatchObject({ decimals: 8, graduation: 0.12, enabled: true, payoutMin: "6000" });
+  expect(pairs.some((p: any) => p.symbol === "QUANTS")).toBe(false);
 });
 
 test("status lists failed steps and launches with steps in flight", async () => {

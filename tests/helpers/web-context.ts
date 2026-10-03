@@ -74,6 +74,7 @@ export async function makeWebContext(over: Partial<WebContext> = {}) {
     platformAddresses: {},
     sessionSecret: crypto.getRandomValues(new Uint8Array(32)),
     tokenProgramOf: async () => CLASSIC,
+    rewardMints: async (mints: string[]) => new Map(mints.map((m) => [m, { program: CLASSIC, problem: null }])),
     stocks: { list: async () => [], icons: async () => ({}) },
     ...over,
     conn,

@@ -1,12 +1,11 @@
 import { z } from "zod";
 import { getContext } from "@/web/server/context";
-import { json, jsonError, readJson } from "@/web/server/http";
+import { adminJson, jsonError, readJson } from "@/web/server/http";
 import { requireAdmin } from "@/web/server/admin";
 import { LaunchError } from "@/launch/prepare";
 
 export const dynamic = "force-dynamic";
 
-const CLASSIC = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
 const Body = z.object({
   mint: z.string().min(1),
   basket: z.array(z.object({ mint: z.string().regex(/^[1-9A-HJ-NP-Za-km-z]{32,44}$/), weightBps: z.number().int().positive(), symbol: z.string().max(20).optional(), decimals: z.number().int().min(0).max(18).optional() }))
@@ -18,13 +17,15 @@ const Body = z.object({
 export async function POST(req: Request) {
   try {
     const c = getContext();
-    await requireAdmin(c, req);
+    await requireAdmin(c, req, "full");
     const b = Body.parse(await readJson(req));
     const [l] = await c.sql`select l.id, l.trading_only from launches l where l.mint = ${b.mint}`;
     if (!l) throw new LaunchError("invalid_input", "Token not found");
     if (l.trading_only) throw new LaunchError("invalid_input", "This token is paired with a stock and has no basket");
+    const checked = await c.rewardMints(b.basket.map((t) => t.mint));
     for (const t of b.basket) {
-      if ((await c.tokenProgramOf(t.mint)) !== CLASSIC) throw new LaunchError("basket_unsupported", `${t.mint} is not a classic SPL token`);
+      const problem = checked.get(t.mint)?.problem;
+      if (problem !== null) throw new LaunchError("basket_unsupported", `${t.mint} ${problem ?? "was not found on chain"}, which reward pools do not take`);
     }
     // One statement, not sql.begin (pooled queries queued behind it can get another caller's rows); a farm or swap freezes the basket.
     const [r] = await c.sql`
@@ -43,7 +44,7 @@ export async function POST(req: Request) {
       )
       select yes from started`;
     if (r.yes) throw new LaunchError("invalid_input", "Farms already exist for this launch");
-    return json({ ok: true });
+    return adminJson({ ok: true });
   } catch (e) {
     return jsonError(e);
   }

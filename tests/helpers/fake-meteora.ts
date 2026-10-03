@@ -1,6 +1,9 @@
 import { Keypair, PublicKey, SystemProgram, Transaction } from "@solana/web3.js";
 import type { MeteoraPort, GraduatedPosition, LaunchTxInput, NewConfig } from "../../src/meteora/port";
 import type { FakeChain } from "./fake-chain";
+import { buildQuantsConfig, type QuoteSpec } from "../../src/meteora/config";
+import { curveOfParams } from "../../src/meteora/first-buy";
+import { NATIVE_MINT } from "../../src/domain/types";
 
 export class FakeMeteora implements MeteoraPort {
   partnerFee = new Map<string, bigint>();
@@ -15,6 +18,16 @@ export class FakeMeteora implements MeteoraPort {
   thresholds = new Map<string, bigint>();
   configs = new Map<string, { feeClaimer: string; quoteMint: string; threshold: bigint }>();
   constructor(private chain: FakeChain) {}
+  curveCalls: (string | { feeBps: number; quote: QuoteSpec })[] = [];
+  /** Config keys stand for SOL at 85 with their fee from the name (CfgSol200), unless curves says otherwise. */
+  curves = new Map<string, { feeBps: number; quote: QuoteSpec }>();
+  async curveConfig(config: string | { feeBps: number; quote: QuoteSpec }) {
+    this.curveCalls.push(config);
+    const p = typeof config === "string"
+      ? this.curves.get(config) ?? { feeBps: Number(config.match(/\d+$/)?.[0] ?? 200), quote: { mint: NATIVE_MINT, decimals: 9, migrationQuoteThreshold: 85 } }
+      : config;
+    return curveOfParams(buildQuantsConfig(p.feeBps, p.quote));
+  }
   async configThreshold(configKey: string) { return this.thresholds.get(configKey) ?? 0n; }
   async configState(configKey: string) { return this.configs.get(configKey) ?? null; }
   async firstBuyMaxOut(config: string | { feeBps: number }, amount: bigint) {

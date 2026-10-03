@@ -53,6 +53,13 @@ const replacer = (_k: string, v: unknown) => (typeof v === "bigint" ? v.toString
 export const json = (data: unknown, status = 200) =>
   new Response(JSON.stringify(data, replacer), { status, headers: { "content-type": "application/json" } });
 
+/** Admin responses stay out of browser and proxy caches. */
+export const adminJson = (data: unknown) => {
+  const r = json(data);
+  r.headers.set("cache-control", "no-store");
+  return r;
+};
+
 export function jsonError(e: unknown): Response {
   if (e instanceof LaunchError) return json({ error: { code: e.code, message: e.message } }, 400);
   if (e instanceof LimitError) return json({ error: { code: e.status === 413 ? "too_large" : e.status === 411 ? "length_required" : "rate_limited", message: e.message } }, e.status);

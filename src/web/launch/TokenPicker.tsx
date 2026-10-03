@@ -60,7 +60,7 @@ export function TokenPicker({ open, onClose, onPick, taken, max }: {
   return (
     <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center p-0 md:p-6">
       <button type="button" aria-label="Close" onClick={onClose} className="absolute inset-0 bg-black/70 backdrop-blur-sm cursor-default" />
-      <div role="dialog" aria-modal="true" aria-labelledby="picker-title" className="panel relative w-full md:max-w-lg max-h-[85vh] flex flex-col rounded-b-none md:rounded-[32px]">
+      <div role="dialog" aria-modal="true" aria-labelledby="picker-title" className="panel relative w-full md:max-w-2xl max-h-[85vh] flex flex-col rounded-b-none md:rounded-[32px]">
         <div className="flex items-center justify-between gap-4 px-6 pt-6 pb-4">
           <h2 id="picker-title" className="m-0 font-display font-black text-2xl tracking-tight">Pick reward tokens</h2>
           <button type="button" aria-label="Close" onClick={onClose} className="w-11 h-11 rounded-full border border-white/10 text-muted hover:text-ink flex items-center justify-center cursor-pointer">
@@ -75,35 +75,40 @@ export function TokenPicker({ open, onClose, onPick, taken, max }: {
           </label>
         </div>
         <div className="flex-1 overflow-y-auto px-3 pb-4 min-h-48">
-          {browsing && <p className="m-0 px-3 pt-1 pb-2 text-[13px] text-muted">{popular === null ? "Loading popular tokens" : popular.length ? "Popular" : "Search for a verified token. Your stakers earn it."}</p>}
+          {browsing && <p className="m-0 px-3 pt-1 pb-2 text-[13px] text-muted">{popular === null ? "Loading popular tokens" : popular.length ? `Popular verified tokens, ${popular.length} by organic score. Search for any other.` : "Search for a verified token. Your stakers earn it."}</p>}
           {!browsing && state === "searching" && found.length === 0 && <p className="m-0 px-3 py-6 text-sm text-muted">Searching</p>}
           {!browsing && state === "error" && <p className="m-0 px-3 py-6 text-sm text-burn">Search is unavailable. Try again in a moment.</p>}
           {!browsing && state === "done" && found.length === 0 && <p className="m-0 px-3 py-6 text-sm text-muted">No verified token matches.</p>}
-          {list.map((t) => {
-            const added = taken.includes(t.mint);
-            const on = selected.some((x) => x.mint === t.mint);
-            const full = !on && selected.length >= max;
-            return (
-              <button
-                key={t.mint}
-                type="button"
-                role="checkbox"
-                aria-checked={on || added}
-                disabled={added || full}
-                onClick={() => setSelected((cur) => (on ? cur.filter((x) => x.mint !== t.mint) : [...cur, t]))}
-                className={`w-full grid grid-cols-[40px_minmax(0,1fr)_auto] gap-3 items-center px-3 py-3 rounded-2xl text-left cursor-pointer disabled:opacity-40 disabled:cursor-default min-h-14 ${on ? "bg-accent/[0.08]" : "hover:bg-white/[0.04]"}`}
-              >
-                <Avatar seed={t.mint} label={t.symbol} image={t.icon} size={40} />
-                <span className="flex flex-1 flex-col min-w-0">
-                  <span className="font-semibold truncate">{t.symbol}</span>
-                  <span className="text-[13px] text-muted truncate">{t.name} · <span className="font-mono">{shortAddr(t.mint)}</span></span>
-                </span>
-                <span aria-hidden className={`w-6 h-6 rounded-full border flex items-center justify-center ${on || added ? "bg-accent border-accent text-ground" : "border-white/25"}`}>
-                  {(on || added) && <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12l5 5 9-10" /></svg>}
-                </span>
-              </button>
-            );
-          })}
+          <div data-token-grid className="grid grid-cols-2 md:grid-cols-3 gap-2 px-1">
+            {list.map((t) => {
+              const added = taken.includes(t.mint);
+              const on = selected.some((x) => x.mint === t.mint);
+              const full = !on && selected.length >= max;
+              return (
+                <button
+                  key={t.mint}
+                  type="button"
+                  role="checkbox"
+                  aria-checked={on || added}
+                  aria-label={`${t.symbol}, ${t.name}`}
+                  title={`${t.name} · ${t.mint}`}
+                  disabled={added || full}
+                  onClick={() => setSelected((cur) => (on ? cur.filter((x) => x.mint !== t.mint) : [...cur, t]))}
+                  className={`relative grid grid-cols-[32px_minmax(0,1fr)] gap-2.5 items-center pl-3 pr-8 py-2.5 min-h-14 rounded-2xl border text-left cursor-pointer disabled:opacity-40 disabled:cursor-default ${on ? "bg-accent/[0.08] border-accent/70" : "bg-surface border-white/[0.08] hover:border-white/20"}`}
+                >
+                  <Avatar seed={t.mint} label={t.symbol} image={t.icon} size={32} />
+                  <span className="flex flex-col min-w-0 leading-tight">
+                    <span className="font-semibold truncate">{t.symbol}</span>
+                    <span className="text-[12px] text-muted truncate">{t.name}</span>
+                    <span className="text-[11px] text-faint font-mono truncate">{shortAddr(t.mint)}</span>
+                  </span>
+                  <span aria-hidden className={`absolute top-2.5 right-2.5 w-5 h-5 rounded-full border flex items-center justify-center ${on || added ? "bg-accent border-accent text-ground" : "border-white/25"}`}>
+                    {(on || added) && <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12l5 5 9-10" /></svg>}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
         </div>
         <div className="flex items-center justify-between gap-4 px-6 py-4 border-t line">
           <span className="text-sm text-muted">{selected.length ? selected.map((x) => x.symbol).join(", ") : `Pick up to ${max}`}</span>

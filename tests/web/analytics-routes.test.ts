@@ -1,11 +1,11 @@
 import { test, expect, beforeEach } from "bun:test";
 import { makeWebContext, ADMIN_CODE } from "../helpers/web-context";
-import { POST as loginRoute } from "../../src/app/api/admin/session/route";
-import { GET as analyticsRoute } from "../../src/app/api/admin/analytics/route";
+import { POST as loginRoute } from "../../src/app/api/whitehouse/session/route";
+import { GET as analyticsRoute } from "../../src/app/api/whitehouse/analytics/route";
 import { resetAnalyticsCache } from "../../src/web/server/analytics";
 
 const ORIGIN = "http://x";
-const url = (q = "") => `${ORIGIN}/api/admin/analytics${q}`;
+const url = (q = "") => `${ORIGIN}/api/whitehouse/analytics${q}`;
 
 async function signIn() {
   const r = await loginRoute(new Request(ORIGIN, { method: "POST", headers: { origin: ORIGIN }, body: JSON.stringify({ code: ADMIN_CODE }) }));

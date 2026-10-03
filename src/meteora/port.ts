@@ -7,6 +7,7 @@ import {
 import { CpAmm, getTokenProgram } from "@meteora-ag/cp-amm-sdk";
 import type { SignedTx } from "../chain/port";
 import { buildQuantsConfig, type QuoteSpec } from "./config";
+import { curveOfParams, type CurveConfig } from "./first-buy";
 import type { SolanaChain } from "../chain/solana";
 
 export interface GraduatedPosition { dammPool: string; position: string; positionNftAccount: string }
@@ -33,6 +34,8 @@ export interface MeteoraPort {
   buildConfigTx(input: { creator: string; quoteMint: string; create: NewConfig }): Promise<Transaction>;
   /** Base units a first buy of `quoteAmount` takes from a fresh curve, before fees (an upper bound on what it receives). */
   firstBuyMaxOut(config: string | { feeBps: number; quote: QuoteSpec }, quoteAmount: bigint): Promise<bigint>;
+  /** The curve and fees of a config key on chain, or of one not created yet from its parameters. */
+  curveConfig(config: string | { feeBps: number; quote: QuoteSpec }): Promise<CurveConfig>;
   /** The parts of an on-chain config key quants checks before trusting it, or null when it does not exist. */
   configState(configKey: string): Promise<{ feeClaimer: string; quoteMint: string; threshold: bigint } | null>;
   /** Quote base units the curve of this config raises before it graduates. */
@@ -134,6 +137,23 @@ export class MeteoraLive implements MeteoraPort {
     if (!cfg) throw new Error(`config ${config} not found`);
     const r = calculateQuoteToBaseFromAmountIn(cfg, cfg.sqrtStartPrice, amount, cfg.migrationSqrtPrice);
     return BigInt(r.outputAmount.toString());
+  }
+
+  // A config key never changes once created, so each is read from chain once per process.
+  private curves = new Map<string, Promise<CurveConfig>>();
+
+  curveConfig(config: string | { feeBps: number; quote: QuoteSpec }): Promise<CurveConfig> {
+    if (typeof config !== "string") return Promise.resolve(curveOfParams(buildQuantsConfig(config.feeBps, config.quote)));
+    let p = this.curves.get(config);
+    if (!p) {
+      p = this.dbc.state.getPoolConfig(config).then((cfg) => {
+        if (!cfg) throw new Error(`config ${config} not found`);
+        return cfg as unknown as CurveConfig;
+      });
+      p.catch(() => this.curves.delete(config));
+      this.curves.set(config, p);
+    }
+    return p;
   }
 
   async configState(configKey: string) {

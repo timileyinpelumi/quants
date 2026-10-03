@@ -16,10 +16,14 @@ export interface JupiterPort {
 
 type Fetch = (url: string | URL, init?: RequestInit) => Promise<Response>;
 const CLASSIC_TOKEN_PROGRAM = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
-const keepClassicVerified = (rows: TokenRow[]): VerifiedToken[] => rows
-  .filter((t) => t.isVerified === true && t.tokenProgram === CLASSIC_TOKEN_PROGRAM)
+const TOKEN_2022_PROGRAM = "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb";
+/** Verified classic and Token-2022 tokens. Callers that pay a token out check a Token-2022 mint's extensions on chain. */
+const keepVerified = (rows: TokenRow[]): VerifiedToken[] => rows
+  .filter((t) => t.isVerified === true && (t.tokenProgram === CLASSIC_TOKEN_PROGRAM || t.tokenProgram === TOKEN_2022_PROGRAM))
   .map((t) => ({ mint: t.id, symbol: t.symbol, name: t.name, icon: t.icon ?? null, decimals: t.decimals, tokenProgram: t.tokenProgram! }));
-type TokenRow = { id: string; symbol: string; name: string; icon?: string | null; decimals: number; tags?: string[]; isVerified?: boolean; tokenProgram?: string };
+type TokenRow = { id: string; symbol: string; name: string; icon?: string | null; decimals: number; tags?: string[]; isVerified?: boolean; tokenProgram?: string; organicScore?: number };
+/** How many popular tokens the reward picker can browse before searching; a few spare for mints the extension check drops. */
+export const POPULAR_SIZE = 200;
 
 const JUPITER_V6 = "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4";
 const COMPUTE_BUDGET = ComputeBudgetProgram.programId.toBase58();
@@ -112,11 +116,14 @@ export class JupiterLive implements JupiterPort {
 
   private popular: { at: number; list: VerifiedToken[] } | null = null;
 
+  // The top lists stop at 100 tokens of any kind, so the full verified list (about 4,000, 5 MB) is read every 10 minutes
+  // and ranked by organic score instead.
   async popularVerified(): Promise<VerifiedToken[]> {
     if (this.popular && Date.now() - this.popular.at < 600_000) return this.popular.list;
-    const res = await this.fetchFn(`${this.tokensBase}/toporganicscore/24h?limit=100`, { headers: this.headers() });
-    if (!res.ok) return this.popular?.list ?? [];
-    const list = keepClassicVerified(await res.json() as TokenRow[]);
+    const res = await this.fetchFn(`${this.tokensBase}/tag?query=verified`, { headers: this.headers(), signal: AbortSignal.timeout(15_000) }).catch(() => null);
+    if (!res?.ok) return this.popular?.list ?? [];
+    const rows = (await res.json() as TokenRow[]).sort((a, b) => (b.organicScore ?? 0) - (a.organicScore ?? 0));
+    const list = keepVerified(rows).slice(0, POPULAR_SIZE + 100);
     this.remember(list.map((t) => t.mint));
     this.popular = { at: Date.now(), list };
     return list;
@@ -154,7 +161,7 @@ export class JupiterLive implements JupiterPort {
   }
 
   async searchVerified(query: string): Promise<VerifiedToken[]> {
-    const list = keepClassicVerified(await this.search(query));
+    const list = keepVerified(await this.search(query));
     this.remember(list.map((t) => t.mint));
     return list;
   }
