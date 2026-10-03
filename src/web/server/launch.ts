@@ -56,9 +56,12 @@ export async function prepareWithSwap(ctx: WebContext, raw: unknown): Promise<La
   const { slippageBps, launchesPaused } = await loadLatestSettings(ctx.sql);
   if (launchesPaused) throw new LaunchError("launches_paused", "New launches are paused for now. Trading and staking carry on as normal. Try again later.");
   // Labels and decimals shown to stakers come from Jupiter's verified list, never from the request.
+  // Pair tokens and the platform token are known here even before Jupiter lists them.
+  const known = await allQuotes(ctx);
   rest.basket = await Promise.all(rest.basket.map(async (b) => {
     const t = (await ctx.jupiter.searchVerified(b.mint)).find((x) => x.mint === b.mint);
-    return { ...b, symbol: t?.symbol, decimals: t?.decimals };
+    const q = known.find((c) => c.mint === b.mint);
+    return { ...b, symbol: t?.symbol ?? q?.symbol, decimals: t?.decimals ?? q?.decimals };
   }));
   const sol = BigInt(devBuySol);
   const paired = rest.quoteMint !== NATIVE_MINT;

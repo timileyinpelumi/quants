@@ -291,3 +291,13 @@ test("the platform token leads the reward picker and is accepted as a reward bef
   const r = await post(prepare, body({ basket: [{ mint: own, weightBps: 10000 }] }));
   expect((await r.json()).error?.code).not.toBe("basket_not_verified");
 });
+
+test("a reward that Jupiter does not list yet takes its symbol and decimals from the pair tokens", async () => {
+  const c = await makeWebContext();
+  (c.jupiter as any).searchVerified = async () => [];
+  const r = await post(prepare, body({ basket: [{ mint: NATIVE_MINT, weightBps: 10000 }] }));
+  const { mint } = await r.json();
+  const [p] = await c.sql`select basket from prepared_launches where mint = ${mint}`;
+  const basket = typeof p.basket === "string" ? JSON.parse(p.basket) : p.basket;
+  expect(basket[0]).toMatchObject({ symbol: "SOL", decimals: 9 });
+});
