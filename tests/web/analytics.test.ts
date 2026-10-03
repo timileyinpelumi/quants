@@ -87,6 +87,7 @@ test("overview counts the range and the period before it, in USD from the latest
     traders: [3, 1],
     volumeUsd: [500, 500],
     feesUsd: [200, 200],
+    lpUsd: [0, 0],
     stakersUsd: [1, 0],
     creatorsUsd: [25, 0],
     treasuryUsd: [15, 0],
@@ -142,7 +143,7 @@ test("fee flow splits what was collected into rewards bought, rent, creator, tre
   const f = await feeFlow(deps(sql), windowOf("7d", NOW));
   const r = (o: Record<string, number>) => Object.fromEntries(Object.entries(o).map(([k, v]) => [k, round(v)]));
   expect(round(f.collectedUsd)).toBe(200);
-  expect(r(f.flow)).toEqual({ bought: 35, rent: 10, creator: 87.5, treasury: 52.5, held: 15 });
+  expect(r(f.flow)).toEqual({ bought: 35, rent: 10, creator: 87.5, treasury: 52.5, lp: 0, held: 15 });
   expect(r(f.escrow)).toEqual({ unsplit: 10, basket: 0, reward: 2, creator: 20, treasury: 0 });
 });
 
@@ -190,4 +191,17 @@ test("all time has no previous period", async () => {
   expect(o.launches).toEqual({ value: 3, prev: null });
   expect(o.trades).toEqual({ value: 5, prev: null });
   expect(round(o.feesUsd.value)).toBe(400);
+});
+
+test("LP fees from graduated pools go to the treasury in full and are counted on their own", async () => {
+  const { sql, b } = await seed();
+  const before = await feeFlow(deps(sql), windowOf("7d", NOW));
+  await step(sql, b, "split", 2 * H, { amount: "1000000000", lp: true });
+  const f = await feeFlow(deps(sql), windowOf("7d", NOW));
+  expect(round(f.flow.lp)).toBe(100);
+  expect(round(f.flow.creator)).toBe(round(before.flow.creator));
+  expect(round(f.flow.treasury)).toBe(round(before.flow.treasury));
+  expect(round(f.collectedUsd)).toBe(round(before.collectedUsd + 100));
+  const o = await overview(deps(sql), windowOf("7d", NOW));
+  expect(round(o.lpUsd.value ?? 0)).toBe(100);
 });

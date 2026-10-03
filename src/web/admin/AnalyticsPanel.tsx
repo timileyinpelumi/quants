@@ -20,6 +20,7 @@ const TILES: { key: keyof Overview; label: string; usd?: boolean; now?: boolean 
   { key: "traders", label: "Unique traders" },
   { key: "volumeUsd", label: "Volume", usd: true },
   { key: "feesUsd", label: "Fees collected", usd: true },
+  { key: "lpUsd", label: "LP fees", usd: true },
   { key: "stakersUsd", label: "Paid to stakers", usd: true },
   { key: "creatorsUsd", label: "Paid to creators", usd: true },
   { key: "treasuryUsd", label: "Paid to treasury", usd: true },
@@ -146,6 +147,7 @@ const FLOW: { key: keyof FeeFlow["flow"]; label: string; color: string }[] = [
   { key: "rent", label: "Rent for farms", color: "var(--color-stake-light)" },
   { key: "creator", label: "Creators", color: "var(--color-violet)" },
   { key: "treasury", label: "Treasury", color: "var(--color-accent)" },
+  { key: "lp", label: "LP fees to treasury", color: "#7FC1FF" },
   { key: "held", label: "Held for stakers", color: "var(--color-faint)" },
 ];
 const ESCROW: { key: keyof FeeFlow["escrow"]; label: string }[] = [

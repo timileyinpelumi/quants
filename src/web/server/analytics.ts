@@ -41,17 +41,18 @@ export const pxJoin = (sql: SQL, launchId: unknown) => sql`
 /** Each confirmed fee split in [from, to) cut into stakers, platform and creator shares, in quote base units. */
 export const splitShares = (sql: SQL, from: Date, to: Date, unit: Unit | null) => sql`
   select d.launch_id, ${unit === null ? sql`null::timestamptz` : sql`date_trunc(${unit}, d.updated_at, 'UTC')`} as b,
-    sum(v.amt) as amt, sum(w.platform) as platform, sum(z.creator) as creator, sum(v.amt - w.platform - z.creator) as basket
+    sum(v.amt) as amt, sum(w.platform) as platform, sum(z.creator) as creator, sum(v.amt - w.platform - z.creator) as basket,
+    sum(case when v.lp then v.amt else 0 end) as lp
   from distributions d join settings s on s.version = d.settings_version
   cross join lateral (select (d.detail->>'amount')::float8 as amt, (s.data->'split'->>'platformBps')::float8 as p,
-    (s.data->'split'->>'creatorBps')::float8 as c, d.detail->>'tradingOnly' is not null as only) v
-  cross join lateral (select case when not v.only then v.amt * v.p / 10000 when v.p + v.c = 0 then v.amt else v.amt * v.p / (v.p + v.c) end as platform) w
-  cross join lateral (select case when v.only then v.amt - w.platform else v.amt * v.c / 10000 end as creator) z
+    (s.data->'split'->>'creatorBps')::float8 as c, d.detail->>'tradingOnly' is not null as only, coalesce((d.detail->>'lp')::boolean, false) as lp) v
+  cross join lateral (select case when v.lp then v.amt when not v.only then v.amt * v.p / 10000 when v.p + v.c = 0 then v.amt else v.amt * v.p / (v.p + v.c) end as platform) w
+  cross join lateral (select case when v.lp then 0 when v.only then v.amt - w.platform else v.amt * v.c / 10000 end as creator) z
   where d.kind = 'split' and d.status = 'confirmed' and d.updated_at >= ${from} and d.updated_at < ${to}
   group by 1, 2`;
 
 type Period = {
-  launches: number; trades: number; traders: number; volumeUsd: number; feesUsd: number;
+  launches: number; trades: number; traders: number; volumeUsd: number; feesUsd: number; lpUsd: number;
   creatorsUsd: number; treasuryUsd: number; stakingOpened: number; graduated: number;
 };
 
@@ -61,7 +62,7 @@ async function period(sql: SQL, from: Date, to: Date): Promise<Period> {
       select count(*)::int as trades, count(distinct trader)::int as traders, coalesce(sum(quote_value * quote_usd), 0)::float8 as vol
       from trades where block_time >= ${from} and block_time < ${to}
     ), f as (
-      select coalesce(sum(s.amt * px.usd), 0)::float8 as fees from (${splitShares(sql, from, to, null)}) s ${pxJoin(sql, sql`s.launch_id`)}
+      select coalesce(sum(s.amt * px.usd), 0)::float8 as fees, coalesce(sum(s.lp * px.usd), 0)::float8 as lp from (${splitShares(sql, from, to, null)}) s ${pxJoin(sql, sql`s.launch_id`)}
     ), p as (
       select coalesce(sum(x.amt * px.usd) filter (where x.bucket = 'creator'), 0)::float8 as creator,
         coalesce(sum(x.amt * px.usd) filter (where x.bucket = 'treasury'), 0)::float8 as treasury
@@ -70,13 +71,13 @@ async function period(sql: SQL, from: Date, to: Date): Promise<Period> {
         where kind = 'payout' and status = 'confirmed' and updated_at >= ${from} and updated_at < ${to} group by 1, 2
       ) x ${pxJoin(sql, sql`x.launch_id`)}
     )
-    select t.*, f.fees, p.creator, p.treasury,
+    select t.*, f.fees, f.lp, p.creator, p.treasury,
       (select count(*)::int from launches where created_at >= ${from} and created_at < ${to}) as launches,
       (select count(*)::int from launches where graduated_at >= ${from} and graduated_at < ${to}) as graduated,
       (select count(*)::int from stake_pools where opened_at >= ${from} and opened_at < ${to}) as opened
     from t, f, p`;
   return {
-    launches: r.launches, trades: r.trades, traders: r.traders, volumeUsd: Number(r.vol), feesUsd: Number(r.fees),
+    launches: r.launches, trades: r.trades, traders: r.traders, volumeUsd: Number(r.vol), feesUsd: Number(r.fees), lpUsd: Number(r.lp),
     creatorsUsd: Number(r.creator), treasuryUsd: Number(r.treasury), stakingOpened: r.opened, graduated: r.graduated,
   };
 }
@@ -97,7 +98,7 @@ const usdOf = (amounts: Map<string, number>, px: Record<string, number | null>) 
 
 export type Stat = { value: number | null; prev: number | null };
 export type Overview = Record<
-  "launches" | "trades" | "traders" | "volumeUsd" | "feesUsd" | "stakersUsd" | "creatorsUsd" | "treasuryUsd" | "stakers" | "stakingOpen" | "stakingOpened" | "graduated",
+  "launches" | "trades" | "traders" | "volumeUsd" | "feesUsd" | "lpUsd" | "stakersUsd" | "creatorsUsd" | "treasuryUsd" | "stakers" | "stakingOpen" | "stakingOpened" | "graduated",
   Stat
 >;
 
@@ -118,7 +119,7 @@ export async function overview(d: AnalyticsDeps, w: Window): Promise<Overview> {
   ]);
   const pair = (k: keyof Period): Stat => ({ value: cur[k], prev: prev ? prev[k] : null });
   return {
-    launches: pair("launches"), trades: pair("trades"), traders: pair("traders"), volumeUsd: pair("volumeUsd"), feesUsd: pair("feesUsd"),
+    launches: pair("launches"), trades: pair("trades"), traders: pair("traders"), volumeUsd: pair("volumeUsd"), feesUsd: pair("feesUsd"), lpUsd: pair("lpUsd"),
     stakersUsd: { value: usdOf(fundCur, px), prev: w.prevFrom ? usdOf(fundPrev, px) : null },
     creatorsUsd: pair("creatorsUsd"), treasuryUsd: pair("treasuryUsd"),
     stakers: { value: stakers, prev: null },
@@ -200,7 +201,7 @@ export async function topTokens(sql: SQL, w: Window, limit = TOP_TOKENS): Promis
 export type FeeFlow = {
   collectedUsd: number;
   /** Where the fees split in the range went; held is the stakers' share not yet spent on rent or rewards. */
-  flow: { bought: number; rent: number; creator: number; treasury: number; held: number };
+  flow: { bought: number; rent: number; creator: number; treasury: number; lp: number; held: number };
   /** Balances still in escrow right now, whatever range is picked. */
   escrow: { unsplit: number; basket: number; reward: number; creator: number; treasury: number };
 };
@@ -210,7 +211,8 @@ export async function feeFlow(d: AnalyticsDeps, w: Window): Promise<FeeFlow> {
   const sol = (await d.usd([NATIVE_MINT]).catch(() => ({} as Record<string, number | null>)))[NATIVE_MINT] ?? null;
   const [[split], [spent], escrow] = await Promise.all([
     sql`select coalesce(sum(s.amt * px.usd), 0)::float8 as amt, coalesce(sum(s.creator * px.usd), 0)::float8 as creator,
-          coalesce(sum(s.platform * px.usd), 0)::float8 as platform, coalesce(sum(s.basket * px.usd), 0)::float8 as basket
+          coalesce(sum(s.platform * px.usd), 0)::float8 as platform, coalesce(sum(s.basket * px.usd), 0)::float8 as basket,
+          coalesce(sum(s.lp * px.usd), 0)::float8 as lp
         from (${splitShares(sql, w.from, w.to, null)}) s ${pxJoin(sql, sql`s.launch_id`)}`,
     sql`select coalesce(sum(v.usd) filter (where x.k = 'rent'), 0)::float8 as rent, coalesce(sum(v.usd) filter (where x.k = 'buy'), 0)::float8 as bought
         from (
@@ -239,7 +241,7 @@ export async function feeFlow(d: AnalyticsDeps, w: Window): Promise<FeeFlow> {
   const rent = Number(spent.rent), bought = Number(spent.bought);
   return {
     collectedUsd: Number(split.amt),
-    flow: { bought, rent, creator: Number(split.creator), treasury: Number(split.platform), held: Math.max(0, Number(split.basket) - rent - bought) },
+    flow: { bought, rent, creator: Number(split.creator), treasury: Number(split.platform) - Number(split.lp), lp: Number(split.lp), held: Math.max(0, Number(split.basket) - rent - bought) },
     escrow: held,
   };
 }
