@@ -1,45 +1,20 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { fmtCompact, fmtPrice, shortAddr } from "@/web/ui/format";
 import type { BuyRow } from "@/web/server/landing";
 
-const ROTATE_MS = 3_500;
-const REFRESH_MS = 15_000;
 
 export function BuyTicker() {
-  const [buys, setBuys] = useState<BuyRow[]>([]);
-  const [i, setI] = useState(0);
-  const shownRef = useRef<string | null>(null);
+  const [b, setB] = useState<BuyRow | null>(null);
 
+  // One shared stream from the server: new trades as they land, otherwise one recent trade per token in turn.
   useEffect(() => {
-    let live = true;
-    const load = () => fetch("/api/trades/recent?limit=12", { cache: "no-store" })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((j) => {
-        if (!live || !j) return;
-        setBuys((prev) => (prev.length && prev[0]!.id === j.buys[0]?.id ? prev : j.buys));
-        // A refreshed list keeps the rotation going from the trade on screen instead of starting over.
-        setI((n) => {
-          const shown = shownRef.current;
-          const at = shown ? j.buys.findIndex((x: BuyRow) => x.id === shown) : -1;
-          return at >= 0 ? at : Math.min(n, Math.max(0, j.buys.length - 1));
-        });
-      })
-      .catch(() => {});
-    load();
-    const t = setInterval(() => { if (document.visibilityState === "visible") load(); }, REFRESH_MS);
-    return () => { live = false; clearInterval(t); };
+    const es = new EventSource("/api/trades/stream");
+    es.onmessage = (e) => { try { setB(JSON.parse(e.data) as BuyRow); } catch {} };
+    return () => es.close();
   }, []);
 
-  useEffect(() => {
-    if (buys.length < 2) return;
-    const t = setInterval(() => setI((n) => (n + 1) % buys.length), ROTATE_MS);
-    return () => clearInterval(t);
-  }, [buys.length]);
-
-  const b = buys[i % Math.max(1, buys.length)];
-  shownRef.current = b?.id ?? null;
   if (!b) return null;
   return (
     <div className="flex items-center gap-2.5 h-10 md:h-6 text-[13px] text-muted overflow-hidden" aria-live="off">
