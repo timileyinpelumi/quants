@@ -42,3 +42,18 @@ test("a migrated launch records its DAMM position and becomes graduated", async 
   const [l] = await f.sql`select status, damm_pool, damm_position from launches where id = ${id}`;
   expect([l.status, l.damm_pool, l.damm_position]).toEqual(["graduated", "D3", "Pos3"]);
 });
+
+test("the quick graduation check migrates a full curve within seconds, and skips curves far from full", async () => {
+  const { quickGraduate } = await import("../../src/keeper/steps/graduate");
+  const f = await keeperFixture();
+  const full = await insertLaunch(f.sql, { mint: "FULL", pool: "PF" });
+  const far = await insertLaunch(f.sql, { mint: "FAR", pool: "PN" });
+  const at = (id: number, reserve: number, sig: string) => f.sql`insert into trades (signature, event_index, launch_id, venue, side, trader, base_amount, quote_amount, fee_amount, quote_value, price, block_time, slot, curve_reserve, curve_threshold)
+    values (${sig}, 0, ${id}, 'curve', 'buy', 't', 1, 1, 0, 1, 1, now(), 1, ${reserve}, 100)`;
+  await at(full, 100, "s1"); await at(far, 40, "s2");
+  f.meteora.curve.set("PF", { migrated: false, complete: true });
+  f.meteora.curve.set("PN", { migrated: false, complete: true });
+  await quickGraduate(f.deps);
+  expect(f.chain.sent.some((s) => s.startsWith("migrate-PF"))).toBe(true);
+  expect(f.chain.sent.some((s) => s.startsWith("migrate-PN"))).toBe(false);
+});

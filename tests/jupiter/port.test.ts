@@ -79,3 +79,16 @@ test("isVerified remembers tokens already seen as verified in search results", a
   expect(await j.isVerified("A")).toBe(true);
   expect(calls).toBe(1);
 });
+
+test("a quote or swap build that Jupiter rate limits is tried again after a short pause, at most three times", async () => {
+  let calls = 0;
+  const waits: number[] = [];
+  const j = new JupiterLive("https://jup.test", {} as any, async () => (++calls < 3 ? new Response("slow down", { status: 429 }) : new Response(JSON.stringify({ inAmount: "1", outAmount: "2", priceImpactPct: "0" }))), undefined, async (ms) => { waits.push(ms); });
+  expect((await j.quote("A", "B", 1n, 100))?.outAmount).toBe(2n);
+  expect(calls).toBe(3);
+  expect(waits).toEqual([1000, 2000]);
+  calls = 0;
+  const always = new JupiterLive("https://jup.test", {} as any, async () => { calls++; return new Response("slow down", { status: 429 }); }, undefined, async () => {});
+  expect(await always.quote("A", "B", 1n, 100)).toBeNull();
+  expect(calls).toBe(3);
+});

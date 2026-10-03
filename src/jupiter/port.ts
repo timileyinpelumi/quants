@@ -76,8 +76,19 @@ const VERIFIED_TTL = 10 * 60_000;
 export class JupiterLive implements JupiterPort {
   private verified = new Map<string, number>();
   private tokensBase: string;
-  constructor(private baseUrl: string, private chain: SolanaChain, private fetchFn: Fetch = fetch, private apiKey?: string) {
+  constructor(private baseUrl: string, private chain: SolanaChain, private fetchFn: Fetch = fetch, private apiKey?: string, private sleep = (ms: number) => Bun.sleep(ms)) {
     this.tokensBase = `${new URL(baseUrl).origin}/tokens/v2`;
+  }
+
+  // RETRY-LOOP-SAFETY: three tries at most, waiting 1s then 2s, and only on 429; any other answer returns straight away.
+  //   The keeper runs one swap at a time, so the waits cannot pile up; a swap still limited after that waits for the next run.
+  private async fetchLimited(url: string | URL, init?: RequestInit): Promise<Response> {
+    let res = await this.fetchFn(url, init);
+    for (let attempt = 1; res.status === 429 && attempt < 3; attempt++) {
+      await this.sleep(1000 * 2 ** (attempt - 1));
+      res = await this.fetchFn(url, init);
+    }
+    return res;
   }
 
   private headers(extra: Record<string, string> = {}): Record<string, string> {
@@ -87,14 +98,14 @@ export class JupiterLive implements JupiterPort {
   async quote(inputMint: string, outputMint: string, amount: bigint, slippageBps: number): Promise<SwapQuote | null> {
     const url = new URL(`${this.baseUrl}/quote`);
     url.search = new URLSearchParams({ inputMint, outputMint, amount: amount.toString(), slippageBps: String(slippageBps), restrictIntermediateTokens: "true" }).toString();
-    const res = await this.fetchFn(url, { headers: this.headers() });
+    const res = await this.fetchLimited(url, { headers: this.headers() });
     if (!res.ok) return null;
     const q = await res.json() as { inAmount: string; outAmount: string; priceImpactPct: string };
     return { inAmount: BigInt(q.inAmount), outAmount: BigInt(q.outAmount), priceImpactBps: Math.round(Number(q.priceImpactPct) * 10_000), raw: q };
   }
 
   private async swapTx(q: SwapQuote, user: string) {
-    const res = await this.fetchFn(`${this.baseUrl}/swap`, {
+    const res = await this.fetchLimited(`${this.baseUrl}/swap`, {
       method: "POST", headers: this.headers({ "content-type": "application/json" }),
       body: JSON.stringify({ quoteResponse: q.raw, userPublicKey: user, wrapAndUnwrapSol: true, dynamicComputeUnitLimit: true }),
     });

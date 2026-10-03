@@ -1,4 +1,5 @@
 import { sweepPreparedLaunches } from "./steps/sweep";
+import { quickGraduate } from "./steps/graduate";
 import { RpcPool, providerOrder } from "../chain/rpc-pool";
 import { Connection } from "@solana/web3.js";
 import { loadEnv } from "../env";
@@ -38,6 +39,7 @@ const launchStreaks = new Streaks(3);
 void (async () => {
   while (true) {
     await sweepPreparedLaunches(deps, { minAgeSeconds: 20 }).catch((e) => console.error("quick sweep failed", e));
+    await quickGraduate(deps).catch((e) => console.error("quick graduate failed", e));
     await Bun.sleep(15_000);
   }
 })();
