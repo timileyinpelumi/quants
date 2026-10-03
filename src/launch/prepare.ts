@@ -83,7 +83,8 @@ export async function prepareLaunch(
   for (const b of input.basket) {
     if (EXCLUDED_MINTS.has(b.mint)) throw new LaunchError("basket_not_verified", `${b.symbol ?? b.mint} is not offered as a reward token. Pick another one.`);
     // The pair token is already vetted as a pair; paying it out needs no swap.
-    const verified = b.mint === input.quoteMint || await deps.isVerified(b.mint).catch((e) => {
+    // The platform token is offered as a reward before Jupiter lists it as verified.
+    const verified = b.mint === input.quoteMint || (!!settings.platformToken.mint && b.mint === settings.platformToken.mint) || await deps.isVerified(b.mint).catch((e) => {
       if (e instanceof JupiterUnavailable) throw new LaunchError("jupiter_unavailable", "We couldn't check the reward tokens with Jupiter right now. Try again in a moment.");
       throw e;
     });

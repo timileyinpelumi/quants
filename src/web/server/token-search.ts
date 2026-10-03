@@ -1,3 +1,5 @@
+import { cachedSettings } from "@/domain/settings";
+import type { WebContext } from "./context";
 import { POPULAR_SIZE, type JupiterPort, type VerifiedToken } from "@/jupiter/port";
 import type { RewardMintCheck } from "@/chain/reward-mint";
 import { ttlCache } from "@/domain/lru";
@@ -22,3 +24,11 @@ export async function rewardTokens(check: RewardMintCheck, list: VerifiedToken[]
 
 export const popularRewardTokens = async (jupiter: JupiterPort, check: RewardMintCheck) =>
   (await rewardTokens(check, await jupiter.popularVerified())).slice(0, POPULAR_SIZE);
+
+/** The platform token as a reward choice, listed first in the picker once it has launched. */
+export async function platformRewardToken(ctx: Pick<WebContext, "sql">): Promise<VerifiedToken | null> {
+  const p = (await cachedSettings(ctx.sql)).platformToken;
+  if (!p.mint) return null;
+  const [row] = await ctx.sql`select name, image from launches where mint = ${p.mint}`;
+  return { mint: p.mint, symbol: p.symbol, name: row?.name ?? "quants", icon: row?.image ?? null, decimals: p.decimals, tokenProgram: "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA" };
+}

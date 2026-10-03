@@ -174,7 +174,7 @@ test("an empty search returns popular tokens", async () => {
   const c = await makeWebContext();
   (c.jupiter as any).popularVerified = async () => [{ mint: "S", symbol: "SOL", name: "Solana", icon: null, decimals: 9, tokenProgram: "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA" }];
   const j = await (await search(new Request("http://x/api/tokens/search?q="))).json();
-  expect(j.tokens.map((t: any) => t.symbol)).toEqual(["SOL"]);
+  expect(j.tokens.at(-1).symbol).toBe("SOL");
   expect(j.popular).toBe(true);
 });
 
@@ -275,4 +275,19 @@ test("launch cost lists config rent only while that pair and fee has no live con
   await c.sql`update config_keys set status = 'live' where quote_mint = ${NATIVE_MINT} and fee_bps = 200`;
   const live = (await c.sql`select count(*)::int as n from config_keys where quote_mint = ${NATIVE_MINT} and fee_bps = 200 and status = 'live'`)[0].n;
   expect((await ask()).config).toBe(live > 0 ? "0" : before.config);
+});
+
+test("the platform token leads the reward picker and is accepted as a reward before Jupiter verifies it", async () => {
+  const c = await makeWebContext();
+  const { loadLatestSettings, saveSettings } = await import("../../src/domain/settings");
+  const { version: _v, ...s } = await loadLatestSettings(c.sql);
+  const own = Keypair.generate().publicKey.toBase58();
+  await saveSettings(c.sql, { ...s, platformToken: { ...s.platformToken, mint: own, enabled: true, graduation: 1_000_000 } }, "t");
+  const { invalidateSettingsCache } = await import("../../src/domain/settings");
+  invalidateSettingsCache?.();
+  const popular = await (await search(new Request("http://x/api/tokens/search"))).json();
+  expect(popular.tokens[0].mint).toBe(own);
+  (c.jupiter as any).isVerified = async () => false;
+  const r = await post(prepare, body({ basket: [{ mint: own, weightBps: 10000 }] }));
+  expect((await r.json()).error?.code).not.toBe("basket_not_verified");
 });
