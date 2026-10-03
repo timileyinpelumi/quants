@@ -3,7 +3,7 @@ import { BorshCoder } from "@coral-xyz/anchor";
 import bs58 from "bs58";
 import { DynamicBondingCurveIdl } from "@meteora-ag/dynamic-bonding-curve-sdk";
 import { CpAmmIdl } from "@meteora-ag/cp-amm-sdk";
-import type { ChainHistory, IndexedTx, MissingTx, PoolSwap, SignatureInfo, UnreadableTx } from "./run";
+import type { ChainHistory, IndexedTx, MissingTx, PoolSwap, RetryTx, SignatureInfo, UnreadableTx } from "./run";
 
 const DBC = "dbcij3LWUppWqq96dh6gJWwBifmcGfLSB5D4DuSMaqN";
 const DAMM = "cpamdpZCGKUy5JxQXB4dcpGPiikHawvSWAd6mEn1sGG";
@@ -64,14 +64,18 @@ export class RpcHistory implements ChainHistory {
   }
 
   // Raw JSON so every transaction version decodes the same way; web3.js cannot parse version 1 messages.
-  async transactions(signatures: string[], address: string): Promise<(IndexedTx | MissingTx | UnreadableTx)[]> {
+  async transactions(signatures: string[], address: string): Promise<(IndexedTx | MissingTx | UnreadableTx | RetryTx)[]> {
     const replies: { result?: any; error?: { message?: string } }[] = await (this.conn as any)._rpcBatchRequest(signatures.map((sig) => ({
       methodName: "getTransaction",
       args: [sig, { encoding: "json", maxSupportedTransactionVersion: 1, commitment: "confirmed" }],
     })));
-    return replies.map((reply, i): IndexedTx | MissingTx | UnreadableTx => {
+    return replies.map((reply, i): IndexedTx | MissingTx | UnreadableTx | RetryTx => {
       const signature = signatures[i]!;
-      if (reply?.error) return { signature, unreadable: true };
+      if (reply?.error) {
+        const e = reply.error as { code?: number; message?: string };
+        if (e.code === -32005 || e.code === 429 || /too many|rate limit|timeout|unavailable/i.test(e.message ?? "")) return { signature, retry: true };
+        return { signature, unreadable: true };
+      }
       const tx = reply?.result;
       if (!tx?.meta || !tx.blockTime) return { signature, missing: true };
       const keys: string[] = [...tx.transaction.message.accountKeys, ...(tx.meta.loadedAddresses?.writable ?? []), ...(tx.meta.loadedAddresses?.readonly ?? [])];

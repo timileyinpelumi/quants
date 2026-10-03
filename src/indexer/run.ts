@@ -15,13 +15,15 @@ export interface IndexedTx { signature: string; failed: boolean; blockTime: numb
 export interface MissingTx { signature: string; missing: true }
 /** The RPC refused this one transaction (for example a version it cannot serve); it is skipped so the pool keeps indexing. */
 export interface UnreadableTx { signature: string; unreadable: true }
+/** The RPC throttled this read; the pass stops here and the next one tries again. */
+export interface RetryTx { signature: string; retry: true }
 export interface SignatureInfo { signature: string; blockTime: number | null }
 
 export interface ChainHistory {
   /** Signatures after `until` (all of them when null), oldest first. */
   signaturesSince(address: string, until: string | null): Promise<SignatureInfo[]>;
   /** The given transactions in the same order, with only the swaps that hit `address`. */
-  transactions(signatures: string[], address: string): Promise<(IndexedTx | MissingTx | UnreadableTx)[]>;
+  transactions(signatures: string[], address: string): Promise<(IndexedTx | MissingTx | UnreadableTx | RetryTx)[]>;
 }
 
 export interface IndexerDeps {
@@ -36,7 +38,7 @@ const MAX_ADDRESSES_PER_PASS = 100;
 const MAX_TX_PER_PASS = 500;
 const CHUNK = 10;
 // RPC nodes can list a signature before they serve the transaction, and pruned nodes never serve old ones
-const MISSING_GRACE_MS = 10 * 60_000;
+const MISSING_GRACE_MS = 6 * 60 * 60_000;
 const BASE_DECIMALS = 6; // every quants launch is minted with 6 decimals
 
 export const spotPrice = (sqrtPrice: bigint, baseDecimals: number, quoteDecimals: number) => {
@@ -81,6 +83,7 @@ export async function indexOnce(d: IndexerDeps): Promise<{ trades: number; skipp
         const ready: IndexedTx[] = [];
         let waitOn: string | null = null;
         for (const t of got) {
+          if ("retry" in t) { waitOn = t.signature; break; }
           if ("unreadable" in t) {
             skipped++;
             console.error(JSON.stringify({ at: new Date().toISOString(), unreadableTx: t.signature, address }));

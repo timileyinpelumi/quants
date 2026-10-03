@@ -164,14 +164,14 @@ test("a transaction the RPC cannot return yet holds the cursor just before it", 
   expect((await indexOnce(deps(sql, h, 1_790_000_200_000))).trades).toBe(2);
 });
 
-test("a transaction missing for more than ten minutes is skipped and counted", async () => {
+test("a transaction missing for more than six hours is skipped and counted", async () => {
   const sql = await freshDb();
   await insertLaunch(sql, { pool: "P1" });
   const h = new FakeHistory();
   h.add("P1", { signature: "s1", blockTime: 1_790_000_000 });
   h.add("P1", { signature: "s2", blockTime: 1_790_000_001 });
   h.missing.add("s1");
-  const r = await indexOnce(deps(sql, h, 1_790_000_000_000 + 11 * 60_000));
+  const r = await indexOnce(deps(sql, h, 1_790_000_000_000 + (6 * 60 + 1) * 60_000));
   expect(r).toMatchObject({ trades: 1, skipped: 1, errors: [] });
   expect((await sql`select last_signature from index_cursors`)[0].last_signature).toBe("s2");
 });

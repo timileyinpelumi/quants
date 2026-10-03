@@ -36,3 +36,8 @@ test("one transaction the RPC refuses is skipped without blocking the others", a
   expect(out[0]).toEqual({ signature: "BAD", unreadable: true });
   expect((out[1] as IndexedTx).swaps.length).toBe(1);
 });
+
+test("a throttled read is retried next pass, never treated as unreadable or missing", async () => {
+  const h = new RpcHistory(conn({ SLOW: { error: { code: -32005, message: "Too Many Requests" } } }));
+  expect(await h.transactions(["SLOW"], POOL)).toEqual([{ signature: "SLOW", retry: true }]);
+});
