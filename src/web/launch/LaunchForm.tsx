@@ -216,6 +216,15 @@ export function LaunchForm({ split, tiers, maxPenaltyBps, quotes, initialPair, f
     if (!wallet.publicKey) { modal.setVisible(true); return; }
     if (problems.length) { setError(problems[0]!); return; }
     setError(null);
+    // Check the balance before uploading anything, so a short wallet hears it straight away.
+    if (costTotal > 0n) {
+      const have = await fetch(`/api/wallet/${wallet.publicKey.toBase58()}`, { cache: "no-store" })
+        .then((r) => (r.ok ? r.json() : null)).then((j) => (j?.sol != null ? BigInt(j.sol) : null)).catch(() => null);
+      if (have !== null && have < costTotal) {
+        setError(`Your wallet has ${solText(have)} and this launch needs ${solText(costTotal)}. Add ${solText(costTotal - have)} and try again.`);
+        return;
+      }
+    }
     const steps: LaunchStep["step"][] = [];
     const got: { mint?: string; need?: bigint } = {};
     try {
