@@ -153,17 +153,16 @@ export async function featured(sql: SQL, now = Date.now(), icons?: Icons, coins:
   return { mint: coin.mint, symbol: coin.symbol, name: coin.name, pairs: p.n, token: token?.mint === coin.mint ? token : null };
 }
 
-export type BuyRow = { id: string; mint: string; symbol: string; trader: string; amount: number; at: string };
+export type BuyRow = { id: string; mint: string; symbol: string; trader: string; amount: number; at: string; side: "buy" | "sell" };
 
-/** Newest buys across every launch, for the home page ticker. */
+/** Newest buys and sells across every launch, for the home page ticker. */
 export async function recentBuys(sql: SQL, limit: number): Promise<BuyRow[]> {
   const rows = await sql`
-    select t.signature, t.event_index, l.mint, coalesce(l.symbol, left(l.mint, 4)) as symbol, t.trader, t.base_amount::float8 as base, t.block_time
+    select t.signature, t.event_index, l.mint, coalesce(l.symbol, left(l.mint, 4)) as symbol, t.trader, t.base_amount::float8 as base, t.block_time, t.side
     from trades t join launches l on l.id = t.launch_id
-    where t.side = 'buy'
     order by t.slot desc, t.seq desc limit ${limit}`;
   return rows.map((r: any) => ({
-    id: `${r.signature}:${r.event_index}`, mint: r.mint, symbol: r.symbol, trader: r.trader, amount: r.base * BASE_UNIT, at: new Date(r.block_time).toISOString(),
+    id: `${r.signature}:${r.event_index}`, mint: r.mint, symbol: r.symbol, trader: r.trader, amount: r.base * BASE_UNIT, at: new Date(r.block_time).toISOString(), side: r.side,
   }));
 }
 

@@ -78,7 +78,7 @@ test("home pages the first tab", async () => {
   expect(d.nextOffset).toBe(HOME_PAGE);
 });
 
-test("recent buys are the newest buys across every launch", async () => {
+test("recent trades are the newest buys and sells across every launch", async () => {
   const sql = await freshDb();
   const a = await launch(sql, "AAA", 4);
   const b = await launch(sql, "BBB", 3);
@@ -86,7 +86,7 @@ test("recent buys are the newest buys across every launch", async () => {
   await trade(sql, b, 20, 0.001, { trader: "w2", side: "sell" });
   await trade(sql, b, 10, 0.001, { trader: "w3" });
   const r = await recentBuys(sql, 10);
-  expect(r.map((x) => [x.symbol, x.trader])).toEqual([["BBB", "w3"], ["AAA", "w1"]]);
+  expect(r.map((x) => [x.symbol, x.trader, x.side])).toEqual([["BBB", "w3", "buy"], ["BBB", "w2", "sell"], ["AAA", "w1", "buy"]]);
   expect(r[0]!.amount).toBeCloseTo(0.000001, 12);
   const { GET } = await import("../../src/app/api/trades/recent/route");
   const { makeWebContext } = await import("../helpers/web-context");
