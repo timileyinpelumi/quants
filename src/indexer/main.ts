@@ -6,6 +6,7 @@ import { JupiterPrices } from "./prices";
 import { applyClusterDefaults } from "../cluster";
 import { pricesFor } from "../jupiter/select";
 import { indexOnce } from "./run";
+import { pacedFetch, nextWait } from "./pace";
 import { cachedSettings } from "../domain/settings";
 import { makeAlerter, sqlThrottle, Streaks, indexerPassAlerts } from "../ops/alerts";
 
@@ -16,11 +17,12 @@ const sql = db(e.DATABASE_URL);
 const conn = new Connection(e.RPC_URL, {
   commitment: "confirmed",
   disableRetryOnRateLimit: true,
-  fetch: ((url, init) => fetch(url, { ...init, signal: AbortSignal.timeout(20_000) })) as typeof fetch,
+  fetch: pacedFetch(((url, init) => fetch(url, { ...init, signal: AbortSignal.timeout(20_000) })) as typeof fetch, Number(e.INDEXER_RPC_GAP_MS ?? 150)),
 });
 const prices = pricesFor(e, conn, new JupiterPrices(e.JUPITER_PRICE_URL ?? "https://api.jup.ag/price/v3", e.JUPITER_API_KEY));
 const decimals = new Map<string, number>();
-const intervalMs = Number(e.INDEXER_INTERVAL_SECONDS ?? 5) * 1000;
+const intervalMs = Number(e.INDEXER_INTERVAL_SECONDS ?? 15) * 1000;
+let waitMs = intervalMs;
 
 // Session-level advisory lock on a reserved connection: a second indexer exits instead of double reading.
 const lockConn = await sql.reserve();
@@ -55,9 +57,11 @@ while (true) {
     if (first || r.trades || r.skipped || r.errors.length) console.log(JSON.stringify({ at: new Date().toISOString(), checked: checked.length, ...r }));
     first = false;
     indexerPassAlerts(alert, addressStreaks, { ...r, checked });
+    waitMs = nextWait(waitMs, r.errors.some((x) => /429|Too Many/i.test(x.error)), intervalMs, 60_000);
   } catch (err) {
+    waitMs = nextWait(waitMs, /429|Too Many/i.test(String(err)), intervalMs, 60_000);
     console.error(JSON.stringify({ at: new Date().toISOString(), error: String(err) }));
     void alert("indexer-pass", `pass failed: ${String(err)}`);
   }
-  await Bun.sleep(Math.max(0, intervalMs - (Date.now() - started)));
+  await Bun.sleep(Math.max(0, waitMs - (Date.now() - started)));
 }

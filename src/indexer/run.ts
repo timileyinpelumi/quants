@@ -32,7 +32,7 @@ export interface IndexerDeps {
 
 const MAX_ADDRESSES_PER_PASS = 100;
 const MAX_TX_PER_PASS = 500;
-const CHUNK = 100;
+const CHUNK = 10;
 // RPC nodes can list a signature before they serve the transaction, and pruned nodes never serve old ones
 const MISSING_GRACE_MS = 10 * 60_000;
 const BASE_DECIMALS = 6; // every quants launch is minted with 6 decimals
