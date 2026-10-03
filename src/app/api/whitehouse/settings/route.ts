@@ -13,8 +13,12 @@ const pairs = () => quoteCoins().filter((c) => !c.platform)
   .map((c) => ({ mint: c.mint, symbol: c.symbol, name: c.name, decimals: c.decimals, payoutMin: c.payoutMin.toString(), graduation: c.graduation, enabled: c.enabled }));
 
 // The alert webhook URL lets anyone post to that channel, so read only sessions only learn whether one is set.
-const forRole = <T extends { alertWebhookUrl: string }>(s: T, role: AdminRole) =>
-  role === "full" ? s : { ...s, alertWebhookUrl: s.alertWebhookUrl ? "hidden" : "" };
+// The creator payout hold list is for the full code only and is left out entirely.
+const forRole = <T extends { alertWebhookUrl: string; creatorPayoutHold?: string[] }>(s: T, role: AdminRole) => {
+  if (role === "full") return s;
+  const { creatorPayoutHold: _hold, ...rest } = s;
+  return { ...rest, alertWebhookUrl: s.alertWebhookUrl ? "hidden" : "" };
+};
 
 /** A target the curve builder refuses would break every launch on that pair, so it is refused at save. */
 function checkCurves(s: Settings) {

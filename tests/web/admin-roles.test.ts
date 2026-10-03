@@ -207,3 +207,15 @@ test("read only sessions can read every GET route except access codes", async ()
     expect(r.status, name).toBe(name === "codes" ? 403 : 200);
   }
 });
+
+test("the creator payout hold list never reaches a read only session", async () => {
+  const c = await makeWebContext();
+  const s = await loadLatestSettings(c.sql);
+  const mint = "3JMpdC7tXi5Wga8vgUjgLSSihuBxHfzPdeSvqsATiLgE";
+  await saveSettings(c.sql, { ...s, creatorPayoutHold: [mint] }, "t");
+  const { full, read } = await readSession();
+  const asRead = await (await getSettings(req(read))).text();
+  expect(asRead).not.toContain("creatorPayoutHold");
+  expect(asRead).not.toContain(mint);
+  expect((await (await getSettings(req(full))).json()).settings.creatorPayoutHold).toEqual([mint]);
+});

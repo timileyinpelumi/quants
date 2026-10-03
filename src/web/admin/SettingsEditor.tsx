@@ -144,9 +144,9 @@ export function SettingsEditor({ initial, version, pairs, onSave, readOnly = fal
         <Text label="Site banner" value={s.bannerMessage} onChange={(v) => set({ bannerMessage: v })} placeholder="Empty shows no banner" hint="Shown at the top of every page. 200 characters at most." />
       </Section>
 
-      <Section title="Creator payouts">
+      {!readOnly && <Section title="Creator payouts">
         <HoldList value={s.creatorPayoutHold ?? []} onChange={(v) => set({ creatorPayoutHold: v })} />
-      </Section>
+      </Section>}
 
       <Section title="Pairs" note="Which pair tokens new launches can use, and how much each curve raises before it graduates. A new target applies to curves created from now on; existing pools keep theirs.">
         <div className="flex flex-col">
