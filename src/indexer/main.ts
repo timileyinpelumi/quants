@@ -14,7 +14,8 @@ const e = applyClusterDefaults(process.env);
 if (!e.DATABASE_URL || !e.RPC_URL) throw new Error("DATABASE_URL and RPC_URL are required");
 const sql = db(e.DATABASE_URL);
 // No built-in 429 retry and a hard timeout: a slow or throttled address fails this pass and is retried on the next.
-const conn = new Connection(e.RPC_URL, {
+// INDEXER_RPC_URL lets the indexer use its own provider so its reads do not share the keeper's rate limit.
+const conn = new Connection(e.INDEXER_RPC_URL || e.RPC_URL, {
   commitment: "confirmed",
   disableRetryOnRateLimit: true,
   fetch: pacedFetch(((url, init) => fetch(url, { ...init, signal: AbortSignal.timeout(20_000) })) as typeof fetch, Number(e.INDEXER_RPC_GAP_MS ?? 150)),
