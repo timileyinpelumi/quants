@@ -42,7 +42,6 @@ const MAINNET: Pick<QuoteCoin, "mint" | "symbol" | "name" | "decimals" | "gradua
     ["ETH", "7vfCXTUXx5WJV5JADk17DUJ4ksgau7utNKj4b963voxs", "Ether (Wormhole)", 8, 3.7, 200_000n],
     ["BONK", "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263", "Bonk", 5, 2_000_000_000, 150_000_000_000n],
     ["WIF", "EKpQGSJtjMFqKZ9KQanSqYXRcF8fBopzLHYxdM65zcjm", "dogwifhat", 6, 40_000, 20_000_000n, "/tokens/wif.png"],
-    ["TRUMP", "6p6xgHyF7AeE6TZkSmFsko444wqoP15icUSqi2jfGiPN", "Official Trump", 6, 4_900, 2_500_000n],
     ["RAY", "4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R", "Raydium", 6, 4_800, 2_500_000n],
   ] as [string, string, string, number, number, bigint, string?][]).map(([symbol, mint, name, decimals, graduation, payoutMin, iconUrl]) => ({ mint, symbol, name, decimals, graduation, iconMint: mint, payoutMin, ...(iconUrl ? { iconUrl } : {}) })),
 ];
