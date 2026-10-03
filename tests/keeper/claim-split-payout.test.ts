@@ -130,3 +130,20 @@ test("a trading only launch's LP fees also go to the treasury in full", async ()
   expect(await getBalance(sql, id, "treasury", NATIVE_MINT)).toBe(1000n);
   expect(await getBalance(sql, id, "creator", NATIVE_MINT)).toBe(0n);
 });
+
+test("a token on the creator hold list keeps its creator share until it is taken off the list", async () => {
+  const { sql, chain, meteora, deps, settings } = await keeperFixture();
+  const id = await insertLaunch(sql, { pool: "PH", mint: "HoldMint1111111111111111111111111111111111" });
+  meteora.partnerFee.set("PH", 1_000_000_000n);
+  const [launch] = await loadLaunches(sql);
+  const held = { ...settings, creatorPayoutHold: [launch!.mint] };
+  await claimStep(deps, launch!, held, "r1");
+  await splitStep(deps, launch!, held, "r1");
+  await payoutStep(deps, launch!, held, "r1");
+  expect(await getBalance(sql, id, "creator", NATIVE_MINT)).toBe(250_000_000n);
+  expect(await getBalance(sql, id, "treasury", NATIVE_MINT)).toBe(0n);
+  expect(chain.sent.filter((s) => s.startsWith("transfer")).length).toBe(1);
+  await payoutStep(deps, launch!, { ...settings, creatorPayoutHold: [] }, "r2");
+  expect(await getBalance(sql, id, "creator", NATIVE_MINT)).toBe(0n);
+  expect(chain.sent.filter((s) => s.startsWith("transfer")).length).toBe(2);
+});

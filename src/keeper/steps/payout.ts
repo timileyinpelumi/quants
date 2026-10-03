@@ -10,9 +10,11 @@ export const payoutResolver: DeltaResolver = async (row) =>
 
 export async function payoutStep(deps: KeeperDeps, launch: LaunchRow, s: VersionedSettings, runId: string) {
   const mint = launch.quoteMint;
+  const held = (s.creatorPayoutHold ?? []).includes(launch.mint);
   const targets = [
     { bucket: "treasury" as const, to: deps.wallets.treasury, min: 1n },
-    { bucket: "creator" as const, to: launch.creator, min: s.creatorPayoutMin[mint] ?? quoteCoin(mint)?.payoutMin ?? 1n },
+    // A held token keeps its creator share in the ledger; it is paid on the first run after the hold is lifted.
+    ...(held ? [] : [{ bucket: "creator" as const, to: launch.creator, min: s.creatorPayoutMin[mint] ?? quoteCoin(mint)?.payoutMin ?? 1n }]),
   ];
   for (const t of targets) {
     const amount = await getBalance(deps.sql, launch.id, t.bucket, mint);

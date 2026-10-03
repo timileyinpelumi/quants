@@ -50,6 +50,7 @@ const Schema = z.object({
   launchesPaused: z.boolean(),
   bannerMessage: z.string().trim().max(200, "Banner is 200 characters at most"),
   stockPairs: z.boolean(),
+  creatorPayoutHold: z.array(z.string().regex(/^[1-9A-HJ-NP-Za-km-z]{32,44}$/, "Hold list entries must be token addresses")).max(100),
 });
 
 export type Settings = {
@@ -59,6 +60,8 @@ export type Settings = {
   feeTiersBps: number[];
   featured: { headline: string; body: string; prelaunch: string };
   xUrl: string; alertWebhookUrl: string; launchesPaused: boolean; bannerMessage: string; stockPairs: boolean;
+  /** Tokens whose creator share is held instead of paid out; taking one off the list pays what built up. */
+  creatorPayoutHold: string[];
 } & QuoteSettings;
 export type VersionedSettings = Settings & { version: number };
 
@@ -77,6 +80,7 @@ function seedExtras(env: Env) {
     launchesPaused: false,
     bannerMessage: "",
     stockPairs: env.STOCK_PAIRS === "1",
+    creatorPayoutHold: [] as string[],
   };
 }
 
