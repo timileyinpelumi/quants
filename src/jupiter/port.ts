@@ -65,7 +65,12 @@ export function assertSafeSwap(tx: VersionedTransaction, keeper: PublicKey) {
   }
 }
 
+export class JupiterUnavailable extends Error {}
+
+const VERIFIED_TTL = 10 * 60_000;
+
 export class JupiterLive implements JupiterPort {
+  private verified = new Map<string, number>();
   private tokensBase: string;
   constructor(private baseUrl: string, private chain: SolanaChain, private fetchFn: Fetch = fetch, private apiKey?: string) {
     this.tokensBase = `${new URL(baseUrl).origin}/tokens/v2`;
@@ -112,22 +117,45 @@ export class JupiterLive implements JupiterPort {
     const res = await this.fetchFn(`${this.tokensBase}/toporganicscore/24h?limit=100`, { headers: this.headers() });
     if (!res.ok) return this.popular?.list ?? [];
     const list = keepClassicVerified(await res.json() as TokenRow[]);
+    this.remember(list.map((t) => t.mint));
     this.popular = { at: Date.now(), list };
     return list;
   }
 
+  private remember(mints: string[]) { const now = Date.now(); for (const m of mints) this.verified.set(m, now); }
+
+  // RETRY-LOOP-SAFETY: two attempts at most, 8s timeout each, no sleep; the caller sees JupiterUnavailable after that.
+  private async searchStrict(query: string): Promise<TokenRow[]> {
+    let last = "";
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const res = await this.fetchFn(`${this.tokensBase}/search?query=${encodeURIComponent(query)}`, { headers: this.headers(), signal: AbortSignal.timeout(8000) });
+        if (res.ok) return await res.json() as TokenRow[];
+        last = `status ${res.status}`;
+      } catch (e) {
+        last = e instanceof Error ? e.message : String(e);
+      }
+    }
+    console.error(JSON.stringify({ at: new Date().toISOString(), jupiterTokenSearchFailed: last }));
+    throw new JupiterUnavailable(last);
+  }
+
   private async search(query: string): Promise<TokenRow[]> {
-    const res = await this.fetchFn(`${this.tokensBase}/search?query=${encodeURIComponent(query)}`, { headers: this.headers() });
-    if (!res.ok) return [];
-    return await res.json() as TokenRow[];
+    return this.searchStrict(query).catch(() => []);
   }
 
   async isVerified(mint: string): Promise<boolean> {
-    const t = (await this.search(mint)).find((x) => x.id === mint);
-    return !!t && (t.isVerified === true || (t.tags ?? []).includes("verified"));
+    const seen = this.verified.get(mint);
+    if (seen && Date.now() - seen < VERIFIED_TTL) return true;
+    const t = (await this.searchStrict(mint)).find((x) => x.id === mint);
+    const ok = !!t && (t.isVerified === true || (t.tags ?? []).includes("verified"));
+    if (ok) this.remember([mint]);
+    return ok;
   }
 
   async searchVerified(query: string): Promise<VerifiedToken[]> {
-    return keepClassicVerified(await this.search(query));
+    const list = keepClassicVerified(await this.search(query));
+    this.remember(list.map((t) => t.mint));
+    return list;
   }
 }

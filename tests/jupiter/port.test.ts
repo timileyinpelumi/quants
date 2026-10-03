@@ -50,3 +50,21 @@ test("popularVerified reads top tokens and keeps verified classic SPL only", asy
   expect((await j.popularVerified()).map((t) => t.symbol)).toEqual(["SOL"]);
   expect(url).toBe("https://api.jup.ag/tokens/v2/toporganicscore/24h?limit=100");
 });
+
+test("isVerified retries a failed lookup once, then reports Jupiter as unavailable instead of unverified", async () => {
+  const { JupiterUnavailable } = await import("../../src/jupiter/port");
+  let calls = 0;
+  const flaky = new JupiterLive("https://jup.test", {} as any, async () => (++calls === 1 ? new Response("busy", { status: 503 }) : new Response(JSON.stringify([{ id: "m", isVerified: true }]))));
+  expect(await flaky.isVerified("m")).toBe(true);
+  expect(calls).toBe(2);
+  const down = new JupiterLive("https://jup.test", {} as any, async () => new Response("busy", { status: 503 }));
+  await expect(down.isVerified("m")).rejects.toBeInstanceOf(JupiterUnavailable);
+});
+
+test("isVerified remembers tokens already seen as verified in search results", async () => {
+  let calls = 0;
+  const j = new JupiterLive("https://jup.test", {} as any, async () => { calls++; return new Response(JSON.stringify([{ id: "A", symbol: "A", name: "A", decimals: 6, isVerified: true, tokenProgram: "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA" }])); });
+  await j.searchVerified("A");
+  expect(await j.isVerified("A")).toBe(true);
+  expect(calls).toBe(1);
+});

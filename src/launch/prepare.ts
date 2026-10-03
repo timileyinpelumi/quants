@@ -1,3 +1,4 @@
+import { JupiterUnavailable } from "../jupiter/port";
 import type { SQL } from "bun";
 import type { Keypair } from "@solana/web3.js";
 import { z } from "zod";
@@ -7,7 +8,7 @@ import { loadLatestSettings } from "../domain/settings";
 import { NATIVE_MINT } from "../domain/types";
 
 export class LaunchError extends Error {
-  constructor(public code: "invalid_input" | "launches_paused" | "basket_not_verified" | "basket_unsupported" | "dev_buy_too_large" | "not_found_on_chain" | "pool_mismatch" | "simulation_failed" | "tx_too_large" | "cosign_refused" | "blockhash_expired", message: string) { super(message); }
+  constructor(public code: "invalid_input" | "launches_paused" | "basket_not_verified" | "basket_unsupported" | "dev_buy_too_large" | "not_found_on_chain" | "pool_mismatch" | "simulation_failed" | "tx_too_large" | "cosign_refused" | "blockhash_expired" | "jupiter_unavailable", message: string) { super(message); }
 }
 
 // ALLOW_LOCAL_URIS is set only by scripts/dev-seed.ts so local uploads served over http work.
@@ -77,7 +78,11 @@ export async function prepareLaunch(
   const input = parsed.data;
   for (const b of input.basket) {
     // The pair token is already vetted as a pair; paying it out needs no swap.
-    if (b.mint !== input.quoteMint && !(await deps.isVerified(b.mint))) throw new LaunchError("basket_not_verified", `${b.symbol ?? b.mint} is not on the Jupiter verified list. Pick another reward token.`);
+    const verified = b.mint === input.quoteMint || await deps.isVerified(b.mint).catch((e) => {
+      if (e instanceof JupiterUnavailable) throw new LaunchError("jupiter_unavailable", "We couldn't check the reward tokens with Jupiter right now. Try again in a moment.");
+      throw e;
+    });
+    if (!verified) throw new LaunchError("basket_not_verified", `${b.symbol ?? b.mint} is not on the Jupiter verified list. Pick another reward token.`);
     if ((await deps.tokenProgramOf(b.mint)) !== CLASSIC_TOKEN_PROGRAM) {
       throw new LaunchError("basket_unsupported", `${b.symbol ?? b.mint} is not a classic SPL token, which Kamino farms require. Pick another reward token.`);
     }
