@@ -14,12 +14,14 @@ const env = loadEnv();
 const sql = db(env.DATABASE_URL);
 const keeper = loadKeypair(env.KEEPER_KEYPAIR);
 const spill = loadKeypair(env.SPILL_KEYPAIR);
-const chain = new SolanaChain(new Connection(env.RPC_URL, "confirmed"), keeper, spill);
+// KEEPER_RPC_URL gives the keeper its own provider so its sends do not share a rate limit with the web app.
+const rpcUrl = process.env.KEEPER_RPC_URL || env.RPC_URL;
+const chain = new SolanaChain(new Connection(rpcUrl, "confirmed"), keeper, spill);
 const deps = {
   sql, chain,
   meteora: new MeteoraLive(chain, env.DAMM_V2_MIGRATION_CONFIG),
   jupiter: swapPortFor(process.env, chain),
-  staking: new KaminoBackend(chain, env.RPC_URL, env.KAMINO_GLOBAL_CONFIG ?? ""),
+  staking: new KaminoBackend(chain, rpcUrl, env.KAMINO_GLOBAL_CONFIG ?? ""),
   wallets: { keeper: keeper.publicKey.toBase58(), spill: spill.publicKey.toBase58(), treasury: env.TREASURY_ADDRESS },
 };
 
