@@ -37,6 +37,7 @@ COPY --chown=bun:bun db ./db
 COPY --chown=bun:bun src ./src
 COPY --chown=bun:bun scripts ./scripts
 COPY --chown=bun:bun public ./public
+COPY --chown=bun:bun assets ./assets
 COPY --from=build --chown=bun:bun /app/.next ./.next
 USER bun
 EXPOSE 3000
