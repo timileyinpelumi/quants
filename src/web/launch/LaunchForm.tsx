@@ -170,7 +170,6 @@ export function LaunchForm({ split, tiers, maxPenaltyBps, quotes, initialPair, f
     : picked;
 
   const problems = [
-    !image && "Add an image",
     !name.trim() && "Add a name",
     !/^[A-Za-z0-9]{1,10}$/.test(symbol) && "Symbol is 1 to 10 letters or numbers",
     !tradingOnly && basket.length === 0 && "Pick at least one reward token",
@@ -222,7 +221,7 @@ export function LaunchForm({ split, tiers, maxPenaltyBps, quotes, initialPair, f
     try {
       setStatus("uploading");
       const form = new FormData();
-      form.set("image", image!);
+      if (image) form.set("image", image);
       form.set("name", name.trim());
       form.set("symbol", symbol);
       for (const [k, v] of Object.entries({ description, website, x, telegram })) if (v.trim()) form.set(k, v.trim());
@@ -301,7 +300,7 @@ export function LaunchForm({ split, tiers, maxPenaltyBps, quotes, initialPair, f
             <span className={num}>01</span>
             <div className="grid grid-cols-[112px_minmax(0,1fr)] md:grid-cols-[132px_minmax(0,1fr)_200px] gap-5 items-start md:items-end">
               <div className="flex flex-col gap-2.5 text-[13px] text-muted row-span-2 md:row-span-1">
-                <span>Image</span>
+                <span>Image <span className="text-faint">(optional)</span></span>
                 <label className="w-28 h-28 md:w-[132px] md:h-[132px] rounded-[28px] border-[1.5px] border-dashed border-accent/45 bg-surface flex flex-col items-center justify-center gap-2 text-accent text-[13px] cursor-pointer overflow-hidden focus-within:border-accent">
                   {preview ? (
                     <img src={preview} alt="Token image preview" className="w-full h-full object-cover bg-surface" />
