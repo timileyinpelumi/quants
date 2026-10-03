@@ -10,7 +10,7 @@ function Stat({ label, children }: { label: string; children: React.ReactNode })
   return (
     <span className="flex flex-col gap-1 sm:gap-1.5 min-w-0">
       <span className="text-[11px] sm:text-[12px] text-faint">{label}</span>
-      <span className="font-display font-bold text-[15px] sm:text-xl md:text-[22px] leading-none tabular-nums truncate">{children}</span>
+      <span className="font-display font-bold text-[14px] sm:text-xl md:text-[22px] leading-none tabular-nums whitespace-nowrap">{children}</span>
     </span>
   );
 }
@@ -55,7 +55,7 @@ export function FeaturedCard({ c, links, headline, body }: { c: PlatformCard; li
       </div>
       <div className="flex flex-col gap-4 md:gap-6 bg-surface p-5 md:p-8">
         {market.length > 0 && (
-          <div className="grid grid-cols-4 gap-x-3 sm:gap-x-5 gap-y-5 pb-4 md:pb-6 border-b line">
+          <div className="grid grid-cols-[1.5fr_1fr_1fr_0.9fr] sm:grid-cols-4 gap-x-3 sm:gap-x-5 gap-y-5 pb-4 md:pb-6 border-b line">
             {market.map(([l, v]) => <Stat key={l} label={l}>{v}</Stat>)}
           </div>
         )}
