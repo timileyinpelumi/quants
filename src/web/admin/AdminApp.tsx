@@ -8,6 +8,7 @@ import { LoadMore } from "@/web/ui/LoadMore";
 import { CopyButton } from "@/web/ui/CopyButton";
 import { SettingsEditor, type AdminSettings, type Pair } from "./SettingsEditor";
 import { AnalyticsPanel } from "./AnalyticsPanel";
+import { ADMIN_API } from "./api";
 
 type Settings = AdminSettings;
 type WalletRow = { role: string; index: number; path: string; address: string | null; solscan: string | null; lamports: string | null; low: boolean; usd: number | null };
@@ -25,7 +26,8 @@ async function call<T>(url: string, init?: RequestInit): Promise<T> {
 
 export type { Pair };
 
-export function AdminApp({ pairs }: { pairs: Pair[] }) {
+export function AdminApp() {
+  const [pairs, setPairs] = useState<Pair[]>([]);
   const [signedIn, setSignedIn] = useState<boolean | null>(null);
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
@@ -42,10 +44,11 @@ export function AdminApp({ pairs }: { pairs: Pair[] }) {
 
   const load = useCallback(async () => {
     try {
-      const s = await call<{ version: number; settings: Settings }>("/api/admin/settings");
+      const s = await call<{ version: number; settings: Settings; pairs: Pair[] }>(`${ADMIN_API}/settings`);
+      setPairs(s.pairs);
       setSettings(s.settings);
       setVersion(s.version);
-      setStatus(await call<Status>("/api/admin/status"));
+      setStatus(await call<Status>(`${ADMIN_API}/status`));
       setSignedIn(true);
     } catch (e: any) {
       if (e.status === 401 || e.status === 403) setSignedIn(false);
@@ -56,21 +59,21 @@ export function AdminApp({ pairs }: { pairs: Pair[] }) {
   useEffect(() => { load(); }, [load]);
   const loadWallets = useCallback(() => {
     setWallets(null);
-    call<{ wallets: WalletRow[] }>("/api/admin/wallets").then((r) => setWallets(r.wallets), (e) => setMsg({ ok: false, text: e.message }));
+    call<{ wallets: WalletRow[] }>(`${ADMIN_API}/wallets`).then((r) => setWallets(r.wallets), (e) => setMsg({ ok: false, text: e.message }));
   }, []);
   useEffect(() => {
     if (tab === "wallets" && signedIn) loadWallets();
   }, [tab, signedIn, loadWallets]);
   useEffect(() => {
     if (tab !== "votes" || !signedIn) return;
-    call<{ tokens: VoteRow[] }>("/api/admin/votes").then((r) => setVotes(r.tokens), (e) => setMsg({ ok: false, text: e.message }));
+    call<{ tokens: VoteRow[] }>(`${ADMIN_API}/votes`).then((r) => setVotes(r.tokens), (e) => setMsg({ ok: false, text: e.message }));
   }, [tab, signedIn]);
 
   async function loadFailed() {
     if (!status?.failedNext || failedState === "loading") return;
     setFailedState("loading");
     try {
-      const more = await call<Status>(`/api/admin/status?before=${status.failedNext}`);
+      const more = await call<Status>(`${ADMIN_API}/status?before=${status.failedNext}`);
       setStatus((s) => (s ? { ...s, failed: [...s.failed, ...more.failed], failedNext: more.failedNext } : s));
       setFailedState("idle");
     } catch {
@@ -83,7 +86,7 @@ export function AdminApp({ pairs }: { pairs: Pair[] }) {
     if (busy) return;
     setBusy(true);
     try {
-      await call("/api/admin/session", { method: "POST", body: JSON.stringify({ code }) });
+      await call(`${ADMIN_API}/session`, { method: "POST", body: JSON.stringify({ code }) });
       setCode("");
       setMsg(null);
       await load();
@@ -95,7 +98,7 @@ export function AdminApp({ pairs }: { pairs: Pair[] }) {
   }
 
   async function signOut() {
-    await call("/api/admin/session", { method: "DELETE" }).catch(() => {});
+    await call(`${ADMIN_API}/session`, { method: "DELETE" }).catch(() => {});
     setSignedIn(false);
     setSettings(null);
     setStatus(null);
@@ -104,7 +107,7 @@ export function AdminApp({ pairs }: { pairs: Pair[] }) {
 
   async function save(next: Settings) {
     try {
-      const r = await call<{ version: number; settings: Settings }>("/api/admin/settings", { method: "POST", body: JSON.stringify(next) });
+      const r = await call<{ version: number; settings: Settings }>(`${ADMIN_API}/settings`, { method: "POST", body: JSON.stringify(next) });
       setVersion(r.version);
       setSettings(r.settings);
       setMsg({ ok: true, text: `Saved as version ${r.version}.` });
@@ -115,7 +118,7 @@ export function AdminApp({ pairs }: { pairs: Pair[] }) {
 
   async function saveBasket() {
     try {
-      await call("/api/admin/basket", { method: "POST", body: JSON.stringify({ mint: basketMint.trim(), basket: JSON.parse(basketJson) }) });
+      await call(`${ADMIN_API}/basket`, { method: "POST", body: JSON.stringify({ mint: basketMint.trim(), basket: JSON.parse(basketJson) }) });
       setMsg({ ok: true, text: "Basket replaced" });
     } catch (e: any) {
       setMsg({ ok: false, text: e instanceof SyntaxError ? "Basket must be valid JSON" : e.message });

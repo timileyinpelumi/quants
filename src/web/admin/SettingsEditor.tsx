@@ -16,7 +16,7 @@ export type AdminSettings = {
   featured: { headline: string; body: string; prelaunch: string };
   xUrl: string; alertWebhookUrl: string; launchesPaused: boolean; bannerMessage: string; stockPairs: boolean;
 };
-export type Pair = { mint: string; symbol: string; name: string; decimals: number; payoutMin: string };
+export type Pair = { mint: string; symbol: string; name: string; decimals: number; payoutMin: string; graduation: number; enabled: boolean };
 
 const small = `${inputClass} text-base py-3 font-mono`;
 const text = `${inputClass} text-base py-3`;
@@ -129,7 +129,7 @@ export function SettingsEditor({ initial, version, pairs, onSave }: {
       <Section title="Pairs" note="Which pair tokens new launches can use, and how much each curve raises before it graduates. A new target applies to curves created from now on; existing pools keep theirs.">
         <div className="flex flex-col">
           {pairs.map((c) => {
-            const q = s.quotes[c.symbol] ?? { enabled: false, graduation: 1 };
+            const q = s.quotes[c.symbol] ?? { enabled: c.enabled, graduation: c.graduation };
             const setQ = (patch: Partial<typeof q>) => set({ quotes: { ...s.quotes, [c.symbol]: { ...q, ...patch } } });
             return (
               <div key={c.symbol} className="grid grid-cols-1 md:grid-cols-[180px_minmax(0,1fr)_minmax(0,1fr)] gap-3 md:gap-4 py-4 border-t line items-end">

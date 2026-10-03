@@ -1,10 +1,10 @@
 import { test, expect } from "bun:test";
 import { makeWebContext, ADMIN_CODE } from "../helpers/web-context";
-import { POST as loginRoute, DELETE as logoutRoute } from "../../src/app/api/admin/session/route";
-import { GET as getSettings, POST as postSettings } from "../../src/app/api/admin/settings/route";
-import { GET as statusRoute } from "../../src/app/api/admin/status/route";
-import { POST as basketRoute } from "../../src/app/api/admin/basket/route";
-import { GET as walletsRoute } from "../../src/app/api/admin/wallets/route";
+import { POST as loginRoute, DELETE as logoutRoute } from "../../src/app/api/whitehouse/session/route";
+import { GET as getSettings, POST as postSettings } from "../../src/app/api/whitehouse/settings/route";
+import { GET as statusRoute } from "../../src/app/api/whitehouse/status/route";
+import { POST as basketRoute } from "../../src/app/api/whitehouse/basket/route";
+import { GET as walletsRoute } from "../../src/app/api/whitehouse/wallets/route";
 import { parsePlatformAddresses } from "../../src/domain/platform-wallets";
 import { loadLatestSettings } from "../../src/domain/settings";
 import { beginStep, failStep } from "../../src/ledger/ledger";

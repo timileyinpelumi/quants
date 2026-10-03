@@ -66,7 +66,7 @@ Nothing else is needed on chain before the first launch (see Starting with no SO
 
 ### Graduation targets
 
-Each pair graduates once a set amount of the pair token has been raised on the curve: 85 SOL, 12,000 USDC, 12,000 USDT and 30,000 JUP by default, and the platform token's own target. Change them on the admin page under Pairs and Platform token.
+Each pair graduates once a set amount of the pair token has been raised on the curve: 85 SOL, 12,000 USDC and 12,000 USDT by default, and the platform token's own target. Change them on the admin page under Pairs and Platform token.
 
 The target is fixed into the DBC config key a pool is created from, and every pool keeps the target it started with. Config keys live in the `config_keys` table by pair, fee tier and threshold. When a launch needs a key for the current target that does not exist yet, prepare returns a setup step first that creates it, paid by that launcher (about 0.008 SOL of rent), and records the key. The launcher approves it on its own, and the launch transaction is built only after it confirmed. So a new target applies to the next launch on that pair, and old pools keep theirs. The first prepare claims the row, so two first launches on the same pair get the same address. If a setup transaction fails, the launch form shows its error and stops; launching again gets the setup step again, or the launch when the key landed meanwhile. A pending row not handed out for 2 minutes (`issued_at`) and not on chain is dropped and the next launch gets a fresh keypair, so a failed or expired setup never blocks the pair. A pending key is trusted only once it is on chain with the keeper as fee claimer, the right mint and the right threshold.
 
@@ -190,7 +190,7 @@ Never set these in production: `NEXT_PUBLIC_TEST_WALLET_SECRET`, `PINATA_JWT=stu
 
 ### Admin access
 
-`/admin` asks for one access code. Create it once per network:
+The admin lives at `/whitehouse` and `/kremlin` (the same app at either path; nothing links to them). `/admin` is a 404 like any unknown page, and the admin API is under `/api/whitehouse/`, so `/api/admin/*` is a 404 too. The page asks for an access code. Create the full code once per network:
 
 ```bash
 bun scripts/admin-code.ts                       # mainnet; --cluster devnet or localnet for the others
@@ -259,7 +259,7 @@ bun scripts/hd-wallet.ts export spill secrets/spill.json
 deploy/aws/deploy.sh
 ```
 
-It checks that each keypair file matches its address and that required values are set, rsyncs the repo (without `.git`, `node_modules`, `.next`, local env files and devnet state) plus `.env.production` and `secrets/` to `/opt/quants`, builds the image there tagged with the commit (`quants-app:<sha>`, plus `latest`), runs `docker compose up -d`, waits for web to be healthy and then runs `deploy/aws/smoke.sh` on the instance. The smoke check passes when `migrate` exited 0, web returns 200 on `/` and `/explore` (inside the network and on `https://SITE_HOST/`), the indexer logged its first pass and the keeper logged a run, with no restarts. On a fresh database the first settings version comes from the env seed, so the keeper runs straight away. Sign in on `/admin` with the code to check and change the settings. `NEXT_PUBLIC_*` values are built into the bundle, so every deploy rebuilds; settings do not need one. A build takes several minutes on a t3.medium.
+It checks that each keypair file matches its address and that required values are set, rsyncs the repo (without `.git`, `node_modules`, `.next`, local env files and devnet state) plus `.env.production` and `secrets/` to `/opt/quants`, builds the image there tagged with the commit (`quants-app:<sha>`, plus `latest`), runs `docker compose up -d`, waits for web to be healthy and then runs `deploy/aws/smoke.sh` on the instance. The smoke check passes when `migrate` exited 0, web returns 200 on `/` and `/explore` (inside the network and on `https://SITE_HOST/`), the indexer logged its first pass and the keeper logged a run, with no restarts. On a fresh database the first settings version comes from the env seed, so the keeper runs straight away. Sign in on `/whitehouse` with the code to check and change the settings. `NEXT_PUBLIC_*` values are built into the bundle, so every deploy rebuilds; settings do not need one. A build takes several minutes on a t3.medium.
 
 ### Logs
 

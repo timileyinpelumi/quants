@@ -111,8 +111,16 @@ test("docs, terms, portfolio and 404 render", async ({ page }) => {
   await expect(page.getByText("Nothing here.")).toBeVisible();
 });
 
+test("the admin is unlisted: /admin is a 404, /whitehouse and /kremlin both serve it", async ({ page }) => {
+  expect((await page.goto("/admin"))?.status()).toBe(404);
+  await expect(page.getByText("Nothing here.")).toBeVisible();
+  expect((await page.request.get("/api/admin/settings")).status()).toBe(404);
+  await page.goto("/kremlin");
+  await expect(page.getByLabel("Access code")).toBeVisible();
+});
+
 test("admin sign in and settings load", async ({ page }) => {
-  await page.goto("/admin");
+  await page.goto("/whitehouse");
   await page.getByLabel("Access code").fill(process.env.E2E_ADMIN_CODE!);
   await page.getByRole("button", { name: "Sign in" }).click();
   await expect(page.getByText(/Current version \d+/)).toBeVisible();

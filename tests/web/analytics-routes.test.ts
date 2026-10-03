@@ -1,7 +1,7 @@
 import { test, expect, beforeEach } from "bun:test";
 import { makeWebContext, ADMIN_CODE } from "../helpers/web-context";
-import { POST as loginRoute } from "../../src/app/api/admin/session/route";
-import { GET as analyticsRoute } from "../../src/app/api/admin/analytics/route";
+import { POST as loginRoute } from "../../src/app/api/whitehouse/session/route";
+import { GET as analyticsRoute } from "../../src/app/api/whitehouse/analytics/route";
 import { resetAnalyticsCache } from "../../src/web/server/analytics";
 
 const ORIGIN = "http://x";

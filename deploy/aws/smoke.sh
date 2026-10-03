@@ -41,7 +41,7 @@ else bad "indexer logged no pass; last lines:"; tail -5 <<<"$indexer"; fi
 grep -qE '"error"|"fatal"' <<<"$indexer" && bad "indexer logged errors: $(grep -E '"error"|"fatal"' <<<"$indexer" | tail -1)"
 
 if grep -q '"runId"' <<<"$keeper"; then ok "keeper run: $(grep '"runId"' <<<"$keeper" | tail -1 | cut -c1-300)"
-elif grep -q 'no settings saved' <<<"$keeper"; then warn "keeper reached the chain and database but no settings are saved yet; save them on /admin"
+elif grep -q 'no settings saved' <<<"$keeper"; then warn "keeper reached the chain and database but no settings are saved yet; save them on the admin page"
 else bad "keeper logged no run; last lines:"; tail -5 <<<"$keeper"; fi
 grep '"fatal"' <<<"$keeper" | grep -v 'no settings saved' | tail -1 | grep -q . && bad "keeper fatal: $(grep '"fatal"' <<<"$keeper" | grep -v 'no settings saved' | tail -1)"
 
