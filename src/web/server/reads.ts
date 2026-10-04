@@ -86,7 +86,12 @@ export async function launchDetail(ctx: WebContext, mint: string): Promise<Launc
  * All in the launch's quote token, base units. `earned` is what reached quants after Meteora's cut, including fees not yet split.
  * `lp`: fees from the graduated pool's locked LP position, which all go to the platform; `platform` includes them.
  */
-export type FeeSummary = { earned: string; stakers: string; creator: string; platform: string; lp: string; meteora: string; held: string; lastPaidAt: string | null };
+export type FeeSummary = {
+  earned: string; stakers: string; creator: string; platform: string; lp: string; meteora: string; held: string;
+  /** Reward tokens already bought with the stakers' share and not yet sent into the farms. */
+  rewardsHeld: { mint: string; amount: string }[];
+  lastPaidAt: string | null;
+};
 
 export async function feeSummary(sql: SQL, launchId: number): Promise<FeeSummary> {
   const splits = await sql`
@@ -106,11 +111,13 @@ export async function feeSummary(sql: SQL, launchId: number): Promise<FeeSummary
       coalesce(sum(e.amount) filter (where e.bucket = 'basket'), 0)::text as held,
       (select max(updated_at) from distributions where launch_id = ${launchId} and kind = 'fund' and status = 'confirmed') as last_paid
     from escrow e join launches l on l.id = e.launch_id and e.mint = l.quote_mint where e.launch_id = ${launchId}`;
+  const rewards = await sql`select mint, sum(amount)::text as amount from escrow where launch_id = ${launchId} and bucket = 'reward' and amount > 0 group by mint order by mint`;
   lp += BigInt(e?.lp_unsplit ?? "0");
   platform += lp;
   const earned = stakers + creator + platform + BigInt(e?.unsplit ?? "0");
   return {
     earned: earned.toString(), stakers: stakers.toString(), creator: creator.toString(), platform: platform.toString(), lp: lp.toString(),
-    meteora: ((earned * 20n) / 80n).toString(), held: e?.held ?? "0", lastPaidAt: e?.last_paid ? new Date(e.last_paid).toISOString() : null,
+    meteora: ((earned * 20n) / 80n).toString(), held: e?.held ?? "0",
+    rewardsHeld: rewards.map((r: any) => ({ mint: r.mint as string, amount: r.amount as string })), lastPaidAt: e?.last_paid ? new Date(e.last_paid).toISOString() : null,
   };
 }

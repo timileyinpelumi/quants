@@ -33,6 +33,16 @@ export function RewardsStaking({ mint, symbol, d, fees, icons, px, quote, tokenU
     if (sum === null || b.decimals === null || p == null) return BigInt(b.paidOut) === 0n ? sum : null;
     return sum + whole(b.paidOut, b.decimals) * p;
   }, 0);
+  // Held = the stakers' share not spent yet plus reward tokens bought and waiting for the farms, at today's prices.
+  const heldQuote = quote.usd == null ? null : whole(fees.held, quote.decimals) * quote.usd;
+  const rewardsHeldUsd = (fees.rewardsHeld ?? []).reduce<number | null>((sum, r) => {
+    const b = d.basket.find((x) => x.mint === r.mint);
+    const p = px[r.mint];
+    if (sum === null || !b || b.decimals === null || p == null) return sum;
+    return sum + whole(r.amount, b.decimals) * p;
+  }, 0);
+  const heldTotal = heldQuote === null ? null : heldQuote + (rewardsHeldUsd ?? 0);
+  const heldSub = rewardsHeldUsd && rewardsHeldUsd > 0 ? `${q(fees.held)} + rewards bought $${fmtCompact(rewardsHeldUsd)}` : q(fees.held);
   const split = [
     { key: "Stakers", amount: fees.stakers, color: "bg-accent" },
     { key: "Creator", amount: fees.creator, color: "bg-ink" },
@@ -69,7 +79,7 @@ export function RewardsStaking({ mint, symbol, d, fees, icons, px, quote, tokenU
       <div className="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-5 py-5 border-y line">
         <Stat label="Paid to stakers" value={paidUsd === null ? "No price" : `$${fmtCompact(paidUsd)}`} />
         <Stat label="Fees earned" value={qUsd(fees.earned) ?? q(fees.earned)} sub={qUsd(fees.earned) ? q(fees.earned) : null} />
-        <Stat label="Held for stakers" value={qUsd(fees.held) ?? q(fees.held)} sub={qUsd(fees.held) ? q(fees.held) : null} />
+        <Stat label="Held for stakers" value={heldTotal === null ? q(fees.held) : `$${fmtCompact(heldTotal)}`} sub={heldTotal === null ? null : heldSub} />
         <Stat label="Last paid" value={fees.lastPaidAt ? fmtAgo(fees.lastPaidAt) : "Not yet"} />
       </div>
 

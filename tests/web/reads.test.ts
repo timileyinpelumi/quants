@@ -80,7 +80,7 @@ test("launchDetail sums paid out and burned, and weights tier shares by multipli
 test("feeSummary totals every split by its settings, plus what is held for stakers and when they were last paid", async () => {
   const c = await makeWebContext();
   const a = await launch(c, "CAT");
-  expect(await feeSummary(c.sql, a.id)).toEqual({ earned: "0", stakers: "0", creator: "0", platform: "0", lp: "0", meteora: "0", held: "0", lastPaidAt: null });
+  expect(await feeSummary(c.sql, a.id)).toEqual({ earned: "0", stakers: "0", creator: "0", platform: "0", lp: "0", meteora: "0", held: "0", rewardsHeld: [], lastPaidAt: null });
   await step(c, a.id, "s1", "split", { amount: "1000" });
   await step(c, a.id, "s2", "split", { amount: "2000" });
   const held = await beginStep(c.sql, { launchId: a.id, idemKey: "h", kind: "split", settingsVersion: 1, detail: { amount: "0" } });
@@ -92,6 +92,9 @@ test("feeSummary totals every split by its settings, plus what is held for stake
   // default split is 60% stakers, 25% platform, 15% creator; Meteora keeps 20% before it
   expect(f).toMatchObject({ earned: "3400", stakers: "1800", platform: "450", creator: "750", meteora: "850", held: "700" });
   expect(typeof f.lastPaidAt).toBe("string");
+  const bought = await beginStep(c.sql, { launchId: a.id, idemKey: "r", kind: "swap", settingsVersion: 1, detail: {} });
+  await confirmStep(c.sql, bought, [{ bucket: "reward", mint: ZEC, amount: 55n }]);
+  expect((await feeSummary(c.sql, a.id)).rewardsHeld).toEqual([{ mint: ZEC, amount: "55" }]);
 });
 
 test("detail route returns 404 json for an unknown mint", async () => {
