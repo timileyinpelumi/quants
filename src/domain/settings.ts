@@ -54,6 +54,7 @@ const Schema = z.object({
   bannerMessage: z.string().trim().max(200, "Banner is 200 characters at most"),
   stockPairs: z.boolean(),
   creatorPayoutHold: z.array(z.string().regex(/^[1-9A-HJ-NP-Za-km-z]{32,44}$/, "Hold list entries must be token addresses")).max(100),
+  stakeAutoPay: z.array(z.string().regex(/^[1-9A-HJ-NP-Za-km-z]{32,44}$/, "Auto pay entries must be wallet addresses")).max(200),
 });
 
 export type Settings = {
@@ -65,6 +66,7 @@ export type Settings = {
   xUrl: string; alertWebhookUrl: string; launchesPaused: boolean; rewardFundingPaused: boolean; earnPeriodDays: number; earnTargetBps: number; bannerMessage: string; stockPairs: boolean;
   /** Tokens whose creator share is held instead of paid out; taking one off the list pays what built up. */
   creatorPayoutHold: string[];
+  stakeAutoPay: string[];
 } & QuoteSettings;
 export type VersionedSettings = Settings & { version: number };
 
@@ -87,6 +89,7 @@ function seedExtras(env: Env) {
     bannerMessage: "",
     stockPairs: env.STOCK_PAIRS === "1",
     creatorPayoutHold: [] as string[],
+    stakeAutoPay: [] as string[],
   };
 }
 

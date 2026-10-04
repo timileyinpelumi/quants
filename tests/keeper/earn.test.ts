@@ -84,3 +84,16 @@ test("an approved period is paid by the keeper, a rejected one returns to the re
   await stakePayoutStep(deps, launch, s);
   expect(f.chain.sent.filter((x) => x.startsWith("transfer")).length).toBe(1);
 });
+
+test("a wallet on the auto pay list is paid when its lock ends without waiting for approval", async () => {
+  const { f, staking, deps, id, launch, s } = await setup();
+  staking.stakers.set("F1", [{ owner: "Alice", staked: tokens(500_000), lastStakeTs: T0 }, { owner: "Carol", staked: tokens(500_000), lastStakeTs: T0 }]);
+  await earnStep(deps, launch, s, T0 + 60);
+  await earnStep(deps, launch, s, T0 + 60 + DAY / 2);
+  staking.stakers.set("F1", []);
+  await earnStep(deps, launch, s, T0 + DAY + 60);
+  await stakePayoutStep(deps, launch, { ...s, stakeAutoPay: ["Alice"] });
+  const rows = await f.sql`select owner, status, decided_by from stake_periods where launch_id = ${id} order by owner`;
+  expect(rows.map((r: any) => [r.owner, r.status, r.decided_by])).toEqual([["Alice", "paid", "auto pay list"], ["Carol", "due", null]]);
+  expect(f.chain.sent.filter((x) => x.startsWith("transfer")).length).toBe(1);
+});

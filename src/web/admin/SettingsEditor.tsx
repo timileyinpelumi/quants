@@ -14,7 +14,7 @@ export type AdminSettings = {
   platformToken: { mint: string; symbol: string; decimals: number; graduation: number; enabled: boolean };
   feeTiersBps: number[];
   featured: { headline: string; body: string; prelaunch: string };
-  xUrl: string; alertWebhookUrl: string; launchesPaused: boolean; rewardFundingPaused?: boolean; earnPeriodDays?: number; earnTargetBps?: number; bannerMessage: string; stockPairs: boolean; creatorPayoutHold?: string[];
+  xUrl: string; alertWebhookUrl: string; launchesPaused: boolean; rewardFundingPaused?: boolean; earnPeriodDays?: number; earnTargetBps?: number; bannerMessage: string; stockPairs: boolean; creatorPayoutHold?: string[]; stakeAutoPay?: string[];
 };
 export type Pair = { mint: string; symbol: string; name: string; decimals: number; payoutMin: string; graduation: number; enabled: boolean };
 
@@ -26,7 +26,7 @@ const LABELS: Record<keyof AdminSettings, string> = {
   rewardPeriodSeconds: "Reward stream period", slippageBps: "Swap slippage cap", devBuyCapBps: "First buy cap",
   keeperIntervalSeconds: "Keeper interval", defaultBackend: "Staking backend", quotes: "Pairs", platformToken: "Platform token",
   feeTiersBps: "Fee tiers", featured: "Featured card text", xUrl: "X link", alertWebhookUrl: "Alert webhook",
-  launchesPaused: "Launches paused", rewardFundingPaused: "Staker earnings paused", earnPeriodDays: "Earning period", earnTargetBps: "Staked target", bannerMessage: "Site banner", stockPairs: "Stock pairs", creatorPayoutHold: "Creator payouts on hold",
+  launchesPaused: "Launches paused", rewardFundingPaused: "Staker earnings paused", earnPeriodDays: "Earning period", earnTargetBps: "Staked target", bannerMessage: "Site banner", stockPairs: "Stock pairs", creatorPayoutHold: "Creator payouts on hold", stakeAutoPay: "Staker auto pay list",
 };
 
 /** Text while typing, a number once it parses, so "0." and "" can be typed through. */
@@ -57,13 +57,12 @@ function Text({ label, value, onChange, placeholder, area, hint }: { label: stri
 }
 
 /** One token address per line; the raw text stays while typing and the list updates as lines change. */
-function HoldList({ value, onChange }: { value: string[]; onChange: (v: string[]) => void }) {
+function AddressList({ label, placeholder, hint, value, onChange }: { label: string; placeholder: string; hint: string; value: string[]; onChange: (v: string[]) => void }) {
   const [raw, setRaw] = useState(value.join("\n"));
   useEffect(() => { if (raw.split(/\s+/).filter(Boolean).join("\n") !== value.join("\n")) setRaw(value.join("\n")); }, [value]);
   return (
-    <Text area label="Tokens on hold" value={raw} placeholder="One token address per line"
-      onChange={(v) => { setRaw(v); onChange([...new Set(v.split(/\s+/).map((x) => x.trim()).filter(Boolean))]); }}
-      hint="The keeper keeps these tokens' creator share instead of sending it. Remove a token to pay out what built up on the next run." />
+    <Text area label={label} value={raw} placeholder={placeholder} hint={hint}
+      onChange={(v) => { setRaw(v); onChange([...new Set(v.split(/\s+/).map((x) => x.trim()).filter(Boolean))]); }} />
   );
 }
 
@@ -146,7 +145,13 @@ export function SettingsEditor({ initial, version, pairs, onSave, readOnly = fal
       </Section>
 
       {!readOnly && <Section title="Creator payouts">
-        <HoldList value={s.creatorPayoutHold ?? []} onChange={(v) => set({ creatorPayoutHold: v })} />
+        <AddressList label="Tokens on hold" placeholder="One token address per line" value={s.creatorPayoutHold ?? []} onChange={(v) => set({ creatorPayoutHold: v })}
+          hint="The keeper keeps these tokens' creator share instead of sending it. Remove a token to pay out what built up on the next run." />
+      </Section>}
+
+      {!readOnly && <Section title="Staker payouts">
+        <AddressList label="Paid without approval" placeholder="One wallet address per line" value={s.stakeAutoPay ?? []} onChange={(v) => set({ stakeAutoPay: v })}
+          hint="When one of these wallets finishes a lock period, the keeper pays it on its next run without waiting in the Payouts list." />
       </Section>}
 
       <Section title="Pairs" note="Which pair tokens new launches can use, and how much each curve raises before it graduates. A new target applies to curves created from now on; existing pools keep theirs.">

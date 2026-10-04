@@ -107,6 +107,12 @@ export async function earnStep(deps: KeeperDeps, launch: LaunchRow, s: Versioned
 export const stakePayoutResolver: DeltaResolver = async (row) => [{ bucket: "owed", mint: row.detail.mint, amount: -BigInt(row.detail.amount) }];
 
 export async function stakePayoutStep(deps: KeeperDeps, launch: LaunchRow, s: VersionedSettings) {
+  const auto = new Set(s.stakeAutoPay ?? []);
+  if (auto.size) {
+    for (const p of await deps.sql`select id, owner from stake_periods where launch_id = ${launch.id} and status = 'due'`) {
+      if (auto.has(p.owner)) await deps.sql`update stake_periods set status = 'approved', decided_by = 'auto pay list', decided_at = now(), updated_at = now() where id = ${p.id} and status = 'due'`;
+    }
+  }
   const periods = await deps.sql`select id, owner from stake_periods where launch_id = ${launch.id} and status = 'approved' order by id`;
   for (const p of periods) {
     const earnings = await deps.sql`select mint, amount from stake_earnings where period_id = ${p.id} and amount > 0 order by mint`;

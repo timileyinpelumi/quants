@@ -208,14 +208,18 @@ test("read only sessions can read every GET route except access codes", async ()
   }
 });
 
-test("the creator payout hold list never reaches a read only session", async () => {
+test("the creator hold list and staker auto pay list never reach a read only session", async () => {
   const c = await makeWebContext();
   const s = await loadLatestSettings(c.sql);
   const mint = "3JMpdC7tXi5Wga8vgUjgLSSihuBxHfzPdeSvqsATiLgE";
-  await saveSettings(c.sql, { ...s, creatorPayoutHold: [mint] }, "t");
+  const wallet = "6qhJys7PgX5VQVXNgNinwHTwPDwBuAWHM8WruZEPtHuW";
+  await saveSettings(c.sql, { ...s, creatorPayoutHold: [mint], stakeAutoPay: [wallet] }, "t");
   const { full, read } = await readSession();
   const asRead = await (await getSettings(req(read))).text();
   expect(asRead).not.toContain("creatorPayoutHold");
+  expect(asRead).not.toContain("stakeAutoPay");
   expect(asRead).not.toContain(mint);
-  expect((await (await getSettings(req(full))).json()).settings.creatorPayoutHold).toEqual([mint]);
+  expect(asRead).not.toContain(wallet);
+  const asFull = (await (await getSettings(req(full))).json()).settings;
+  expect([asFull.creatorPayoutHold, asFull.stakeAutoPay]).toEqual([[mint], [wallet]]);
 });
