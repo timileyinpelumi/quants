@@ -41,7 +41,7 @@ export function TradePanel({ mint, symbol, quoteMint, quoteSymbol, quoteDecimals
   const [slippageBps, setSlippage] = useState(100);
   const [quote, setQuote] = useState<Quote | null>(null);
   const [quoteError, setQuoteError] = useState<string | null>(null);
-  const [balances, setBalances] = useState<{ quote: bigint; token: bigint } | null>(null);
+  const [balances, setBalances] = useState<{ quote: bigint | null; token: bigint | null } | null>(null);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const owner = wallet.publicKey?.toBase58();
@@ -68,7 +68,8 @@ export function TradePanel({ mint, symbol, quoteMint, quoteSymbol, quoteDecimals
     if (!owner) { setBalances(null); return; }
     const o = new PublicKey(owner);
     const spl = (m: string) => tokenBalance(connection, m, o);
-    const [q, t] = await Promise.all([quoteMint === SOL ? connection.getBalance(o).then(BigInt) : spl(quoteMint), spl(mint)]);
+    // Through the server: a failed read is null (unknown) and never shows as a zero balance.
+    const [q, t] = await Promise.all([spl(quoteMint), spl(mint)]);
     setBalances({ quote: q, token: t });
   }, [owner, connection, mint, quoteMint]);
 
@@ -95,7 +96,7 @@ export function TradePanel({ mint, symbol, quoteMint, quoteSymbol, quoteDecimals
   const inPrice = side === "buy" ? px[quoteMint] : px[mint];
   const outPrice = side === "buy" ? px[mint] : px[quoteMint];
   const whole = (base: string | bigint, decimals: number, mult = 1) => Number(rawToUi(BigInt(base), mult)) / 10 ** decimals;
-  const have = balances ? (side === "buy" ? balances.quote : balances.token) : null;
+  const have = balances ? (side === "buy" ? balances.quote : balances.token) ?? null : null;
   const spendable = have === null ? null : side === "buy" && quoteMint === SOL ? (have > FEE_RESERVE ? have - FEE_RESERVE : 0n) : have;
   const tooMuch = amountBase !== null && spendable !== null && amountBase > spendable;
   const partial = quote && BigInt(quote.filledIn) < BigInt(quote.amountIn);
