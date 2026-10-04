@@ -11,6 +11,7 @@ import { AnalyticsPanel } from "./AnalyticsPanel";
 import { ADMIN_API } from "./api";
 import { AccessCodes } from "./AccessCodes";
 import { StakePayouts } from "./StakePayouts";
+import { BurnApprovals } from "./BurnApprovals";
 
 type Settings = AdminSettings;
 type WalletRow = { role: string; index: number; path?: string; address: string | null; solscan: string | null; lamports: string | null; low: boolean; usd: number | null };
@@ -34,7 +35,7 @@ export function AdminApp() {
   const [role, setRole] = useState<"full" | "read">("read");
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
-  const [tab, setTab] = useState<"settings" | "analytics" | "keeper" | "payouts" | "wallets" | "baskets" | "votes" | "codes">("settings");
+  const [tab, setTab] = useState<"settings" | "analytics" | "keeper" | "payouts" | "burns" | "wallets" | "baskets" | "votes" | "codes">("settings");
   const [wallets, setWallets] = useState<WalletRow[] | null>(null);
   const [votes, setVotes] = useState<VoteRow[] | null>(null);
   const [settings, setSettings] = useState<Settings | null>(null);
@@ -134,7 +135,7 @@ export function AdminApp() {
 
   const readOnly = role === "read";
   const tabs = [
-    { value: "settings" as const, label: "Settings" }, { value: "analytics" as const, label: "Analytics" }, { value: "keeper" as const, label: "Keeper" }, { value: "payouts" as const, label: "Payouts" },
+    { value: "settings" as const, label: "Settings" }, { value: "analytics" as const, label: "Analytics" }, { value: "keeper" as const, label: "Keeper" }, { value: "payouts" as const, label: "Payouts" }, { value: "burns" as const, label: "Burns" },
     { value: "wallets" as const, label: "Wallets" }, ...(readOnly ? [] : [{ value: "baskets" as const, label: "Baskets" }]), { value: "votes" as const, label: "Votes" },
     ...(readOnly ? [] : [{ value: "codes" as const, label: "Access codes" }]),
   ];
@@ -237,6 +238,8 @@ export function AdminApp() {
       )}
 
       {tab === "payouts" && <StakePayouts readOnly={readOnly} />}
+
+      {tab === "burns" && <BurnApprovals readOnly={readOnly} />}
 
       {tab === "codes" && !readOnly && <AccessCodes />}
 

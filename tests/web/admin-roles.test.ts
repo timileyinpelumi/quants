@@ -174,7 +174,7 @@ const WRITES = ["POST", "PUT", "PATCH", "DELETE"] as const;
 const routes = readdirSync(DIR).filter((d) => existsSync(join(DIR, d, "route.ts")));
 
 test("the admin route list is what these tests expect", () => {
-  expect(routes.sort()).toEqual(["analytics", "basket", "codes", "session", "settings", "stake-payouts", "status", "votes", "wallets"]);
+  expect(routes.sort()).toEqual(["analytics", "basket", "burns", "codes", "session", "settings", "stake-payouts", "status", "votes", "wallets"]);
 });
 
 for (const name of routes) {

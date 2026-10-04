@@ -22,12 +22,23 @@ export async function penaltyStep(deps: KeeperDeps, launch: LaunchRow, s: Versio
       resolve: collectResolver(deps),
     });
   }
-  const amount = await getBalance(deps.sql, launch.id, "penalty", launch.mint);
-  if (amount === 0n) return;
-  await runTxStep(deps.sql, deps.chain, {
-    launchId: launch.id, idemKey: `burn:${launch.id}:${runId}`, stepKey: `burn:${launch.id}`, kind: "burn", settingsVersion: s.version,
-    detail: { mint: launch.mint, amount: amount.toString() },
-    build: () => deps.chain.buildBurn(launch.mint, amount),
-    resolve: burnResolver,
-  });
+  // Collected penalties are listed for approval; only approved amounts are burned.
+  const held = await getBalance(deps.sql, launch.id, "penalty", launch.mint);
+  const [listed] = await deps.sql`select coalesce(sum(amount), 0)::text as amount from burn_requests where launch_id = ${launch.id} and mint = ${launch.mint} and status <> 'burned'`;
+  const unlisted = held - BigInt(listed.amount);
+  if (unlisted > 0n) {
+    await deps.sql`insert into burn_requests (launch_id, mint, amount, status) values (${launch.id}, ${launch.mint}, ${unlisted.toString()}, 'pending')`;
+  }
+  const approved = await deps.sql`select id, amount from burn_requests where launch_id = ${launch.id} and mint = ${launch.mint} and status = 'approved' order by id`;
+  for (const r of approved) {
+    const amount = BigInt(r.amount);
+    const key = `burn:req:${r.id}`;
+    const out = await runTxStep(deps.sql, deps.chain, {
+      launchId: launch.id, idemKey: key, stepKey: key, kind: "burn", settingsVersion: s.version,
+      detail: { mint: launch.mint, amount: amount.toString(), requestId: Number(r.id) },
+      build: () => deps.chain.buildBurn(launch.mint, amount),
+      resolve: burnResolver,
+    });
+    if (out === "confirmed") await deps.sql`update burn_requests set status = 'burned', burned_at = now() where id = ${r.id} and status = 'approved'`;
+  }
 }

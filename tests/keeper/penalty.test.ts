@@ -11,7 +11,7 @@ async function readyPool(sql: any, id: number) {
   await sql`insert into stake_tiers values (${id}, '7d', 604800, 10000, 'FarmA'), (${id}, '30d', 2592000, 15000, 'FarmB')`;
 }
 
-test("collects slashed amounts from every farm and burns all of it", async () => {
+test("collects slashed amounts from every farm and burns only after approval", async () => {
   const f = await keeperFixture();
   const staking = new FakeStaking(f.chain);
   const deps = { ...f.deps, staking };
@@ -28,10 +28,23 @@ test("collects slashed amounts from every farm and burns all of it", async () =>
   const [launch] = await loadLaunches(f.sql);
   await penaltyStep(deps, launch!, f.settings, "r1");
   expect(f.chain.sent.filter((s) => s.startsWith("collect")).length).toBe(2);
+  expect(f.chain.sent.filter((s) => s.startsWith("burn")).length).toBe(0);
+  expect(await getBalance(f.sql, id, "penalty", "CAT")).toBe(500n);
+  const [req] = await f.sql`select id, amount::text, status from burn_requests`;
+  expect([req.amount, req.status]).toEqual(["500", "pending"]);
+
+  staking.slashed.clear();
+  await penaltyStep(deps, launch!, f.settings, "r2");
+  expect((await f.sql`select count(*)::int as n from burn_requests`)[0].n).toBe(1);
+
+  await f.sql`update burn_requests set status = 'approved' where id = ${req.id}`;
+  await penaltyStep(deps, launch!, f.settings, "r3");
   expect(f.chain.sent.filter((s) => s.startsWith("burn")).length).toBe(1);
   expect(await getBalance(f.sql, id, "penalty", "CAT")).toBe(0n);
-  const [burn] = await f.sql`select detail->>'amount' as amount from distributions where kind = 'burn'`;
-  expect(burn.amount).toBe("500");
+  const [done] = await f.sql`select status from burn_requests where id = ${req.id}`;
+  expect(done.status).toBe("burned");
+  await penaltyStep(deps, launch!, f.settings, "r4");
+  expect(f.chain.sent.filter((s) => s.startsWith("burn")).length).toBe(1);
 });
 
 test("no transactions when nothing was slashed", async () => {
