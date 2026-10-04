@@ -27,13 +27,15 @@ export class JupiterPrices implements PricePort {
     const out: Record<string, number | null> = {};
     for (let i = 0; i < missing.length; i += BATCH) {
       const batch = missing.slice(i, i + BATCH);
-      let found: Record<string, { usdPrice?: number }> = {};
+      let found: Record<string, { usdPrice?: number }> | null = null;
       try {
         const res = await this.fetchFn(`${this.base}?ids=${batch.map(encodeURIComponent).join(",")}`, { headers: this.apiKey ? { "x-api-key": this.apiKey } : {}, signal: AbortSignal.timeout(10_000) });
-        if (res.ok) found = (await res.json()) as typeof found;
+        if (res.ok) found = (await res.json()) as Record<string, { usdPrice?: number }>;
       } catch {
-        found = {};
+        found = null;
       }
+      // A failed lookup (rate limit, timeout) keeps the last good price and is not cached, so the next call asks again.
+      if (!found) continue;
       for (const m of batch) {
         out[m] = found[m]?.usdPrice ?? null;
         this.cache.set(m, { at: now, usd: out[m] });

@@ -50,3 +50,22 @@ test("the cache holds at most maxEntries mints", async () => {
   await p.usdMany(["C"]);
   expect(n).toBe(4);
 });
+
+test("a failed price lookup keeps the last good price and is asked again next time", async () => {
+  const { JupiterPrices } = await import("../../src/indexer/prices");
+  let mode: "ok" | "limited" = "ok";
+  let calls = 0;
+  const p = new JupiterPrices("https://p.test", undefined, async () => { calls++; return mode === "ok" ? Response.json({ M: { usdPrice: 2 } }) : new Response("slow", { status: 429 }); }, -1);
+  expect(await p.usd("M")).toBe(2);
+  mode = "limited";
+  expect(await p.usd("M")).toBe(2);
+  mode = "ok";
+  expect(await p.usd("M")).toBe(2);
+  expect(calls).toBe(3);
+  const fresh = new JupiterPrices("https://p.test", undefined, async () => new Response("slow", { status: 429 }), 60_000);
+  expect(await fresh.usd("X")).toBeNull();
+  let again = 0;
+  const retry = new JupiterPrices("https://p.test", undefined, async () => { again++; return new Response("slow", { status: 429 }); }, 60_000);
+  await retry.usd("X"); await retry.usd("X");
+  expect(again).toBe(2);
+});
