@@ -14,7 +14,7 @@ export type AdminSettings = {
   platformToken: { mint: string; symbol: string; decimals: number; graduation: number; enabled: boolean };
   feeTiersBps: number[];
   featured: { headline: string; body: string; prelaunch: string };
-  xUrl: string; alertWebhookUrl: string; launchesPaused: boolean; bannerMessage: string; stockPairs: boolean; creatorPayoutHold?: string[];
+  xUrl: string; alertWebhookUrl: string; launchesPaused: boolean; rewardFundingPaused?: boolean; bannerMessage: string; stockPairs: boolean; creatorPayoutHold?: string[];
 };
 export type Pair = { mint: string; symbol: string; name: string; decimals: number; payoutMin: string; graduation: number; enabled: boolean };
 
@@ -26,7 +26,7 @@ const LABELS: Record<keyof AdminSettings, string> = {
   rewardPeriodSeconds: "Reward stream period", slippageBps: "Swap slippage cap", devBuyCapBps: "First buy cap",
   keeperIntervalSeconds: "Keeper interval", defaultBackend: "Staking backend", quotes: "Pairs", platformToken: "Platform token",
   feeTiersBps: "Fee tiers", featured: "Featured card text", xUrl: "X link", alertWebhookUrl: "Alert webhook",
-  launchesPaused: "Launches paused", bannerMessage: "Site banner", stockPairs: "Stock pairs", creatorPayoutHold: "Creator payouts on hold",
+  launchesPaused: "Launches paused", rewardFundingPaused: "Reward funding paused", bannerMessage: "Site banner", stockPairs: "Stock pairs", creatorPayoutHold: "Creator payouts on hold",
 };
 
 /** Text while typing, a number once it parses, so "0." and "" can be typed through. */
@@ -141,6 +141,7 @@ export function SettingsEditor({ initial, version, pairs, onSave, readOnly = fal
 
       <Section title="Launches">
         <Check label="Pause new launches" checked={s.launchesPaused} onChange={(v) => set({ launchesPaused: v })} hint="The launch page says launches are paused and prepare refuses. Trading, staking and the keeper carry on." />
+        <Check label="Pause reward funding" checked={!!s.rewardFundingPaused} onChange={(v) => set({ rewardFundingPaused: v })} hint="The keeper keeps buying rewards but holds them instead of adding them to the farms." />
         <Text label="Site banner" value={s.bannerMessage} onChange={(v) => set({ bannerMessage: v })} placeholder="Empty shows no banner" hint="Shown at the top of every page. 200 characters at most." />
       </Section>
 

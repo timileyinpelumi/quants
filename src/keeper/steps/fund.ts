@@ -9,6 +9,7 @@ import { kaminoRawRps } from "../../domain/rate";
 export const fundResolver: DeltaResolver = async (row) => [{ bucket: "reward", mint: row.detail.rewardMint, amount: -BigInt(row.detail.amount) }];
 
 export async function fundStep(deps: KeeperDeps, launch: LaunchRow, s: VersionedSettings, runId: string) {
+  if (s.rewardFundingPaused) return;
   const [pool] = await deps.sql`select status from stake_pools where launch_id = ${launch.id}`;
   if (pool?.status !== "ready") return;
   const tiers = await deps.sql`select tier_id, farm, multiplier_bps from stake_tiers where launch_id = ${launch.id} order by lock_seconds`;
