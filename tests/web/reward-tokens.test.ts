@@ -1,5 +1,5 @@
 import { test, expect } from "bun:test";
-import { makeWebContext } from "../helpers/web-context";
+import { makeWebContext, OURS } from "../helpers/web-context";
 import { GET as search } from "../../src/app/api/tokens/search/route";
 
 const CLASSIC = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
@@ -21,7 +21,8 @@ async function ctx() {
 test("popular reward tokens keep classic ones and Token-2022 ones with allowed extensions only", async () => {
   const { checked } = await ctx();
   const r = await (await search(new Request("http://x/api/tokens/search?q="))).json();
-  expect(r.tokens.map((t: any) => t.symbol)).toEqual(["AAA", "META"]);
+  expect(r.tokens[0].mint).toBe(OURS);
+  expect(r.tokens.slice(1).map((t: any) => t.symbol)).toEqual(["AAA", "META"]);
   expect(r.popular).toBe(true);
   expect(checked).toEqual([["Meta1", "Fee1", "Stock1"]]);
 });

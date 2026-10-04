@@ -45,6 +45,8 @@ export class FakeStaking implements StakingAdapter {
   built: { action: string; owner: string; farm: string; amount?: bigint }[] = [];
   userFarmList: string[] = [];
   async userFarms(_owner: string, farms: string[]) { return this.userFarmList.filter((f) => farms.includes(f)); }
+  stakers = new Map<string, { owner: string; staked: bigint; lastStakeTs: number }[]>();
+  async farmStakers(farm: string) { return this.stakers.get(farm) ?? []; }
   async position(owner: string, farm: string) { return this.positions.get(`${owner}:${farm}`) ?? null; }
   async buildStakeTx(owner: string, farm: string, _m: string, amount: bigint) { this.built.push({ action: "stake", owner, farm, amount }); return fakeTx(owner); }
   async buildClaimTx(owner: string, farm: string) { this.built.push({ action: "claim", owner, farm }); return fakeTx(owner); }

@@ -136,14 +136,14 @@ export default async function DocsPage() {
             const m = t.multiplierBps / 10_000;
             return [lockLabel(t.lockSeconds), `${m}x`, `${Math.round((m / (m + 1)) * 100)}%`];
           })} />
-          <P>Claim rewards at any time. Adding more to a stake that is still locked starts its lock again for the whole amount. When the lock ends you can withdraw everything with no penalty.</P>
+          <P>Rewards build up while you stake and are paid to your wallet after your lock ends. If you stay staked, a new lock period starts and is paid when it ends. Rewards are planned around half of the supply being staked, so someone who stakes early earns the same rate per token as everyone who joins later. Adding more to a stake that is still locked starts its lock again for the whole amount. When the lock ends you can withdraw everything with no penalty.</P>
 
           <H2 id="early">Leaving early</H2>
           <P>You can leave before your lock ends. Up to {pct(s.maxPenaltyBps)} of your stake is burned, and the penalty shrinks every day you stay: leave with half your lock left and you lose half of {pct(s.maxPenaltyBps)}. The stake page shows the exact amount before you sign.</P>
-          <P>Rewards already earned stay yours. 100% of every penalty is burned. quants never receives any of it.</P>
+          <P>Leaving early gives up the rewards earned in that lock. They go back to the token&apos;s reward pool for the stakers who stay. 100% of every penalty is burned. quants never receives any of it.</P>
 
           <H2 id="graduation">Graduation</H2>
-          <P>New tokens trade on a bonding curve. When the curve has raised the amount below in its pair token, the token graduates to a Meteora DAMM v2 pool with permanently locked liquidity. Trading and staking continue, and rewards already bought keep streaming to stakers. After graduation, pool LP fees go to the platform.</P>
+          <P>New tokens trade on a bonding curve. When the curve has raised the amount below in its pair token, the token graduates to a Meteora DAMM v2 pool with permanently locked liquidity. Trading and staking continue, and stakers keep earning. After graduation, pool LP fees go to the platform.</P>
           <Table head={["Paired with", "Graduates at"]} rows={pairs.filter((c) => c.graduation > 0).map((c) => [c.name === "quants" ? `${c.symbol} (platform token)` : `${c.symbol} (${c.name})`, `${c.graduation.toLocaleString("en-US")} ${c.symbol}`])} />
 
           {s.stockPairs && <>

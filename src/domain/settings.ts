@@ -49,6 +49,8 @@ const Schema = z.object({
   alertWebhookUrl: https("Alert webhook"),
   launchesPaused: z.boolean(),
   rewardFundingPaused: z.boolean(),
+  earnPeriodDays: z.number().int().min(1).max(365),
+  earnTargetBps: z.number().int().min(100).max(10_000),
   bannerMessage: z.string().trim().max(200, "Banner is 200 characters at most"),
   stockPairs: z.boolean(),
   creatorPayoutHold: z.array(z.string().regex(/^[1-9A-HJ-NP-Za-km-z]{32,44}$/, "Hold list entries must be token addresses")).max(100),
@@ -60,7 +62,7 @@ export type Settings = {
   keeperIntervalSeconds: number; defaultBackend: "kamino";
   feeTiersBps: number[];
   featured: { headline: string; body: string; prelaunch: string };
-  xUrl: string; alertWebhookUrl: string; launchesPaused: boolean; rewardFundingPaused: boolean; bannerMessage: string; stockPairs: boolean;
+  xUrl: string; alertWebhookUrl: string; launchesPaused: boolean; rewardFundingPaused: boolean; earnPeriodDays: number; earnTargetBps: number; bannerMessage: string; stockPairs: boolean;
   /** Tokens whose creator share is held instead of paid out; taking one off the list pays what built up. */
   creatorPayoutHold: string[];
 } & QuoteSettings;
@@ -80,6 +82,8 @@ function seedExtras(env: Env) {
     alertWebhookUrl: env.ALERT_WEBHOOK_URL ?? "",
     launchesPaused: false,
     rewardFundingPaused: false,
+    earnPeriodDays: 30,
+    earnTargetBps: 5000,
     bannerMessage: "",
     stockPairs: env.STOCK_PAIRS === "1",
     creatorPayoutHold: [] as string[],

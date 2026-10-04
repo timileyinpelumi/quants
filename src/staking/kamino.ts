@@ -16,10 +16,13 @@ export class KaminoBackend implements StakingAdapter {
   readonly backend = "kamino" as const;
   private farms: Farms;
   private rpc;
-  constructor(private chain: SolanaChain, rpcUrl: string, private globalConfigAddress = "") {
+  private scanners: Farms[];
+  // Listing every user of a farm is a getProgramAccounts call, which some providers rate limit hard; scanUrls are tried first.
+  constructor(private chain: SolanaChain, rpcUrl: string, private globalConfigAddress = "", scanUrls: string[] = []) {
     const rpc = createSolanaRpc(rpcUrl);
     this.rpc = rpc;
     this.farms = new Farms(rpc);
+    this.scanners = [...scanUrls.filter((u) => u && u !== rpcUrl).map((u) => new Farms(createSolanaRpc(u))), this.farms];
   }
 
   capabilities() { return { earlyExit: true, tiersOnChain: false, rewardsPerTx: REWARDS_PER_TX }; }
@@ -162,6 +165,19 @@ export class KaminoBackend implements StakingAdapter {
   async userFarms(owner: string, farms: string[]): Promise<string[]> {
     const states = await this.userStates(owner, farms);
     return farms.filter((_f, i) => states[i] != null);
+  }
+
+  async farmStakers(farm: string) {
+    let last: unknown;
+    for (const f of this.scanners) {
+      try {
+        const users = await f.getAllUserStatesForFarm(address(farm));
+        return users.map((u) => ({ owner: String(u.userState.owner), staked: u.userState.activeStakeScaled / WAD, lastStakeTs: Number(u.userState.lastStakeTs) }));
+      } catch (e) {
+        last = e;
+      }
+    }
+    throw last;
   }
 
   async position(owner: string, farm: string): Promise<StakePosition | null> {

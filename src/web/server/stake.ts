@@ -10,7 +10,12 @@ const addr = z.string().regex(/^[1-9A-HJ-NP-Za-km-z]{32,44}$/, "Wallet address i
 
 export interface PositionView {
   tierId: string; farm: string; multiplierBps: number; lockSeconds: number; staked: string; unlocksAt: number; locked: boolean;
-  pending: { mint: string; symbol: string | null; decimals: number | null; amount: string }[];
+  /** Earned and not yet paid, across the running period and any finished ones waiting to be sent. */
+  earned: { mint: string; symbol: string | null; decimals: number | null; amount: string }[];
+  /** When the running period's earnings become payable, or null when nothing is running. */
+  paysAt: number | null;
+  /** A finished period is waiting to be sent. */
+  paying: boolean;
   exitPreview: { back: string; burned: string; penaltyBps: number; daysLeft: number } | null;
 }
 
@@ -38,18 +43,27 @@ export async function positions(ctx: WebContext, mint: string, ownerRaw: string)
   const { launch, tiers, basket } = await launchStake(ctx, mint);
   const meta = new Map<string, { symbol: string | null; decimals: number | null }>(basket.map((b: any) => [b.reward_mint, { symbol: b.symbol, decimals: b.decimals }]));
   const now = Math.floor(Date.now() / 1000);
+  const periods = await ctx.sql`select p.tier_id, p.status, extract(epoch from p.ends_at)::bigint::int as ends, e.mint, e.amount::text as amount
+    from stake_periods p left join stake_earnings e on e.period_id = p.id
+    where p.launch_id = ${launch.id} and p.owner = ${owner} and p.status in ('accruing', 'due', 'approved')`;
   const out: PositionView[] = [];
   for (const t of tiers) {
     if (!t.farm) continue;
+    const mine = periods.filter((r: any) => r.tier_id === t.tier_id);
+    const earnedBy = new Map<string, bigint>();
+    for (const r of mine) if (r.mint) earnedBy.set(r.mint, (earnedBy.get(r.mint) ?? 0n) + BigInt(r.amount));
+    const earned = [...earnedBy].filter(([, a]) => a > 0n)
+      .map(([m, a]) => ({ mint: m, symbol: meta.get(m)?.symbol ?? null, decimals: meta.get(m)?.decimals ?? null, amount: a.toString() }));
+    const running = mine.find((r: any) => r.status === "accruing");
     const p = await ctx.staking.position(owner, t.farm);
-    if (!p || (p.staked === 0n && p.pending.every((r) => r.amount === 0n))) continue;
+    if (!p || (p.staked === 0n && earned.length === 0)) continue;
     const unlocksAt = p.lastStakeTs + p.lockSeconds;
     const remaining = unlocksAt - now;
     const locked = remaining > 0 && p.staked > 0n;
     const burned = locked ? earlyExitPenalty(p.staked, launch.max_penalty_bps, p.lockSeconds, remaining) : 0n;
     out.push({
       tierId: t.tier_id, farm: t.farm, multiplierBps: t.multiplier_bps, lockSeconds: p.lockSeconds, staked: p.staked.toString(), unlocksAt, locked,
-      pending: p.pending.map((r) => ({ mint: r.mint, symbol: meta.get(r.mint)?.symbol ?? null, decimals: meta.get(r.mint)?.decimals ?? null, amount: r.amount.toString() })),
+      earned, paysAt: running ? Number(running.ends) : null, paying: mine.some((r: any) => r.status !== "accruing"),
       exitPreview: locked
         ? { back: (p.staked - burned).toString(), burned: burned.toString(), penaltyBps: Number((BigInt(launch.max_penalty_bps) * BigInt(Math.min(remaining, p.lockSeconds))) / BigInt(p.lockSeconds)), daysLeft: Math.ceil(remaining / 86_400) }
         : null,

@@ -111,7 +111,7 @@ export async function feeSummary(sql: SQL, launchId: number): Promise<FeeSummary
       coalesce(sum(e.amount) filter (where e.bucket = 'basket'), 0)::text as held,
       (select max(updated_at) from distributions where launch_id = ${launchId} and kind = 'fund' and status = 'confirmed') as last_paid
     from escrow e join launches l on l.id = e.launch_id and e.mint = l.quote_mint where e.launch_id = ${launchId}`;
-  const rewards = await sql`select mint, sum(amount)::text as amount from escrow where launch_id = ${launchId} and bucket = 'reward' and amount > 0 group by mint order by mint`;
+  const rewards = await sql`select mint, sum(amount)::text as amount from escrow where launch_id = ${launchId} and bucket in ('reward', 'owed') and amount > 0 group by mint order by mint`;
   lp += BigInt(e?.lp_unsplit ?? "0");
   platform += lp;
   const earned = stakers + creator + platform + BigInt(e?.unsplit ?? "0");

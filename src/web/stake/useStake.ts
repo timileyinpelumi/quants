@@ -10,7 +10,8 @@ import { tokenBalance } from "@/web/wallet/balance";
 export type Tier = { id: string; lockSeconds: number; multiplierBps: number };
 export type Position = {
   tierId: string; multiplierBps: number; lockSeconds: number; staked: string; unlocksAt: number; locked: boolean;
-  pending: { mint: string; symbol: string | null; decimals: number | null; amount: string }[];
+  earned: { mint: string; symbol: string | null; decimals: number | null; amount: string }[];
+  paysAt: number | null; paying: boolean;
   exitPreview: { back: string; burned: string; penaltyBps: number; daysLeft: number } | null;
 };
 

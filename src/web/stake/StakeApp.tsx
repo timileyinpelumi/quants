@@ -13,7 +13,7 @@ export function StakeApp({ mint, symbol, tiers, maxPenaltyBps, ready, opens }: {
   const [tier, setTier] = useState(tiers[Math.min(2, tiers.length - 1)]?.id ?? tiers[0]!.id);
   const [amount, setAmount] = useState("");
   const [exiting, setExiting] = useState<string | null>(null);
-  const rewardMints = [...new Set(positions.flatMap((p) => p.pending.map((r) => r.mint)))];
+  const rewardMints = [...new Set(positions.flatMap((p) => p.earned.map((r) => r.mint)))];
   const px = useUsd([mint, ...rewardMints]);
   const usd = (base: bigint | string, decimals = DECIMALS, m = mint) => usdText(Number(BigInt(base)) / 10 ** decimals, px[m]);
 
@@ -109,12 +109,13 @@ export function StakeApp({ mint, symbol, tiers, maxPenaltyBps, ready, opens }: {
                     <span className="text-[13px] text-muted">{lockLabel(p.lockSeconds)}, {p.locked ? `unlocks ${dateOf(p.unlocksAt)}` : p.staked === "0" ? "exited" : "unlocked"}</span>
                   </span>
                   <span className="col-span-2 md:col-span-1 flex flex-col gap-1 font-mono text-[13px]">
-                    {p.pending.map((r) => <span key={r.mint}>{fmtAmount(r.amount, r.decimals ?? 0, 4)} {r.symbol ?? ""}{r.decimals !== null && usd(r.amount, r.decimals, r.mint) && <span className="text-faint"> · {usd(r.amount, r.decimals, r.mint)}</span>}</span>)}
+                    {p.earned.length === 0 && <span className="text-muted">Nothing earned yet</span>}
+                    {p.earned.map((r) => <span key={r.mint}>{fmtAmount(r.amount, r.decimals ?? 0, 4)} {r.symbol ?? ""}{r.decimals !== null && usd(r.amount, r.decimals, r.mint) && <span className="text-faint"> · {usd(r.amount, r.decimals, r.mint)}</span>}</span>)}
                   </span>
                   <span className="col-span-2 md:col-span-1 flex gap-2 md:justify-end">
-                    <Button size="sm" variant="accent" disabled={busy !== null || p.pending.every((r) => r.amount === "0")} onClick={() => act("claim", p.tierId)}>
-                      {busy === `claim:${p.tierId}` ? "Approve" : "Claim"}
-                    </Button>
+                    <span className="text-[13px] text-muted self-center">
+                      {p.paying ? "Your lock ended. Payout is on the way." : p.paysAt ? `Paid after your lock ends on ${dateOf(p.paysAt)}` : ""}
+                    </span>
                     {p.locked ? (
                       <Button size="sm" variant="danger" disabled={busy !== null} onClick={() => setExiting(exiting === p.tierId ? null : p.tierId)}>Exit early</Button>
                     ) : p.staked !== "0" ? (
@@ -131,7 +132,7 @@ export function StakeApp({ mint, symbol, tiers, maxPenaltyBps, ready, opens }: {
                       <div className="flex flex-col gap-1.5 px-5 py-4 rounded-[22px] bg-surface"><span className="text-[13px] text-muted">Burned</span><span className="font-display font-bold text-2xl text-burn">{fmtAmount(p.exitPreview.burned, DECIMALS, 2)} {symbol}</span>{usd(p.exitPreview.burned) && <span className="font-mono text-[13px] text-faint">≈ {usd(p.exitPreview.burned)}</span>}</div>
                     </div>
                     <p className="m-0 text-sm text-[#C9C5D6] leading-relaxed">
-                      The penalty is {(p.exitPreview.penaltyBps / 100).toFixed(p.exitPreview.penaltyBps % 100 ? 1 : 0)}% because {lockLabel(Math.max(0, p.unlocksAt - Math.floor(Date.now() / 1000)))} of your {lockLabel(p.lockSeconds)} lock is left. It shrinks every day you stay. Rewards already earned stay yours. Burned tokens are destroyed and quants never receives them.
+                      The penalty is {(p.exitPreview.penaltyBps / 100).toFixed(p.exitPreview.penaltyBps % 100 ? 1 : 0)}% because {lockLabel(Math.max(0, p.unlocksAt - Math.floor(Date.now() / 1000)))} of your {lockLabel(p.lockSeconds)} lock is left. It shrinks every day you stay. Leaving early gives up what this lock has earned so far. Burned tokens are destroyed and quants never receives them.
                     </p>
                     <div className="flex flex-wrap gap-2.5">
                       <Button variant="burn" disabled={busy !== null} onClick={() => act("exit", p.tierId)}>{busy === `exit:${p.tierId}` ? "Approve in your wallet" : `Exit and burn ${fmtAmount(p.exitPreview.burned, DECIMALS, 0)} ${symbol}`}</Button>

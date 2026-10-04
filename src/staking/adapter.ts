@@ -23,6 +23,8 @@ export interface StakingAdapter {
   buildFund(i: { farm: string; rewardMint: string; amount: bigint; rawRps: bigint; decimals: number }): Promise<SignedTx>;
   slashedAmount(farm: string): Promise<bigint>;
   buildCollectPenalty(farm: string, spillAccount: string): Promise<SignedTx>;
+  /** Every user of the farm with their active stake. */
+  farmStakers(farm: string): Promise<{ owner: string; staked: bigint; lastStakeTs: number }[]>;
   position(owner: string, farm: string): Promise<StakePosition | null>;
   /** The subset of `farms` the owner has a user state in. */
   userFarms(owner: string, farms: string[]): Promise<string[]>;

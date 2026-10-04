@@ -17,22 +17,28 @@ async function setup() {
   const staking = c.staking as any;
   staking.positions.set(`${OWNER}:farm7`, { staked: 1_000_000n, activeShares: 1_000_000n * 10n ** 18n, lastStakeTs: now - 302_400, lockSeconds: 604_800, pending: [{ mint: ZEC, amount: 5n }] });
   staking.positions.set(`${OWNER}:farm30`, { staked: 2_000_000n, activeShares: 1n, lastStakeTs: now - 2_600_000, lockSeconds: 2_592_000, pending: [{ mint: ZEC, amount: 0n }] });
-  return c;
+  const [p] = await c.sql`insert into stake_periods (launch_id, tier_id, owner, stake, started_at, ends_at, status)
+    values (${l.id}, '7d', ${OWNER}, 1000000, to_timestamp(${now - 302_400}), to_timestamp(${now + 302_400}), 'accruing') returning id`;
+  await c.sql`insert into stake_earnings (period_id, mint, amount) values (${p.id}, ${ZEC}, 5)`;
+  return Object.assign(c, { paysAt: now + 302_400 });
 }
 const get = (owner: string) => positionsRoute(new Request(`http://x/api/launches/CATmint/positions?owner=${owner}`), { params: Promise.resolve({ mint: "CATmint" }) });
 const post = (action: string, body: object) => stakeRoute(new Request("http://x", { method: "POST", body: JSON.stringify(body) }), { params: Promise.resolve({ action }) });
 
-test("positions include pending rewards with symbols and an exit preview for locked stakes", async () => {
-  await setup();
+test("positions include earned rewards with symbols, when they pay, and an exit preview for locked stakes", async () => {
+  const c = await setup();
   const { positions } = await (await get(OWNER)).json();
   const p7 = positions.find((p: any) => p.tierId === "7d");
   expect(p7.locked).toBe(true);
-  expect(p7.pending).toEqual([{ mint: ZEC, symbol: "ZEC", decimals: 8, amount: "5" }]);
+  expect(p7.earned).toEqual([{ mint: ZEC, symbol: "ZEC", decimals: 8, amount: "5" }]);
+  expect(p7.paysAt).toBe(c.paysAt);
+  expect(p7.paying).toBe(false);
   expect(Math.abs(Number(p7.exitPreview.burned) - 150_000)).toBeLessThanOrEqual(100);
   expect(BigInt(p7.exitPreview.back) + BigInt(p7.exitPreview.burned)).toBe(1_000_000n);
   const p30 = positions.find((p: any) => p.tierId === "30d");
   expect(p30.locked).toBe(false);
   expect(p30.exitPreview).toBeNull();
+  expect(p30.earned).toEqual([]);
 });
 
 test("stake validates amount and tier, and returns an unsigned transaction", async () => {

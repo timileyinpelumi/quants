@@ -14,7 +14,7 @@ export type AdminSettings = {
   platformToken: { mint: string; symbol: string; decimals: number; graduation: number; enabled: boolean };
   feeTiersBps: number[];
   featured: { headline: string; body: string; prelaunch: string };
-  xUrl: string; alertWebhookUrl: string; launchesPaused: boolean; rewardFundingPaused?: boolean; bannerMessage: string; stockPairs: boolean; creatorPayoutHold?: string[];
+  xUrl: string; alertWebhookUrl: string; launchesPaused: boolean; rewardFundingPaused?: boolean; earnPeriodDays?: number; earnTargetBps?: number; bannerMessage: string; stockPairs: boolean; creatorPayoutHold?: string[];
 };
 export type Pair = { mint: string; symbol: string; name: string; decimals: number; payoutMin: string; graduation: number; enabled: boolean };
 
@@ -26,7 +26,7 @@ const LABELS: Record<keyof AdminSettings, string> = {
   rewardPeriodSeconds: "Reward stream period", slippageBps: "Swap slippage cap", devBuyCapBps: "First buy cap",
   keeperIntervalSeconds: "Keeper interval", defaultBackend: "Staking backend", quotes: "Pairs", platformToken: "Platform token",
   feeTiersBps: "Fee tiers", featured: "Featured card text", xUrl: "X link", alertWebhookUrl: "Alert webhook",
-  launchesPaused: "Launches paused", rewardFundingPaused: "Reward funding paused", bannerMessage: "Site banner", stockPairs: "Stock pairs", creatorPayoutHold: "Creator payouts on hold",
+  launchesPaused: "Launches paused", rewardFundingPaused: "Staker earnings paused", earnPeriodDays: "Earning period", earnTargetBps: "Staked target", bannerMessage: "Site banner", stockPairs: "Stock pairs", creatorPayoutHold: "Creator payouts on hold",
 };
 
 /** Text while typing, a number once it parses, so "0." and "" can be typed through. */
@@ -141,7 +141,7 @@ export function SettingsEditor({ initial, version, pairs, onSave, readOnly = fal
 
       <Section title="Launches">
         <Check label="Pause new launches" checked={s.launchesPaused} onChange={(v) => set({ launchesPaused: v })} hint="The launch page says launches are paused and prepare refuses. Trading, staking and the keeper carry on." />
-        <Check label="Pause reward funding" checked={!!s.rewardFundingPaused} onChange={(v) => set({ rewardFundingPaused: v })} hint="The keeper keeps buying rewards but holds them instead of adding them to the farms." />
+        <Check label="Pause staker earnings" checked={!!s.rewardFundingPaused} onChange={(v) => set({ rewardFundingPaused: v })} hint="Stakers earn nothing while this is on, and the paused time is never paid later. The keeper keeps buying reward tokens and what stakers already earned stays owed." />
         <Text label="Site banner" value={s.bannerMessage} onChange={(v) => set({ bannerMessage: v })} placeholder="Empty shows no banner" hint="Shown at the top of every page. 200 characters at most." />
       </Section>
 
@@ -207,7 +207,8 @@ export function SettingsEditor({ initial, version, pairs, onSave, readOnly = fal
         {!readOnly && s.tiers.length < 8 && <button type="button" onClick={() => set({ tiers: [...s.tiers, { id: "new", lockSeconds: 86_400, multiplierBps: 10_000 }] })} className="self-start text-sm font-semibold text-accent min-h-11 cursor-pointer">Add a tier</button>}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Num label="Max early exit penalty" suffix="%" value={pct(s.maxPenaltyBps)} onChange={(v) => set({ maxPenaltyBps: toBps(v) })} />
-          <Num label="Reward stream period" suffix="hours" value={s.rewardPeriodSeconds / 3600} onChange={(v) => set({ rewardPeriodSeconds: Math.round(v * 3600) })} />
+          <Num label="Earning period, how long a token's reward pool takes to pay out once the target is staked" suffix="days" value={s.earnPeriodDays ?? 30} onChange={(v) => set({ earnPeriodDays: Math.round(v) })} />
+          <Num label="Staked target, the share of supply rewards are planned around" suffix="%" value={pct(s.earnTargetBps ?? 5000)} onChange={(v) => set({ earnTargetBps: toBps(v) })} />
         </div>
       </Section>
 

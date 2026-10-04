@@ -17,7 +17,7 @@ async function full() {
   return { ...f, staking, jupiter, deps: { ...f.deps, staking, jupiter } };
 }
 
-test("a full run claims, splits, pays out, takes the farm rent, creates farms, swaps and funds", async () => {
+test("a full run claims, splits, pays out, takes the farm rent, creates farms and swaps into the stakers' reserve", async () => {
   const f = await full();
   const id = await insertLaunch(f.sql, { mint: "CAT", pool: "P1" });
   await f.sql`insert into baskets values (${id}, 'ZEC', 10000)`;
@@ -27,9 +27,8 @@ test("a full run claims, splits, pays out, takes the farm rent, creates farms, s
   f.staking.totalStaked = async () => 1n;
   const r = await runKeeper(f.deps);
   expect(r.errors).toEqual([]);
-  expect(f.staking.funded.length).toBe(1);
-  expect(f.staking.funded[0]!.amount).toBe(600_000_000n - launchCost({ tiers: [{ id: "7d", lockSeconds: 604800, multiplierBps: 10000 }] }, 1).rent);
-  expect(await getBalance(f.sql, id, "reward", "ZEC")).toBe(0n);
+  expect(f.staking.funded.length).toBe(0);
+  expect(await getBalance(f.sql, id, "reward", "ZEC")).toBe(600_000_000n - launchCost({ tiers: [{ id: "7d", lockSeconds: 604800, multiplierBps: 10000 }] }, 1).rent);
 });
 
 test("resume confirms a sent step whose transaction landed, without resending", async () => {
