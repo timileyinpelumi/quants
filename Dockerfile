@@ -1,5 +1,5 @@
 # One image for web, indexer, keeper and migrate; compose picks the command.
-ARG BUN_IMAGE=oven/bun:1.3.14-slim
+ARG BUN_IMAGE=oven/bun:1.4.2-slim
 ARG NODE_IMAGE=node:22.21.1-bookworm-slim
 
 FROM ${NODE_IMAGE} AS node

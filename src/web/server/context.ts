@@ -80,7 +80,7 @@ export function getContext(): WebContext {
     sql,
     conn,
     meteora,
-    staking: new KaminoBackend(chain, e.RPC_URL!, e.KAMINO_GLOBAL_CONFIG ?? ""),
+    staking: new KaminoBackend(chain, providerOrder(e.RPC_URL, e.KEEPER_RPC_URL, e.INDEXER_RPC_URL), e.KAMINO_GLOBAL_CONFIG ?? ""),
     jupiter: withVerifiedCache(withLocalTokens(swapPortFor(e, chain), e.LOCAL_TOKEN_LIST), sql),
     uploads: uploadsFrom(e),
     uploadPrefix: uploadPrefix(e),

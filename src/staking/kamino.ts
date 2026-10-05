@@ -2,6 +2,7 @@ import { Keypair, PublicKey, SystemProgram, Transaction, type TransactionInstruc
 import { createAssociatedTokenAccountIdempotentInstruction, createSyncNativeInstruction, getAssociatedTokenAddressSync, NATIVE_MINT, TOKEN_PROGRAM_ID } from "@solana/spl-token";
 import { Farms, FarmConfigOption, GlobalConfigOption, fetchAllMaybeUserState, getUserStatePDA, getWithdrawSlashedAmountInstruction, type UserState } from "@kamino-finance/farms-sdk";
 import { address, createNoopSigner, createSolanaRpc, none, type Address } from "@solana/kit";
+import { failoverRpc } from "../chain/kit-rpc";
 import Decimal from "decimal.js";
 import type { StakePosition, StakingAdapter } from "./adapter";
 import { fromKitInstruction, kitSigner, type SolanaChain } from "../chain/solana";
@@ -18,11 +19,13 @@ export class KaminoBackend implements StakingAdapter {
   private rpc;
   private scanners: Farms[];
   // Listing every user of a farm is a getProgramAccounts call, which some providers rate limit hard; scanUrls are tried first.
-  constructor(private chain: SolanaChain, rpcUrl: string, private globalConfigAddress = "", scanUrls: string[] = []) {
-    const rpc = createSolanaRpc(rpcUrl);
+  // rpcUrl may list several providers; reads then fail over between them instead of failing on one provider's rate limit.
+  constructor(private chain: SolanaChain, rpcUrl: string | string[], private globalConfigAddress = "", scanUrls: string[] = []) {
+    const rpc = Array.isArray(rpcUrl) ? failoverRpc(rpcUrl) : createSolanaRpc(rpcUrl);
     this.rpc = rpc;
     this.farms = new Farms(rpc);
-    this.scanners = [...scanUrls.filter((u) => u && u !== rpcUrl).map((u) => new Farms(createSolanaRpc(u))), this.farms];
+    const own = Array.isArray(rpcUrl) ? rpcUrl : [rpcUrl];
+    this.scanners = [...scanUrls.filter((u) => u && !own.includes(u)).map((u) => new Farms(createSolanaRpc(u))), this.farms];
   }
 
   capabilities() { return { earlyExit: true, tiersOnChain: false, rewardsPerTx: REWARDS_PER_TX }; }
