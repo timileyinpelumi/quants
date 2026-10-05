@@ -8,7 +8,7 @@ const transport = (calls: string[], name: string, result: () => unknown) =>
 
 test("a rate limit, a server error or a network failure moves on to the next provider", async () => {
   const calls: string[] = [];
-  const t = failover([
+  const t: any = failover([
     transport(calls, "infura", () => { throw httpError(429); }),
     transport(calls, "alchemy", () => { throw httpError(503); }),
     transport(calls, "flaky", () => { throw new TypeError("fetch failed"); }),
