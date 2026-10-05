@@ -12,7 +12,7 @@ import { MobileTabs, TabPanel, TabRow } from "@/web/ui/MobileTabs";
 
 type Position = {
   tierId: string; multiplierBps: number; lockSeconds: number; staked: string; unlocksAt: number; locked: boolean;
-  pending: { mint: string; symbol: string | null; decimals: number | null; amount: string }[];
+  earned: { mint: string; symbol: string | null; decimals: number | null; amount: string }[];
 };
 type StakeLaunch = { mint: string; symbol: string | null; name: string | null; image: string | null; positions: Position[] };
 type Held = { mint: string; amount: string; decimals: number; symbol: string | null; name: string | null; image: string | null; kind: "launch" | "platform" | "reward" | "other" };
@@ -56,7 +56,7 @@ export function PortfolioApp() {
 
   useEffect(() => { load(); }, [load]);
   const SOL_MINT = "So11111111111111111111111111111111111111112";
-  const px = useUsd([SOL_MINT, ...(holdings?.tokens.map((t) => t.mint) ?? []), ...(stakes ?? []).flatMap((l) => [l.mint, ...l.positions.flatMap((p) => p.pending.map((r) => r.mint))])]);
+  const px = useUsd([SOL_MINT, ...(holdings?.tokens.map((t) => t.mint) ?? []), ...(stakes ?? []).flatMap((l) => [l.mint, ...l.positions.flatMap((p) => (p.earned ?? []).map((r) => r.mint))])]);
 
   if (!owner) {
     return (
@@ -177,7 +177,7 @@ export function PortfolioApp() {
                         <span className="text-[13px] text-muted">{lockLabel(p.lockSeconds)}, {p.locked ? `unlocks ${dateOf(p.unlocksAt)}` : p.staked === "0" ? "exited" : "unlocked"}</span>
                       </span>
                       <span className="col-span-2 md:col-span-1 flex flex-wrap gap-x-4 gap-y-1 font-mono text-[13px] md:justify-end">
-                        {p.pending.map((r) => <span key={r.mint}><span className="text-muted">Earned </span>{fmtAmount(r.amount, r.decimals ?? 0, 4)} {r.symbol ?? ""}{r.decimals !== null && usdOf(r.amount, r.decimals, r.mint) && <span className="text-faint"> · {usdOf(r.amount, r.decimals, r.mint)}</span>}</span>)}
+                        {(p.earned ?? []).map((r) => <span key={r.mint}><span className="text-muted">Earned </span>{fmtAmount(r.amount, r.decimals ?? 0, 4)} {r.symbol ?? ""}{r.decimals !== null && usdOf(r.amount, r.decimals, r.mint) && <span className="text-faint"> · {usdOf(r.amount, r.decimals, r.mint)}</span>}</span>)}
                       </span>
                     </div>
                   ))}

@@ -1,7 +1,13 @@
 "use client";
+import { useEffect } from "react";
 import Link from "next/link";
 
-export default function ErrorPage({ reset }: { error: Error; reset: () => void }) {
+export default function ErrorPage({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
+  // A crash in the browser leaves no server log otherwise, so the page reports what broke and where.
+  useEffect(() => {
+    const message = `${location.pathname} ${error.message} ${(error.stack ?? "").split("\n").slice(1, 4).join(" | ")}${error.digest ? ` digest ${error.digest}` : ""}`;
+    fetch("/api/client-error", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ step: "page-crash", message: message.slice(0, 500) }) }).catch(() => {});
+  }, [error]);
   return (
     <div className="flex-1 bg-launch">
     <main className="flex flex-col items-start gap-5 wrap pt-24 pb-24">
